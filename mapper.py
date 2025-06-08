@@ -188,6 +188,272 @@ class NetworkMapper:
                 }
                 writer.writerow(row)
 
+    
+    def save_changes(self, changes, timestamp):
+        """Save change report"""
+        if not changes:
+            return
+            
+        changes_file = self.output_path / "changes" / f"changes_{timestamp}.json"
+        with open(changes_file, 'w') as f:
+            json.dump(changes, f, indent=2)
+        
+        # Also save human-readable summary
+        summary_file = self.output_path / "changes" / f"changes_{timestamp}.txt"
+        with open(summary_file, 'w') as f:
+            f.write(f"Network Changes Report - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("=" * 60 + "\n\n")
+            
+            if changes.get('new_devices'):
+                f.write(f"NEW DEVICES ({len(changes['new_devices'])})\n")
+                f.write("-" * 30 + "\n")
+                for device in changes['new_devices']:
+                    f.write(f"  • {device['ip']} - {device.get('hostname', 'N/A')} ({device.get('type', 'unknown')})\n")
+                f.write("\n")
+            
+            if changes.get('missing_devices'):
+                f.write(f"MISSING DEVICES ({len(changes['missing_devices'])})\n")
+                f.write("-" * 30 + "\n")
+                for device in changes['missing_devices']:
+                    f.write(f"  • {device['ip']} - {device.get('hostname', 'N/A')} ({device.get('type', 'unknown')})\n")
+                f.write("\n")
+            
+            if changes.get('changed_devices'):
+                f.write(f"CHANGED DEVICES ({len(changes['changed_devices'])})\n")
+                f.write("-" * 30 + "\n")
+                for device in changes['changed_devices']:
+                    f.write(f"  • {device['ip']} - {device.get('hostname', 'N/A')}\n")
+                    for change in device['changes']:
+                        f.write(f"    - {change['field']}: {change.get('action', 'changed')}\n")
+                f.write("\n")
+    
+    def generate_html_report(self, devices, timestamp):
+        """Generate HTML report with network visualization"""
+        from jinja2 import Environment, FileSystemLoader
+        import webbrowser
+        
+        # Apply annotations
+        devices = self.annotator.apply_annotations(devices)
+        
+        # Generate visualization data
+        d3_data = self.map_gen.generate_d3_data(devices)
+        three_data = self.map_gen.generate_threejs_data(devices)
+        
+        # Setup Jinja2
+        env = Environment(loader=FileSystemLoader(self.base_path / 'templates'))
+        template = env.get_template('report.html')
+        
+        # Prepare report data
+        report_data = {
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'scan_date': datetime.now().strftime('%B %d, %Y'),
+            'total_devices': len(devices),
+            'devices': devices,
+            'device_types': self._count_device_types(devices),
+            'critical_devices': [d for d in devices if d.get('critical', False)],
+            'd3_data': json.dumps(d3_data),
+            'three_data': json.dumps(three_data),
+            'subnet_summary': self._get_subnet_summary(devices)
+        }
+        
+        # Render and save report
+        report_file = self.output_path / "reports" / f"report_{timestamp}.html"
+        html_content = template.render(**report_data)
+        
+        with open(report_file, 'w') as f:
+            f.write(html_content)
+        
+        # Open in browser
+        file_url = f"file://{report_file.absolute()}"
+        webbrowser.open(file_url)
+        
+        # Show clickable link in terminal
+        console.print(f"\n[green]✓ Report generated![/green]")
+        console.print(f"Report saved to: [link={file_url}]{report_file}[/link]")
+    
+    def _count_device_types(self, devices):
+        """Count devices by type"""
+        counts = {}
+        for device in devices:
+            dtype = device.get('type', 'unknown')
+            counts[dtype] = counts.get(dtype, 0) + 1
+        return counts
+    
+    def _get_subnet_summary(self, devices):
+        """Get subnet summary"""
+        subnets = {}
+        for device in devices:
+            ip_parts = device['ip'].split('.')
+            subnet = f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}.0/24"
+            
+            if subnet not in subnets:
+                subnets[subnet] = {
+                    'network': subnet,
+                    'device_count': 0,
+                    'types': {}
+                }
+            
+            subnets[subnet]['device_count'] += 1
+            dtype = device.get('type', 'unknown')
+            subnets[subnet]['types'][dtype] = subnets[subnet]['types'].get(dtype, 0) + 1
+        
+        return list(subnets.values())
+    
+    def view_recent_scans(self):
+        """View recent scan results"""
+        scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
+        
+        if not scan_files:
+            console.print("[yellow]No scans found[/yellow]")
+            input("\nPress Enter to continue...")
+            return
+        
+        table = Table(title="Recent Scans")
+        table.add_column("Date/Time", style="cyan")
+        table.add_column("Devices", style="green")
+        table.add_column("File", style="yellow")
+        
+        for scan_file in scan_files[:10]:  # Show last 10
+            timestamp = scan_file.stem.replace('scan_', '')
+            with open(scan_file) as f:
+                devices = json.load(f)
+            
+            date_str = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+            table.add_row(date_str, str(len(devices)), scan_file.name)
+        
+        console.print(table)
+        input("\nPress Enter to continue...")
+    
+    def check_changes(self):
+        """Check for network changes"""
+        # Get most recent scan
+        scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
+        if not scan_files:
+            console.print("[yellow]No scans found[/yellow]")
+            input("\nPress Enter to continue...")
+            return
+        
+        with open(scan_files[0]) as f:
+            current_devices = json.load(f)
+        
+        changes = self.tracker.detect_changes(current_devices)
+        
+        if not changes:
+            console.print("[yellow]Need at least 2 scans to detect changes[/yellow]")
+            input("\nPress Enter to continue...")
+            return
+        
+        # Display changes
+        console.print("\n[bold]Network Changes Summary[/bold]\n")
+        
+        if changes.get('new_devices'):
+            console.print(f"[green]NEW DEVICES ({len(changes['new_devices'])})[/green]")
+            for device in changes['new_devices']:
+                console.print(f"  • {device['ip']} - {device.get('hostname', 'N/A')} ({device.get('type', 'unknown')})")
+        
+        if changes.get('missing_devices'):
+            console.print(f"\n[red]MISSING DEVICES ({len(changes['missing_devices'])})[/red]")
+            for device in changes['missing_devices']:
+                console.print(f"  • {device['ip']} - {device.get('hostname', 'N/A')} ({device.get('type', 'unknown')})")
+        
+        if changes.get('changed_devices'):
+            console.print(f"\n[yellow]CHANGED DEVICES ({len(changes['changed_devices'])})[/yellow]")
+            for device in changes['changed_devices']:
+                console.print(f"  • {device['ip']} - {device.get('hostname', 'N/A')}")
+        
+        input("\nPress Enter to continue...")
+    
+    def annotate_devices(self):
+        """Annotate devices"""
+        # Get most recent scan
+        scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
+        if not scan_files:
+            console.print("[yellow]No scans found[/yellow]")
+            input("\nPress Enter to continue...")
+            return
+        
+        with open(scan_files[0]) as f:
+            devices = json.load(f)
+        
+        self.annotator.bulk_annotate(devices)
+    
+    def generate_reports(self):
+        """Generate reports menu"""
+        scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
+        if not scan_files:
+            console.print("[yellow]No scans found[/yellow]")
+            input("\nPress Enter to continue...")
+            return
+        
+        # Select scan
+        console.print("\n[bold]Select scan to generate report:[/bold]")
+        for i, scan_file in enumerate(scan_files[:5]):
+            timestamp = scan_file.stem.replace('scan_', '')
+            date_str = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+            console.print(f"  {i+1}. {date_str}")
+        
+        choice = Prompt.ask("Select scan", choices=[str(i+1) for i in range(min(5, len(scan_files)))])
+        scan_file = scan_files[int(choice)-1]
+        
+        with open(scan_file) as f:
+            devices = json.load(f)
+        
+        timestamp = scan_file.stem.replace('scan_', '')
+        self.generate_html_report(devices, timestamp)
+        input("\nPress Enter to continue...")
+    
+    def view_network_map(self):
+        """Launch network map viewer"""
+        # Get most recent report
+        report_files = sorted((self.output_path / "reports").glob("report_*.html"), reverse=True)
+        if report_files:
+            import webbrowser
+            file_url = f"file://{report_files[0].absolute()}"
+            webbrowser.open(file_url)
+            console.print(f"[green]Opening network map in browser...[/green]")
+        else:
+            console.print("[yellow]No reports found. Generate a report first.[/yellow]")
+        input("\nPress Enter to continue...")
+    
+    def export_data(self):
+        """Export data menu"""
+        console.print("\n[bold]Export Options:[/bold]")
+        console.print("  1. Export all devices (CSV)")
+        console.print("  2. Export critical devices only")
+        console.print("  3. Export by device type")
+        
+        choice = Prompt.ask("Select export option", choices=["1", "2", "3"])
+        
+        # Get most recent scan
+        scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
+        if not scan_files:
+            console.print("[yellow]No scans found[/yellow]")
+            input("\nPress Enter to continue...")
+            return
+        
+        with open(scan_files[0]) as f:
+            devices = json.load(f)
+        
+        devices = self.annotator.apply_annotations(devices)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        if choice == "1":
+            export_file = self.output_path / f"export_all_{timestamp}.csv"
+            self.save_csv(devices, export_file)
+        elif choice == "2":
+            critical = [d for d in devices if d.get('critical', False)]
+            export_file = self.output_path / f"export_critical_{timestamp}.csv"
+            self.save_csv(critical, export_file)
+        elif choice == "3":
+            device_type = Prompt.ask("Enter device type (router/switch/server/etc)")
+            filtered = [d for d in devices if d.get('type') == device_type]
+            export_file = self.output_path / f"export_{device_type}_{timestamp}.csv"
+            self.save_csv(filtered, export_file)
+        
+        console.print(f"[green]✓ Exported to: {export_file}[/green]")
+        input("\nPress Enter to continue...")
+
 mapper = NetworkMapper()
 
 @app.command()

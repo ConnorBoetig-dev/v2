@@ -1,0 +1,49 @@
+# NetworkMapper v2 Configuration
+
+# Default scan settings
+scan:
+  default_target: "192.168.1.0/24"
+  default_type: "discovery"
+  timeout: 300  # seconds
+  retry_attempts: 2
+  
+# Scanner preferences
+scanners:
+  prefer_masscan: false  # Use masscan for discovery when available
+  nmap_timing: "-T4"     # Nmap timing template (T0-T5)
+  
+# Report settings  
+report:
+  auto_open: true
+  include_3d_view: true
+  max_devices_per_page: 100
+  
+# Device classification
+classification:
+  confidence_threshold: 70
+  auto_classify: true
+  
+# Change detection
+changes:
+  track_services: true
+  track_ports: true
+  track_os: true
+  track_mac: true
+  retention_days: 90  # Keep scan history for 90 days
+  
+# Network visualization
+visualization:
+  d3_force_strength: -300
+  d3_link_distance: 100
+  three_js_camera_distance: 15
+  
+# Output settings
+output:
+  save_raw_scan: true
+  compress_old_scans: false
+  export_formats: ["json", "csv", "html"]
+  
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "network_mapper.log"
