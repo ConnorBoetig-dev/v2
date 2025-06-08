@@ -283,12 +283,12 @@
         .visualization {
             width: 100%;
             height: 600px;
-            background: #1e1e1e;
+            background: #f5f5f5;
             border-radius: 10px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             position: relative;
             overflow: hidden;
-            border: 1px solid #3e3e42;
+            border: 1px solid #ddd;
         }
 
         .visualization-controls {
@@ -299,16 +299,17 @@
             display: flex;
             gap: 5px;
             flex-direction: column;
-            background: rgba(45, 45, 48, 0.9);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
             border-radius: 6px;
             padding: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .control-btn {
-            background: #2d2d30;
-            border: 1px solid #3e3e42;
-            color: #cccccc;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            color: #495057;
             padding: 8px 12px;
             border-radius: 4px;
             cursor: pointer;
@@ -319,9 +320,10 @@
         }
 
         .control-btn:hover {
-            background: #333337;
-            color: #569cd6;
+            background: #e9ecef;
+            color: #007bff;
             transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .control-btn:active {
@@ -329,31 +331,31 @@
         }
 
         .control-btn.active {
-            background: #569cd6;
+            background: #007bff;
             color: white;
-            border-color: #569cd6;
+            border-color: #007bff;
         }
 
         .node-tooltip {
             position: absolute;
-            background: rgba(45, 45, 48, 0.95);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            border: 1px solid #3e3e42;
+            border: 1px solid #dee2e6;
             border-radius: 8px;
             padding: 12px;
-            color: #cccccc;
+            color: #333;
             font-size: 13px;
             pointer-events: none;
             z-index: 1000;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             max-width: 280px;
             min-width: 200px;
         }
 
         .node-tooltip h4 {
-            color: #569cd6;
+            color: #007bff;
             margin-bottom: 8px;
-            border-bottom: 1px solid #3e3e42;
+            border-bottom: 1px solid #dee2e6;
             padding-bottom: 6px;
             font-size: 14px;
         }
@@ -367,13 +369,13 @@
 
         .node-tooltip .detail-label {
             font-weight: 600;
-            color: #cccccc;
+            color: #495057;
             min-width: 60px;
             flex-shrink: 0;
         }
 
         .node-tooltip .detail-value {
-            color: #d4d4d4;
+            color: #333;
             text-align: right;
             word-break: break-word;
             font-family: 'Monaco', 'Menlo', monospace;
@@ -404,22 +406,22 @@
             left: 10px;
             width: 280px;
             max-height: 400px;
-            background: rgba(45, 45, 48, 0.95);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(15px);
-            border: 1px solid #3e3e42;
+            border: 1px solid #dee2e6;
             border-radius: 8px;
             padding: 15px;
-            color: #cccccc;
+            color: #333;
             font-size: 13px;
             z-index: 1000;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
         }
 
         .device-info-panel h4 {
-            color: #569cd6;
+            color: #007bff;
             margin-bottom: 10px;
-            border-bottom: 1px solid #3e3e42;
+            border-bottom: 1px solid #dee2e6;
             padding-bottom: 8px;
             font-size: 14px;
         }
@@ -438,13 +440,13 @@
 
         .device-info-panel .info-label {
             font-weight: 600;
-            color: #cccccc;
+            color: #495057;
             min-width: 80px;
             flex-shrink: 0;
         }
 
         .device-info-panel .info-value {
-            color: #d4d4d4;
+            color: #333;
             text-align: right;
             word-break: break-word;
             font-family: 'Monaco', 'Menlo', monospace;
@@ -454,7 +456,7 @@
         .device-info-panel .device-title {
             font-size: 16px;
             font-weight: bold;
-            color: #569cd6;
+            color: #007bff;
             margin-bottom: 8px;
         }
 
@@ -550,6 +552,7 @@
         #network-3d {
             width: 100%;
             height: 100%;
+            background: #ffffff;
         }
 
         .subnet-summary {
@@ -635,14 +638,14 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(30, 30, 30, 0.9);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(5px);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             gap: 1rem;
-            color: #cccccc;
+            color: #333;
             font-size: 1.2rem;
             z-index: 500;
         }
@@ -650,8 +653,8 @@
         .loading-spinner {
             width: 40px;
             height: 40px;
-            border: 4px solid #3e3e42;
-            border-top: 4px solid #569cd6;
+            border: 4px solid #e9ecef;
+            border-top: 4px solid #007bff;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -664,6 +667,84 @@
             100% {
                 transform: rotate(360deg);
             }
+        }
+
+        /* Enhanced styles for network connections */
+        .network-link {
+            fill: none;
+            stroke-opacity: 0.8;
+            transition: stroke-opacity 0.3s, stroke-width 0.3s;
+        }
+
+        .network-link:hover {
+            stroke-opacity: 1;
+            stroke-width: 4;
+        }
+
+        .network-link.backbone {
+            stroke: #ff4444;
+            stroke-width: 3;
+        }
+
+        .network-link.uplink {
+            stroke: #0088cc;
+            stroke-width: 2.5;
+        }
+
+        .network-link.server_link {
+            stroke: #00aa44;
+            stroke-width: 2;
+        }
+
+        .network-link.access {
+            stroke: #8844aa;
+            stroke-width: 1.5;
+        }
+
+        .network-link.peripheral {
+            stroke: #ffaa00;
+            stroke-width: 1;
+            stroke-dasharray: 5, 5;
+        }
+
+        .network-link.application {
+            stroke: #0066ff;
+            stroke-width: 2;
+            stroke-dasharray: 3, 3;
+        }
+
+        .network-link.critical {
+            stroke: #ff0000;
+            stroke-width: 3;
+        }
+
+        .network-link.default {
+            stroke: #999999;
+            stroke-width: 1.5;
+        }
+
+        /* Three.js label styles */
+        .label3d {
+            position: absolute;
+            pointer-events: none;
+            font-size: 11px;
+            color: #333;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            white-space: nowrap;
+            z-index: 100;
+            transition: opacity 0.3s;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .label3d.critical {
+            border-color: #ff0000;
+            color: #ff0000;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.95);
         }
 
         @media (max-width: 768px) {
@@ -779,7 +860,7 @@
         .control-btn:focus,
         .action-btn:focus,
         .sidebar-close:focus {
-            outline: 2px solid #569cd6;
+            outline: 2px solid #007bff;
             outline-offset: 2px;
         }
 
@@ -1032,6 +1113,7 @@
         let autoRotate = true;
         let showConnections = true;
         let show3DLabels = true;
+        let manualRotation = false;
 
         function showTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(tab => {
@@ -1153,10 +1235,12 @@
 
             if (currentLayout === 'force') {
                 simulation = d3.forceSimulation(nodes)
-                    .force("link", d3.forceLink(links).id(d => d.id).distance(80).strength(0.5))
-                    .force("charge", d3.forceManyBody().strength(-300))
+                    .force("link", d3.forceLink(links).id(d => d.id).distance(120).strength(0.3))
+                    .force("charge", d3.forceManyBody().strength(-600))
                     .force("center", d3.forceCenter(width / 2, height / 2))
-                    .force("collision", d3.forceCollide().radius(20));
+                    .force("collision", d3.forceCollide().radius(50))
+                    .alphaMin(0.001)
+                    .alphaDecay(0.02);
             } else if (currentLayout === 'circular') {
                 const deviceTypes = [...new Set(nodes.map(n => n.type))];
                 const angleStep = (2 * Math.PI) / deviceTypes.length;
@@ -1184,26 +1268,69 @@
                 simulation = d3.forceSimulation(nodes);
             }
 
+            // Create links with proper styling
             link = g.append("g")
+                .attr("class", "links")
                 .selectAll("line")
                 .data(links)
                 .enter().append("line")
-                .style("stroke", "#666")
-                .style("stroke-opacity", 0.6)
-                .style("stroke-width", d => Math.sqrt(d.value) + 1);
+                .attr("class", d => `network-link ${d.type || 'default'}`)
+                .style("stroke", d => {
+                    const linkColors = {
+                        backbone: "#ff4444",
+                        uplink: "#0088cc",
+                        critical: "#ff0000",
+                        server_link: "#00aa44",
+                        access: "#8844aa",
+                        peripheral: "#ffaa00",
+                        application: "#0066ff"
+                    };
+                    return linkColors[d.type] || "#666666";
+                })
+                .style("stroke-width", d => (d.value || 2) * 1.5)
+                .style("stroke-opacity", 0.8);
+
+            // Create arrow markers for directed connections
+            svg.append("defs").selectAll("marker")
+                .data(["backbone", "uplink", "server_link", "access", "peripheral", "application"])
+                .enter().append("marker")
+                .attr("id", d => `arrow-${d}`)
+                .attr("viewBox", "0 -5 10 10")
+                .attr("refX", 15)
+                .attr("refY", 0)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M0,-5L10,0L0,5")
+                .attr("fill", d => {
+                    const colors = {
+                        backbone: "#ff4444",
+                        uplink: "#0088cc",
+                        server_link: "#00aa44",
+                        access: "#8844aa",
+                        peripheral: "#ffaa00",
+                        application: "#0066ff"
+                    };
+                    return colors[d] || "#666666";
+                });
+
+            // Apply markers to appropriate links
+            link.attr("marker-end", d => `url(#arrow-${d.type || 'default'})`);
 
             node = g.append("g")
+                .attr("class", "nodes")
                 .selectAll("circle")
                 .data(nodes)
                 .enter().append("circle")
                 .attr("r", d => {
-                    if (d.critical) return 12;
-                    if (d.type === 'router' || d.type === 'switch') return 10;
-                    return 8;
+                    if (d.critical) return 14;
+                    if (d.type === 'router' || d.type === 'switch') return 12;
+                    return 10;
                 })
                 .style("fill", d => getNodeColor(d.type))
-                .style("stroke", d => d.critical ? "#ff6b6b" : "#fff")
-                .style("stroke-width", d => d.critical ? 3 : 1.5)
+                .style("stroke", d => d.critical ? "#ff0000" : "#333")
+                .style("stroke-width", d => d.critical ? 3 : 2)
                 .style("cursor", "pointer")
                 .call(d3.drag()
                     .on("start", dragstarted)
@@ -1213,11 +1340,23 @@
             node
                 .on("mouseover", function (event, d) {
                     showTooltip2D(event, d);
-                    d3.select(this).style("stroke-width", 3);
+                    d3.select(this).style("stroke-width", 4).style("stroke", "#0066ff");
+
+                    // Highlight connected links
+                    link.style("stroke-opacity", l =>
+                        l.source === d || l.target === d ? 1 : 0.2
+                    ).style("stroke-width", l =>
+                        l.source === d || l.target === d ? (l.value || 2) * 2 : (l.value || 2) * 1.5
+                    );
                 })
                 .on("mouseout", function (event, d) {
                     hideTooltip2D();
-                    d3.select(this).style("stroke-width", d.critical ? 3 : 1.5);
+                    d3.select(this).style("stroke-width", d.critical ? 3 : 2)
+                        .style("stroke", d.critical ? "#ff0000" : "#333");
+
+                    // Reset link opacity
+                    link.style("stroke-opacity", 0.8)
+                        .style("stroke-width", l => (l.value || 2) * 1.5);
                 })
                 .on("click", function (event, d) {
                     showDeviceDetails(d);
@@ -1225,14 +1364,17 @@
 
             if (showLabels) {
                 label = g.append("g")
+                    .attr("class", "labels")
                     .selectAll("text")
                     .data(nodes)
                     .enter().append("text")
                     .text(d => d.name)
-                    .style("font-size", "10px")
-                    .style("fill", "#cccccc")
+                    .style("font-size", "11px")
+                    .style("fill", "#333")
+                    .style("font-weight", "600")
                     .style("text-anchor", "middle")
-                    .style("pointer-events", "none");
+                    .style("pointer-events", "none")
+                    .style("text-shadow", "0 0 3px white, 0 0 3px white, 0 0 3px white");
             }
 
             if (simulation) {
@@ -1250,7 +1392,7 @@
                     if (label) {
                         label
                             .attr("x", d => d.x)
-                            .attr("y", d => d.y + 20);
+                            .attr("y", d => d.y + 25);
                     }
                 });
             }
@@ -1258,20 +1400,20 @@
 
         function getNodeColor(type) {
             const colors = {
-                router: "#f48771",
-                switch: "#7ca9dd",
-                server: "#6fc28b",
-                windows_server: "#6fc28b",
-                linux_server: "#4ec9b0",
-                web_server: "#569cd6",
-                database: "#b99bd8",
-                workstation: "#9cdcfe",
-                printer: "#daa674",
-                iot: "#d4c896",
-                subnet: "#858585",
-                unknown: "#666666"
+                router: "#ff3333",
+                switch: "#0077cc",
+                server: "#00aa44",
+                windows_server: "#00aa44",
+                linux_server: "#00cc66",
+                web_server: "#0066cc",
+                database: "#8844aa",
+                workstation: "#4488ff",
+                printer: "#ff8800",
+                iot: "#cc9900",
+                subnet: "#888888",
+                unknown: "#999999"
             };
-            return colors[type] || "#666666";
+            return colors[type] || "#999999";
         }
 
         function showTooltip2D(event, d) {
@@ -1292,7 +1434,7 @@
                 content += `<div class="detail-row"><span class="detail-label">Services:</span> <span class="detail-value">${device.services.slice(0, 3).join(', ')}</span></div>`;
             }
             if (device.critical) {
-                content += `<div class="detail-row"><span class="detail-label" style="color: #ff6b6b;">CRITICAL</span></div>`;
+                content += `<div class="detail-row"><span class="detail-label" style="color: #ff0000;">CRITICAL</span></div>`;
             }
 
             tooltip.innerHTML = content;
@@ -1349,7 +1491,7 @@
             html += '<div class="sidebar-section">';
             html += '<h3>Status & Notes</h3>';
             html += '<div class="sidebar-grid">';
-            html += `<span class="sidebar-label">Critical:</span><span class="sidebar-value" style="color: ${device.critical ? '#ff6b6b' : '#6fc28b'}">${device.critical ? 'YES' : 'No'}</span>`;
+            html += `<span class="sidebar-label">Critical:</span><span class="sidebar-value" style="color: ${device.critical ? '#ff0000' : '#00aa00'}">${device.critical ? 'YES' : 'No'}</span>`;
             html += `<span class="sidebar-label">Last Seen:</span><span class="sidebar-value">${device.last_seen || 'N/A'}</span>`;
             if (device.notes) {
                 html += `<span class="sidebar-label">Notes:</span><span class="sidebar-value">${device.notes}</span>`;
@@ -1414,7 +1556,7 @@
             canvas.width = svgElement.clientWidth;
             canvas.height = svgElement.clientHeight;
 
-            ctx.fillStyle = '#1e1e1e';
+            ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
@@ -1459,19 +1601,23 @@
                 d.fx = null;
                 d.fy = null;
             }
+            // Restore normal stroke
+            d3.select(event.sourceEvent.target)
+                .style("stroke", d.critical ? "#ff0000" : "#333")
+                .style("stroke-width", d.critical ? 3 : 2);
         }
 
+        // 3D Network Functions
         function initialize3DNetwork() {
             const container = document.getElementById('network-3d');
-
             document.getElementById('loading-3d').style.display = 'flex';
 
             container.innerHTML = '';
 
             // Scene setup
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x1a1a1a);
-            scene.fog = new THREE.Fog(0x1a1a1a, 50, 200);
+            scene.background = new THREE.Color(0xffffff);
+            scene.fog = new THREE.Fog(0xffffff, 50, 200);
 
             // Camera setup
             camera = new THREE.PerspectiveCamera(
@@ -1496,14 +1642,14 @@
             container.appendChild(renderer.domElement);
 
             // Enhanced lighting
-            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            const ambientLight = new THREE.AmbientLight(0x606060, 0.8);
             scene.add(ambientLight);
 
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
             directionalLight.position.set(30, 30, 30);
             directionalLight.castShadow = true;
-            directionalLight.shadow.mapSize.width = 4096;
-            directionalLight.shadow.mapSize.height = 4096;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
             directionalLight.shadow.camera.near = 0.5;
             directionalLight.shadow.camera.far = 500;
             scene.add(directionalLight);
@@ -1517,99 +1663,40 @@
             pointLight2.position.set(-20, 15, -20);
             scene.add(pointLight2);
 
-            // Create improved device positions with better spacing
-            const devicesByType = {};
-            devicesData.forEach(device => {
-                const type = device.type || 'unknown';
-                if (!devicesByType[type]) devicesByType[type] = [];
-                devicesByType[type].push(device);
-            });
+            // Add grid helper for better depth perception
+            const gridHelper = new THREE.GridHelper(50, 50, 0xcccccc, 0xeeeeee);
+            gridHelper.position.y = -5;
+            scene.add(gridHelper);
 
-            // Enhanced layer configuration with better spacing
-            const layerHeight = 6;
-            const typeOrder = ['router', 'switch', 'windows_server', 'linux_server', 'web_server', 'database', 'workstation', 'printer', 'iot', 'unknown'];
-
+            // Create nodes from visualization data
             nodes3D = [];
             labels3D = [];
             const nodeMap = new Map();
 
-            typeOrder.forEach((type, layerIndex) => {
-                const devices = devicesByType[type] || [];
-                if (devices.length === 0) return;
+            // Create nodes using the positions from threeData
+            threeData.positions.forEach((position, index) => {
+                const color = new THREE.Color(threeData.colors[index]);
+                const labelData = threeData.labels[index];
+                const device = devicesData.find(d => d.ip === labelData.text || d.hostname === labelData.text);
 
-                const y = (layerIndex - typeOrder.length / 2) * layerHeight;
-
-                devices.forEach((device, deviceIndex) => {
-                    let position;
-
-                    if (devices.length === 1) {
-                        // Single device - center with small random offset
-                        position = {
-                            x: (Math.random() - 0.5) * 2,
-                            y: y + (Math.random() - 0.5) * 1,
-                            z: (Math.random() - 0.5) * 2
-                        };
-                    } else if (devices.length <= 4) {
-                        // Small groups: arrange in corners of a square
-                        const angle = (deviceIndex * Math.PI * 2) / devices.length;
-                        const radius = 8 + Math.random() * 2;
-                        position = {
-                            x: radius * Math.cos(angle) + (Math.random() - 0.5) * 1,
-                            y: y + (Math.random() - 0.5) * 1,
-                            z: radius * Math.sin(angle) + (Math.random() - 0.5) * 1
-                        };
-                    } else {
-                        // Larger groups: improved spiral with better distribution
-                        const spiralTurns = Math.ceil(devices.length / 6);
-                        const angle = (deviceIndex * 2 * Math.PI * spiralTurns) / devices.length;
-                        const radius = 8 + (deviceIndex / devices.length) * 6;
-
-                        position = {
-                            x: radius * Math.cos(angle) + (Math.random() - 0.5) * 1,
-                            y: y + Math.sin(angle * 2) * 1 + (Math.random() - 0.5) * 0.5,
-                            z: radius * Math.sin(angle) + (Math.random() - 0.5) * 1
-                        };
-                    }
-
-                    const nodeData = {
-                        device,
-                        position,
-                        type,
-                        mesh: null,
-                        label: null
-                    };
-
-                    nodes3D.push(nodeData);
-                    nodeMap.set(device.ip, nodeData);
-                });
-            });
-
-            // Create enhanced node meshes with better materials
-            nodes3D.forEach(nodeData => {
-                const { device, position, type } = nodeData;
-
-                // Enhanced node size based on importance
+                // Node size based on type
                 let radius = 0.4;
-                if (device.critical) radius = 0.7;
-                else if (['router', 'switch'].includes(type)) radius = 0.6;
-                else if (type.includes('server')) radius = 0.5;
+                if (labelData.critical) radius = 0.7;
+                else if (['router', 'switch'].includes(labelData.type)) radius = 0.6;
+                else if (labelData.type.includes('server')) radius = 0.5;
 
-                // Create sphere with higher detail
+                // Create sphere
                 const geometry = new THREE.SphereGeometry(radius, 32, 32);
-
-                // Enhanced materials with better colors and effects
-                const baseColor = new THREE.Color(getNodeColor(type));
                 const material = new THREE.MeshPhongMaterial({
-                    color: baseColor,
-                    emissive: baseColor.clone().multiplyScalar(0.1),
+                    color: color,
+                    emissive: color.clone().multiplyScalar(0.1),
                     shininess: 100,
                     transparent: true,
                     opacity: 0.9
                 });
 
-                // Add glow effect for critical devices
-                if (device.critical) {
-                    material.emissive = baseColor.clone().multiplyScalar(0.3);
+                if (labelData.critical) {
+                    material.emissive = color.clone().multiplyScalar(0.3);
                     material.emissiveIntensity = 0.5;
                 }
 
@@ -1617,26 +1704,32 @@
                 mesh.position.set(position.x, position.y, position.z);
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
-                mesh.userData = { device, nodeData };
-
-                // Add subtle animation
-                mesh.userData.originalScale = radius;
-                mesh.userData.animationOffset = Math.random() * Math.PI * 2;
+                mesh.userData = { device: device || labelData, position, index };
 
                 scene.add(mesh);
-                nodeData.mesh = mesh;
 
-                // Create 3D text labels
-                create3DLabel(device, position, nodeData);
+                const nodeData = {
+                    mesh,
+                    device: device || labelData,
+                    position,
+                    label: null
+                };
+
+                nodes3D.push(nodeData);
+                if (device) {
+                    nodeMap.set(device.ip, nodeData);
+                }
+
+                // Create label
+                create3DLabel(labelData.text, position, labelData.critical, nodeData);
             });
 
             // Create connections
-            connections3D = [];
-            if (showConnections) {
-                createConnections3D(nodeMap);
+            if (showConnections && threeData.connections) {
+                createConnections3D(threeData.connections);
             }
 
-            // Enhanced mouse interaction
+            // Mouse interaction
             const raycaster = new THREE.Raycaster();
             const mouse = new THREE.Vector2();
             let hoveredObject = null;
@@ -1648,19 +1741,15 @@
                 mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
                 raycaster.setFromCamera(mouse, camera);
-                const intersects = raycaster.intersectObjects(scene.children.filter(obj => obj.userData.device));
+                const intersects = raycaster.intersectObjects(nodes3D.map(n => n.mesh));
 
-                // Reset previous hover
                 if (hoveredObject && hoveredObject !== selectedObject) {
-                    const material = hoveredObject.material;
-                    material.emissiveIntensity = hoveredObject.userData.device.critical ? 0.3 : 0.1;
                     hoveredObject.scale.setScalar(1);
                 }
 
                 if (intersects.length > 0) {
                     hoveredObject = intersects[0].object;
                     if (hoveredObject !== selectedObject) {
-                        hoveredObject.material.emissiveIntensity = 0.6;
                         hoveredObject.scale.setScalar(1.1);
                     }
                     container.style.cursor = 'pointer';
@@ -1672,16 +1761,12 @@
 
             function onClick(event) {
                 if (hoveredObject) {
-                    // Reset previous selection
                     if (selectedObject) {
                         selectedObject.scale.setScalar(1);
-                        const material = selectedObject.material;
-                        material.emissiveIntensity = selectedObject.userData.device.critical ? 0.3 : 0.1;
                     }
 
                     selectedObject = hoveredObject;
                     selectedObject.scale.setScalar(1.2);
-                    selectedObject.material.emissiveIntensity = 0.8;
 
                     showDeviceInfo3D(selectedObject.userData.device);
                 }
@@ -1690,19 +1775,27 @@
             renderer.domElement.addEventListener('mousemove', onMouseMove);
             renderer.domElement.addEventListener('click', onClick);
 
-            // Enhanced camera controls
+            // Camera controls
             let mouseDown = false;
             let mouseX = 0;
             let mouseY = 0;
+            let manualRotation = false;
 
             renderer.domElement.addEventListener('mousedown', (event) => {
-                mouseDown = true;
-                mouseX = event.clientX;
-                mouseY = event.clientY;
+                if (event.button === 0) { // Left click only
+                    mouseDown = true;
+                    manualRotation = true;
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                }
             });
 
             renderer.domElement.addEventListener('mouseup', () => {
                 mouseDown = false;
+                // Resume auto-rotation after 2 seconds
+                setTimeout(() => {
+                    if (!mouseDown) manualRotation = false;
+                }, 2000);
             });
 
             renderer.domElement.addEventListener('mousemove', (event) => {
@@ -1724,7 +1817,6 @@
                 mouseY = event.clientY;
             });
 
-            // Enhanced zoom with wheel
             renderer.domElement.addEventListener('wheel', (event) => {
                 event.preventDefault();
                 const scale = event.deltaY > 0 ? 1.1 : 0.9;
@@ -1732,37 +1824,33 @@
                 camera.position.clampLength(8, 150);
             });
 
-            // Animation loop with enhanced effects
+            // Animation loop
             function animate() {
                 requestAnimationFrame(animate);
 
                 const time = Date.now() * 0.001;
 
-                // Animate device nodes
-                nodes3D.forEach(nodeData => {
+                // Animate nodes
+                nodes3D.forEach((nodeData, i) => {
                     if (nodeData.mesh) {
-                        const mesh = nodeData.mesh;
-                        // Subtle floating animation
-                        mesh.position.y = nodeData.position.y + Math.sin(time + mesh.userData.animationOffset) * 0.2;
+                        const baseY = nodeData.position.y;
+                        nodeData.mesh.position.y = baseY + Math.sin(time + i) * 0.2;
 
-                        // Gentle rotation for critical devices
-                        if (mesh.userData.device.critical) {
-                            mesh.rotation.y = time * 0.5;
+                        if (nodeData.device && nodeData.device.critical) {
+                            nodeData.mesh.rotation.y = time * 0.5;
                         }
                     }
                 });
 
-                // Auto rotate camera if enabled
-                if (autoRotate && !mouseDown) {
+                // Auto rotate
+                if (autoRotate && !mouseDown && !manualRotation) {
                     const radius = camera.position.length();
                     camera.position.x = Math.cos(time * 0.2) * radius;
                     camera.position.z = Math.sin(time * 0.2) * radius;
                     camera.lookAt(0, 0, 0);
                 }
 
-                // Update label visibility
                 updateLabelVisibility();
-
                 renderer.render(scene, camera);
             }
 
@@ -1783,7 +1871,52 @@
             }, 1000);
         }
 
-        function createConnections3D(nodeMap) {
+        function create3DLabel(text, position, isCritical, nodeData) {
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'label3d' + (isCritical ? ' critical' : '');
+            labelDiv.textContent = text;
+            labelDiv.style.display = show3DLabels ? 'block' : 'none';
+
+            document.getElementById('network-3d').appendChild(labelDiv);
+
+            nodeData.label = {
+                element: labelDiv,
+                position: position
+            };
+
+            labels3D.push(nodeData.label);
+        }
+
+        function updateLabelVisibility() {
+            if (!camera || !renderer) return;
+
+            labels3D.forEach(label => {
+                if (!label || !label.element) return;
+
+                const vector = new THREE.Vector3(
+                    label.position.x,
+                    label.position.y + 1,
+                    label.position.z
+                );
+
+                vector.project(camera);
+
+                const x = (vector.x * 0.5 + 0.5) * renderer.domElement.clientWidth;
+                const y = (vector.y * -0.5 + 0.5) * renderer.domElement.clientHeight;
+
+                label.element.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+
+                // Hide labels that are behind the camera
+                if (vector.z > 1) {
+                    label.element.style.display = 'none';
+                } else {
+                    label.element.style.display = show3DLabels ? 'block' : 'none';
+                }
+            });
+        }
+
+        function createConnections3D(connectionData) {
+            // Clear existing connections
             connections3D.forEach(conn => {
                 if (conn.line) scene.remove(conn.line);
             });
@@ -1791,94 +1924,62 @@
 
             if (!showConnections) return;
 
-            const routers = devicesData.filter(d => d.type === 'router');
-            const switches = devicesData.filter(d => d.type === 'switch');
-            const servers = devicesData.filter(d => d.type && d.type.includes('server'));
-            const workstations = devicesData.filter(d => d.type === 'workstation');
+            connectionData.forEach(conn => {
+                const points = [
+                    new THREE.Vector3(conn.start.x, conn.start.y, conn.start.z),
+                    new THREE.Vector3(conn.end.x, conn.end.y, conn.end.z)
+                ];
 
-            servers.forEach(server => {
-                if (routers.length > 0) {
-                    const router = routers[0];
-                    const serverNode = nodeMap.get(server.ip);
-                    const routerNode = nodeMap.get(router.ip);
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({
+                    color: new THREE.Color(conn.color),
+                    opacity: conn.opacity || 0.6,
+                    transparent: true,
+                    linewidth: conn.thickness || 1
+                });
 
-                    if (serverNode && routerNode) {
-                        createConnectionLine(serverNode.position, routerNode.position, 0x6fc28b, 0.7);
-                    }
-                }
-            });
+                const line = new THREE.Line(geometry, material);
+                scene.add(line);
 
-            workstations.forEach(workstation => {
-                const nearestSwitch = switches.length > 0 ? switches[0] : routers[0];
-                if (nearestSwitch) {
-                    const workstationNode = nodeMap.get(workstation.ip);
-                    const switchNode = nodeMap.get(nearestSwitch.ip);
-
-                    if (workstationNode && switchNode) {
-                        createConnectionLine(workstationNode.position, switchNode.position, 0xb99bd8, 0.4);
-                    }
-                }
-            });
-
-            switches.forEach(switchDevice => {
-                if (routers.length > 0) {
-                    const router = routers[0];
-                    const switchNode = nodeMap.get(switchDevice.ip);
-                    const routerNode = nodeMap.get(router.ip);
-
-                    if (switchNode && routerNode) {
-                        createConnectionLine(switchNode.position, routerNode.position, 0x7ca9dd, 0.8);
-                    }
-                }
+                connections3D.push({ line, ...conn });
             });
         }
 
-        function createConnectionLine(start, end, color, opacity) {
-            const points = [
-                new THREE.Vector3(start.x, start.y, start.z),
-                new THREE.Vector3(end.x, end.y, end.z)
-            ];
+        function showDeviceInfo3D(device) {
+            const panel = document.getElementById('device-info-3d');
+            const content = panel.querySelector('.info-content');
 
-            const geometry = new THREE.BufferGeometry().setFromPoints(points);
-            const material = new THREE.LineBasicMaterial({
-                color: color,
-                opacity: opacity,
-                transparent: true
-            });
+            let html = '';
 
-            const line = new THREE.Line(geometry, material);
-            scene.add(line);
+            if (device.hostname || device.ip) {
+                html += `<div class="device-title">${device.hostname || device.ip}</div>`;
+            }
 
-            connections3D.push({ line, start, end });
-        }
-
-        function showTooltip3D(event, device) {
-            const tooltip = document.getElementById('tooltip-3d');
-
-            let content = `<h4>${device.hostname || device.ip}</h4>`;
-            content += `<div class="detail-row"><span class="detail-label">IP:</span> <span class="detail-value">${device.ip}</span></div>`;
-            content += `<div class="detail-row"><span class="detail-label">Type:</span> <span class="detail-value">${device.type}</span></div>`;
+            html += `<div class="info-row"><span class="info-label">IP:</span><span class="info-value">${device.ip || 'N/A'}</span></div>`;
+            html += `<div class="info-row"><span class="info-label">Type:</span><span class="info-value">${device.type || 'unknown'}</span></div>`;
 
             if (device.vendor) {
-                content += `<div class="detail-row"><span class="detail-label">Vendor:</span> <span class="detail-value">${device.vendor}</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Vendor:</span><span class="info-value">${device.vendor}</span></div>`;
             }
+
+            if (device.os) {
+                html += `<div class="info-row"><span class="info-label">OS:</span><span class="info-value">${device.os}</span></div>`;
+            }
+
             if (device.critical) {
-                content += `<div class="detail-row"><span class="detail-label" style="color: #ff6b6b;">CRITICAL</span></div>`;
+                html += `<div class="info-row"><span class="info-label" style="color: #ff6b6b;">CRITICAL DEVICE</span></div>`;
             }
 
-            tooltip.innerHTML = content;
-            tooltip.style.display = 'block';
-            tooltip.style.left = (event.clientX + 10) + 'px';
-            tooltip.style.top = (event.clientY - 10) + 'px';
-        }
+            if (device.services && device.services.length > 0) {
+                html += `<div class="info-row"><span class="info-label">Services:</span><span class="info-value">${device.services.slice(0, 3).join(', ')}</span></div>`;
+            }
 
-        function hideTooltip3D() {
-            document.getElementById('tooltip-3d').style.display = 'none';
+            content.innerHTML = html;
         }
 
         function reset3DView() {
             if (camera) {
-                camera.position.set(15, 10, 15);
+                camera.position.set(25, 20, 25);
                 camera.lookAt(0, 0, 0);
             }
         }
@@ -1904,12 +2005,17 @@
         function toggle3DConnections() {
             showConnections = document.getElementById('show-connections').checked;
             if (window.threeInitialized && scene) {
-                const nodeMap = new Map();
-                nodes3D.forEach(node => {
-                    nodeMap.set(node.device.ip, node);
-                });
-                createConnections3D(nodeMap);
+                createConnections3D(threeData.connections || []);
             }
+        }
+
+        function toggle3DLabels() {
+            show3DLabels = document.getElementById('show-3d-labels').checked;
+            labels3D.forEach(label => {
+                if (label && label.element) {
+                    label.element.style.display = show3DLabels ? 'block' : 'none';
+                }
+            });
         }
 
         function download3DMap() {
