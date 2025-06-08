@@ -41,8 +41,15 @@ class NetworkScanner:
         """Run nmap scan"""
         profile = self.scan_profiles[scan_type]
 
-        with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
-            cmd = ["nmap", "-oX", tmp.name] + profile["nmap"] + [target]
+        # Create temp file in /tmp with appropriate permissions
+        temp_fd, temp_path = tempfile.mkstemp(suffix=".xml", prefix="nmap_", dir="/tmp")
+        os.close(temp_fd)  # Close the file descriptor
+
+        try:
+            # Set permissions so anyone can write (for sudo)
+            os.chmod(temp_path, 0o666)
+
+            cmd = ["nmap", "-oX", temp_path] + profile["nmap"] + [target]
 
             if needs_root:
                 cmd = ["sudo"] + cmd
@@ -54,7 +61,13 @@ class NetworkScanner:
                 raise Exception(f"Nmap failed: {proc.stderr}")
 
             # Parse XML output
-            return self._parse_nmap_xml(tmp.name)
+            return self._parse_nmap_xml(temp_path)
+        finally:
+            # Clean up temp file
+            try:
+                os.remove(temp_path)
+            except:
+                pass
 
     def _run_masscan(self, target: str) -> List[Dict]:
         """Run masscan for fast discovery"""

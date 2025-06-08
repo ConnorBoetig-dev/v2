@@ -15,8 +15,8 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
-            color: #333;
-            background: #f5f5f5;
+            color: #cccccc;
+            background: #1e1e1e;
         }
 
         .container {
@@ -26,12 +26,12 @@
         }
 
         header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4a5fc1 0%, #6b46c1 100%);
             color: white;
             padding: 2rem;
             border-radius: 10px;
             margin-bottom: 2rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         }
 
         h1 {
@@ -55,11 +55,12 @@
         }
 
         .change-card {
-            background: white;
+            background: #2d2d30;
             padding: 1.5rem;
             border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             text-align: center;
+            border: 1px solid #3e3e42;
         }
 
         .change-card h3 {
@@ -72,50 +73,52 @@
         .change-card .number {
             font-size: 2.5rem;
             font-weight: bold;
+            color: #d4d4d4;
         }
 
         .change-card.new {
-            border-top: 4px solid #48bb78;
+            border-top: 4px solid #4ec9b0;
         }
 
         .change-card.new h3 {
-            color: #48bb78;
+            color: #4ec9b0;
         }
 
         .change-card.missing {
-            border-top: 4px solid #f56565;
+            border-top: 4px solid #f48771;
         }
 
         .change-card.missing h3 {
-            color: #f56565;
+            color: #f48771;
         }
 
         .change-card.modified {
-            border-top: 4px solid #ed8936;
+            border-top: 4px solid #ce9178;
         }
 
         .change-card.modified h3 {
-            color: #ed8936;
+            color: #ce9178;
         }
 
         .change-card.unchanged {
-            border-top: 4px solid #4299e1;
+            border-top: 4px solid #569cd6;
         }
 
         .change-card.unchanged h3 {
-            color: #4299e1;
+            color: #569cd6;
         }
 
         .section {
-            background: white;
+            background: #252526;
             padding: 2rem;
             border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             margin-bottom: 2rem;
+            border: 1px solid #3e3e42;
         }
 
         .section h2 {
-            color: #667eea;
+            color: #569cd6;
             margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
@@ -129,8 +132,8 @@
         }
 
         .device-card {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
+            background: #2d2d30;
+            border: 1px solid #3e3e42;
             border-radius: 8px;
             padding: 1rem;
             transition: all 0.2s;
@@ -138,22 +141,22 @@
 
         .device-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         }
 
         .device-card.new {
-            background: #d4edda;
-            border-color: #48bb78;
+            background: #2d3f3d;
+            border-color: #4ec9b0;
         }
 
         .device-card.missing {
-            background: #f8d7da;
-            border-color: #f56565;
+            background: #3f2d2d;
+            border-color: #f48771;
         }
 
         .device-card.modified {
-            background: #fff3cd;
-            border-color: #ed8936;
+            background: #3f372d;
+            border-color: #ce9178;
         }
 
         .device-header {
@@ -166,6 +169,7 @@
         .device-ip {
             font-weight: bold;
             font-size: 1.1rem;
+            color: #d4d4d4;
         }
 
         .device-type {
@@ -177,57 +181,61 @@
         }
 
         .type-router {
-            background: #fee2e2;
-            color: #dc2626;
+            background: #5a3232;
+            color: #f48771;
         }
 
         .type-switch {
-            background: #dbeafe;
-            color: #2563eb;
+            background: #2b3f5c;
+            color: #7ca9dd;
         }
 
         .type-server {
-            background: #d1fae5;
-            color: #059669;
+            background: #2d4a3d;
+            color: #6fc28b;
         }
 
         .type-workstation {
-            background: #e9d5ff;
-            color: #7c3aed;
+            background: #4a3a5a;
+            color: #b99bd8;
         }
 
         .type-printer {
-            background: #fed7aa;
-            color: #ea580c;
+            background: #5a4226;
+            color: #daa674;
         }
 
         .type-iot {
-            background: #fef3c7;
-            color: #d97706;
+            background: #5a5226;
+            color: #d4c896;
         }
 
         .type-unknown {
-            background: #e5e7eb;
-            color: #6b7280;
+            background: #3e3e42;
+            color: #858585;
         }
 
         .device-details {
             font-size: 0.875rem;
-            color: #6b7280;
+            color: #cccccc;
         }
 
         .device-details div {
             margin: 0.25rem 0;
         }
 
+        .device-details strong {
+            color: #569cd6;
+        }
+
         .change-details {
             margin-top: 0.75rem;
             padding-top: 0.75rem;
-            border-top: 1px solid #dee2e6;
+            border-top: 1px solid #3e3e42;
         }
 
         .change-item {
-            background: white;
+            background: #1e1e1e;
             padding: 0.5rem;
             border-radius: 4px;
             margin: 0.25rem 0;
@@ -236,25 +244,25 @@
 
         .change-field {
             font-weight: 600;
-            color: #495057;
+            color: #569cd6;
         }
 
         .added {
-            color: #48bb78;
+            color: #4ec9b0;
         }
 
         .removed {
-            color: #f56565;
+            color: #f48771;
         }
 
         .changed {
-            color: #ed8936;
+            color: #ce9178;
         }
 
         .empty-state {
             text-align: center;
             padding: 3rem;
-            color: #6b7280;
+            color: #858585;
         }
 
         .actions {
@@ -279,25 +287,25 @@
 
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         }
 
         .btn-primary {
-            background: #667eea;
+            background: #569cd6;
             color: white;
         }
 
         .btn-primary:hover {
-            background: #5a60d8;
+            background: #4b8bc8;
         }
 
         .btn-secondary {
-            background: #e2e8f0;
-            color: #2d3748;
+            background: #3e3e42;
+            color: #cccccc;
         }
 
         .btn-secondary:hover {
-            background: #cbd5e0;
+            background: #4e4e52;
         }
 
         @media (max-width: 768px) {
@@ -316,16 +324,39 @@
         }
 
         @media print {
+            body {
+                background: white;
+                color: black;
+            }
+
             .actions {
                 display: none;
             }
 
-            body {
-                background: white;
-            }
-
             .container {
                 max-width: 100%;
+            }
+
+            .section,
+            .change-card,
+            .device-card {
+                background: white;
+                border: 1px solid #ddd;
+                color: black;
+            }
+
+            .device-details,
+            .device-details strong,
+            .device-ip,
+            .change-field {
+                color: black;
+            }
+
+            header {
+                background: #667eea;
+                color: white;
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
             }
         }
     </style>
@@ -372,7 +403,7 @@
         {% if new_devices %}
         <div class="section">
             <h2>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#48bb78" stroke-width="2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4ec9b0" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <line x1="12" y1="8" x2="12" y2="16"></line>
                     <line x1="8" y1="12" x2="16" y2="12"></line>
@@ -404,7 +435,7 @@
         {% if missing_devices %}
         <div class="section">
             <h2>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f56565" stroke-width="2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f48771" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <line x1="15" y1="9" x2="9" y2="15"></line>
                     <line x1="9" y1="9" x2="15" y2="15"></line>
@@ -434,7 +465,7 @@
         {% if changed_devices %}
         <div class="section">
             <h2>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ed8936" stroke-width="2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ce9178" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <path d="M12 2v10l4 2"></path>
                 </svg>

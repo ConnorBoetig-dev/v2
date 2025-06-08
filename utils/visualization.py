@@ -98,18 +98,18 @@ class MapGenerator:
 
     def generate_threejs_data(self, devices: List[Dict]) -> Dict:
         """Generate Three.js 3D visualization data"""
-        # Organize devices in 3D space by type
+        # Organize devices in 3D space by type - Updated colors for dark theme
         layers = {
-            "router": {"y": 3, "color": "#ff6b6b"},
-            "switch": {"y": 2, "color": "#4ecdc4"},
-            "windows_server": {"y": 1, "color": "#45b7d1"},
-            "linux_server": {"y": 1, "color": "#3498db"},
-            "web_server": {"y": 1, "color": "#2980b9"},
-            "database": {"y": 1, "color": "#8e44ad"},
-            "workstation": {"y": 0, "color": "#96ceb4"},
-            "printer": {"y": 0, "color": "#f39c12"},
-            "iot": {"y": 0, "color": "#daa520"},
-            "unknown": {"y": 0, "color": "#95a5a6"},
+            "router": {"y": 3, "color": "#f48771"},
+            "switch": {"y": 2, "color": "#7ca9dd"},
+            "windows_server": {"y": 1, "color": "#6fc28b"},
+            "linux_server": {"y": 1, "color": "#4ec9b0"},
+            "web_server": {"y": 1, "color": "#569cd6"},
+            "database": {"y": 1, "color": "#b99bd8"},
+            "workstation": {"y": 0, "color": "#9cdcfe"},
+            "printer": {"y": 0, "color": "#daa674"},
+            "iot": {"y": 0, "color": "#d4c896"},
+            "unknown": {"y": 0, "color": "#858585"},
         }
 
         positions = []
@@ -193,7 +193,7 @@ class MapGenerator:
                         {
                             "start": device_positions[device["ip"]],
                             "end": device_positions[nearest["ip"]],
-                            "color": "#34495e",
+                            "color": "#666666",
                             "opacity": 0.3,
                         }
                     )
@@ -207,7 +207,7 @@ class MapGenerator:
                         {
                             "start": device_positions[switch["ip"]],
                             "end": device_positions[router["ip"]],
-                            "color": "#2c3e50",
+                            "color": "#888888",
                             "opacity": 0.5,
                         }
                     )

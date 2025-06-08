@@ -15,8 +15,8 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
-            color: #333;
-            background: #f5f5f5;
+            color: #cccccc;
+            background: #1e1e1e;
         }
 
         .container {
@@ -26,12 +26,12 @@
         }
 
         header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4a5fc1 0%, #6b46c1 100%);
             color: white;
             padding: 2rem;
             border-radius: 10px;
             margin-bottom: 2rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         }
 
         h1 {
@@ -40,17 +40,18 @@
         }
 
         .quick-actions {
-            background: white;
+            background: #252526;
             padding: 1.5rem;
             border-radius: 10px;
             margin-bottom: 2rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: 1px solid #3e3e42;
         }
 
         .quick-actions h2 {
             font-size: 1.25rem;
             margin-bottom: 1rem;
-            color: #667eea;
+            color: #569cd6;
         }
 
         .action-buttons {
@@ -78,39 +79,39 @@
         }
 
         .btn-primary {
-            background: #667eea;
+            background: #569cd6;
             color: white;
         }
 
         .btn-primary:hover {
-            background: #5a60d8;
+            background: #4b8bc8;
         }
 
         .btn-secondary {
-            background: #48bb78;
+            background: #4ec9b0;
             color: white;
         }
 
         .btn-secondary:hover {
-            background: #38a169;
+            background: #43b59f;
         }
 
         .btn-info {
-            background: #4299e1;
+            background: #4fc1e9;
             color: white;
         }
 
         .btn-info:hover {
-            background: #3182ce;
+            background: #3badd6;
         }
 
         .btn-warning {
-            background: #ed8936;
+            background: #ce9178;
             color: white;
         }
 
         .btn-warning:hover {
-            background: #dd6b20;
+            background: #bb8166;
         }
 
         .summary-grid {
@@ -121,64 +122,70 @@
         }
 
         .summary-card {
-            background: white;
+            background: #2d2d30;
             padding: 1.5rem;
             border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             transition: transform 0.2s;
+            border: 1px solid #3e3e42;
         }
 
         .summary-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         }
 
         .summary-card h3 {
-            color: #667eea;
+            color: #569cd6;
             margin-bottom: 0.5rem;
         }
 
         .summary-card .number {
             font-size: 2.5rem;
             font-weight: bold;
-            color: #333;
+            color: #d4d4d4;
         }
 
         .tabs {
             display: flex;
-            background: white;
+            background: #2d2d30;
             border-radius: 10px 10px 0 0;
             overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: 1px solid #3e3e42;
+            border-bottom: none;
         }
 
         .tab {
             flex: 1;
             padding: 1rem 2rem;
-            background: #f8f9fa;
+            background: #2d2d30;
             border: none;
             cursor: pointer;
             transition: background 0.3s;
             font-size: 1rem;
             font-weight: 500;
+            color: #cccccc;
         }
 
         .tab:hover {
-            background: #e9ecef;
+            background: #333337;
         }
 
         .tab.active {
-            background: white;
-            color: #667eea;
-            border-bottom: 3px solid #667eea;
+            background: #1e1e1e;
+            color: #569cd6;
+            border-bottom: 3px solid #569cd6;
         }
 
         .tab-content {
-            background: white;
+            background: #1e1e1e;
             padding: 2rem;
             border-radius: 0 0 10px 10px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             margin-bottom: 2rem;
+            border: 1px solid #3e3e42;
+            border-top: none;
         }
 
         .device-table {
@@ -187,21 +194,22 @@
         }
 
         .device-table th {
-            background: #f8f9fa;
+            background: #2d2d30;
             padding: 1rem;
             text-align: left;
             font-weight: 600;
-            color: #495057;
-            border-bottom: 2px solid #dee2e6;
+            color: #cccccc;
+            border-bottom: 2px solid #3e3e42;
         }
 
         .device-table td {
             padding: 0.75rem 1rem;
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid #3e3e42;
+            color: #d4d4d4;
         }
 
         .device-table tr:hover {
-            background: #f8f9fa;
+            background: #252526;
         }
 
         .device-type {
@@ -213,58 +221,59 @@
         }
 
         .type-router {
-            background: #fee2e2;
-            color: #dc2626;
+            background: #5a3232;
+            color: #f48771;
         }
 
         .type-switch {
-            background: #dbeafe;
-            color: #2563eb;
+            background: #2b3f5c;
+            color: #7ca9dd;
         }
 
         .type-server {
-            background: #d1fae5;
-            color: #059669;
+            background: #2d4a3d;
+            color: #6fc28b;
         }
 
         .type-workstation {
-            background: #e9d5ff;
-            color: #7c3aed;
+            background: #4a3a5a;
+            color: #b99bd8;
         }
 
         .type-printer {
-            background: #fed7aa;
-            color: #ea580c;
+            background: #5a4226;
+            color: #daa674;
         }
 
         .type-iot {
-            background: #fef3c7;
-            color: #d97706;
+            background: #5a5226;
+            color: #d4c896;
         }
 
         .type-unknown {
-            background: #e5e7eb;
-            color: #6b7280;
+            background: #3e3e42;
+            color: #858585;
         }
 
         .critical {
-            color: #dc2626;
+            color: #f48771;
             font-weight: bold;
         }
 
         .services {
             font-size: 0.875rem;
-            color: #6b7280;
+            color: #858585;
         }
 
         .visualization {
             width: 100%;
             height: 600px;
-            background: white;
+            background: #1e1e1e;
             border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             position: relative;
             overflow: hidden;
+            border: 1px solid #3e3e42;
         }
 
         #network-2d,
@@ -280,15 +289,25 @@
         }
 
         .subnet-card {
-            background: #f8f9fa;
+            background: #252526;
             padding: 1rem;
             border-radius: 8px;
-            border: 1px solid #dee2e6;
+            border: 1px solid #3e3e42;
         }
 
         .subnet-card h4 {
-            color: #495057;
+            color: #569cd6;
             margin-bottom: 0.5rem;
+        }
+
+        .subnet-card ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .subnet-card li {
+            color: #cccccc;
+            padding: 0.25rem 0;
         }
 
         .hidden {
@@ -319,6 +338,10 @@
         }
 
         @media print {
+            body {
+                background: white;
+                color: black;
+            }
 
             .quick-actions,
             .tabs,
@@ -329,14 +352,32 @@
             .tab-content {
                 display: block !important;
                 page-break-inside: avoid;
-            }
-
-            body {
                 background: white;
+                border: 1px solid #ddd;
             }
 
             .container {
                 max-width: 100%;
+            }
+
+            .device-table th,
+            .device-table td {
+                border: 1px solid #ddd;
+                color: black;
+            }
+
+            .summary-card,
+            .subnet-card {
+                background: white;
+                border: 1px solid #ddd;
+                color: black;
+            }
+
+            header {
+                background: #667eea;
+                color: white;
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
             }
         }
     </style>
@@ -411,8 +452,8 @@
 
         <div class="tabs">
             <button class="tab active" onclick="showTab('devices')">Devices</button>
-            <button class="tab" onclick="showTab('network-map')">Network Map</button>
-            <button class="tab" onclick="showTab('3d-view')">3D View</button>
+            <button class="tab" onclick="showTab('network-map')">2D Map</button>
+            <button class="tab" onclick="showTab('3d-view')">3D Map</button>
             <button class="tab" onclick="showTab('subnets')">Subnets</button>
         </div>
 
@@ -608,7 +649,7 @@
             .selectAll("line")
             .data(data.links)
             .enter().append("line")
-            .style("stroke", "#999")
+            .style("stroke", "#666")
             .style("stroke-opacity", 0.6)
             .style("stroke-width", d => Math.sqrt(d.value));
 
@@ -619,14 +660,14 @@
             .attr("r", d => d.critical ? 10 : 6)
             .style("fill", d => {
                 const colors = {
-                    router: "#dc2626",
-                    switch: "#2563eb",
-                    server: "#059669",
-                    workstation: "#7c3aed",
-                    subnet: "#6b7280",
-                    unknown: "#9ca3af"
+                    router: "#f48771",
+                    switch: "#7ca9dd",
+                    server: "#6fc28b",
+                    workstation: "#b99bd8",
+                    subnet: "#858585",
+                    unknown: "#666666"
                 };
-                return colors[d.type] || "#9ca3af";
+                return colors[d.type] || "#666666";
             })
             .call(d3.drag()
                 .on("start", dragstarted)
@@ -639,7 +680,7 @@
             .enter().append("text")
             .text(d => d.name)
             .style("font-size", "10px")
-            .style("fill", "#333");
+            .style("fill", "#cccccc");
 
         node.append("title")
             .text(d => `${d.name}\nType: ${d.type}\nServices: ${(d.services || []).join(", ")}`);
@@ -685,7 +726,7 @@
         const container = document.getElementById('network-3d');
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xf5f5f5);
+        scene.background = new THREE.Color(0x1e1e1e);
 
         const camera = new THREE.PerspectiveCamera(
             75,
