@@ -41,14 +41,13 @@ class NetworkScanner:
         """Run nmap scan"""
         profile = self.scan_profiles[scan_type]
 
-        # Create temp file in /tmp with appropriate permissions
-        temp_fd, temp_path = tempfile.mkstemp(suffix=".xml", prefix="nmap_", dir="/tmp")
-        os.close(temp_fd)  # Close the file descriptor
+        # Generate a unique temp filename but don't create the file
+        # Let nmap create it with proper permissions
+        temp_dir = tempfile.gettempdir()
+        temp_filename = f"nmap_{os.getpid()}_{os.urandom(4).hex()}.xml"
+        temp_path = os.path.join(temp_dir, temp_filename)
 
         try:
-            # Set permissions so anyone can write (for sudo)
-            os.chmod(temp_path, 0o666)
-
             cmd = ["nmap", "-oX", temp_path] + profile["nmap"] + [target]
 
             if needs_root:
@@ -65,15 +64,21 @@ class NetworkScanner:
         finally:
             # Clean up temp file
             try:
-                os.remove(temp_path)
+                if os.path.exists(temp_path):
+                    # Use sudo to remove if it was created by root
+                    if needs_root and os.stat(temp_path).st_uid == 0:
+                        subprocess.run(["sudo", "rm", temp_path], capture_output=True)
+                    else:
+                        os.remove(temp_path)
             except:
                 pass
 
     def _run_masscan(self, target: str) -> List[Dict]:
         """Run masscan for fast discovery"""
-        # Create temp file in a writable location
+        # Generate a unique temp filename
         temp_dir = tempfile.gettempdir()
-        temp_file = os.path.join(temp_dir, f"masscan_{os.getpid()}.json")
+        temp_filename = f"masscan_{os.getpid()}_{os.urandom(4).hex()}.json"
+        temp_file = os.path.join(temp_dir, temp_filename)
 
         try:
             cmd = [
@@ -111,7 +116,8 @@ class NetworkScanner:
             # Clean up temp file
             if os.path.exists(temp_file):
                 try:
-                    os.remove(temp_file)
+                    # Use sudo to remove since masscan runs as root
+                    subprocess.run(["sudo", "rm", temp_file], capture_output=True)
                 except:
                     pass
 
