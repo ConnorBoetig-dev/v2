@@ -496,6 +496,10 @@
         const devicesData = {{ devices | tojson }};
         const scanTimestamp = '{{ scan_timestamp }}';
 
+        // Debug: Log the timestamp to console
+        console.log('Scan timestamp:', scanTimestamp);
+        console.log('Expected comparison file:', `comparison_${scanTimestamp}.html`);
+
         // Tab switching
         function showTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(tab => {
@@ -559,15 +563,24 @@
 
         // Compare to last scan
         function compareToLastScan() {
-            // Extract scan file name from current report
-            const urlParams = new URLSearchParams(window.location.search);
-            const currentScan = urlParams.get('scan') || scanTimestamp;
+            // Use the scan timestamp that matches the file naming convention
+            const comparisonUrl = `comparison_${scanTimestamp}.html`;
 
-            // Redirect to comparison report
-            const comparisonUrl = `comparison_${currentScan}.html`;
-
-            // Check if comparison exists by trying to navigate
-            window.location.href = comparisonUrl;
+            // Try to check if the comparison report exists
+            fetch(comparisonUrl, { method: 'HEAD' })
+                .then(response => {
+                    if (response.ok) {
+                        // File exists, navigate to it
+                        window.location.href = comparisonUrl;
+                    } else {
+                        // File doesn't exist
+                        alert('No comparison report available. This might be your first scan or there are no previous scans to compare against.');
+                    }
+                })
+                .catch(() => {
+                    // Fallback - just try to navigate (works in most browsers)
+                    window.location.href = comparisonUrl;
+                });
         }
 
         // Refresh scan (open mapper.py)
@@ -577,7 +590,7 @@
 
         // D3.js Network Visualization
         function initializeD3Network() {
-            const data = {{ d3_data| safe
+            const data = {{ d3_data | safe
         }};
         const width = document.getElementById('network-2d').clientWidth;
         const height = 600;
@@ -667,7 +680,7 @@
 
         // Three.js 3D Network Visualization
         function initialize3DNetwork() {
-            const data = {{ three_data| safe
+            const data = {{ three_data | safe
         }};
         const container = document.getElementById('network-3d');
 

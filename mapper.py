@@ -174,9 +174,7 @@ class NetworkMapper:
 
         if Confirm.ask("\nGenerate HTML report?"):
             report_file, comparison_file = self.generate_html_report(devices, timestamp)
-            # Pass changes if available
-            if hasattr(self, 'last_changes') and self.last_changes:
-                comparison_file = self.generate_comparison_report(devices, self.last_changes, timestamp)
+    # Comparison is already generated inside generate_html_report if applicable
 
             # Show report paths
             console.print(f"\n[bold]Report Files:[/bold]")
