@@ -36,6 +36,7 @@ class NetworkMapper:
         self.tracker = ChangeTracker()
         self.annotator = DeviceAnnotator()
         self.map_gen = MapGenerator()
+        self.last_changes = None
 
     def ensure_directories(self):
         """Create output directories if they don't exist"""
@@ -145,14 +146,49 @@ class NetworkMapper:
         changes = self.tracker.detect_changes(devices)
         if changes:
             self.save_changes(changes, timestamp)
+            # Store changes for report generation
+            self.last_changes = changes
+        else:
+            self.last_changes = None
 
-        # Summary
-        console.print("[green]✓ Scan complete![/green]")
+        # Summary with aligned file paths
+        console.print("\n[green]✓ Scan complete![/green]")
         console.print(f"Found {len(devices)} devices")
-        console.print(f"Results saved to: {scan_file}")
+        console.print(f"\n[bold]Generated Files:[/bold]")
+
+        # Create a table for file paths
+        file_table = Table(show_header=False, box=None, padding=(0, 2))
+        file_table.add_column("Type", style="cyan")
+        file_table.add_column("Path", style="yellow")
+
+        file_table.add_row("Scan data:", str(scan_file))
+        file_table.add_row("CSV export:", str(csv_file))
+
+        if changes:
+            changes_json = self.output_path / "changes" / f"changes_{timestamp}.json"
+            changes_txt = self.output_path / "changes" / f"changes_{timestamp}.txt"
+            file_table.add_row("Changes JSON:", str(changes_json))
+            file_table.add_row("Changes text:", str(changes_txt))
+
+        console.print(file_table)
 
         if Confirm.ask("\nGenerate HTML report?"):
-            self.generate_html_report(devices, timestamp)
+            report_file, comparison_file = self.generate_html_report(devices, timestamp)
+            # Pass changes if available
+            if hasattr(self, 'last_changes') and self.last_changes:
+                comparison_file = self.generate_comparison_report(devices, self.last_changes, timestamp)
+
+            # Show report paths
+            console.print(f"\n[bold]Report Files:[/bold]")
+            report_table = Table(show_header=False, box=None, padding=(0, 2))
+            report_table.add_column("Type", style="cyan")
+            report_table.add_column("Path", style="yellow")
+
+            report_table.add_row("Main report:", str(report_file))
+            if comparison_file:
+                report_table.add_row("Comparison:", str(comparison_file))
+
+            console.print(report_table)
 
         input("\nPress Enter to continue...")
 
@@ -255,9 +291,10 @@ class NetworkMapper:
         env = Environment(loader=FileSystemLoader(self.base_path / "templates"))
         template = env.get_template("report.html")
 
-        # Prepare report data
+        # Prepare report data - IMPORTANT: pass the actual scan timestamp
         report_data = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "scan_timestamp": timestamp,  # Add this for the JavaScript
             "scan_date": datetime.now().strftime("%B %d, %Y"),
             "total_devices": len(devices),
             "devices": devices,
@@ -280,8 +317,72 @@ class NetworkMapper:
         webbrowser.open(file_url)
 
         # Show clickable link in terminal
-        console.print("[green]✓ Report generated![/green]")
-        console.print(f"Report saved to: [link={file_url}]{report_file}[/link]")
+        console.print("\n[green]✓ Report generated and opened in browser![/green]")
+
+        # Also generate comparison report if we have changes
+        comparison_file = None
+        scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
+        if len(scan_files) >= 2:
+            # Get changes for comparison
+            with open(scan_files[0]) as f:
+                current = json.load(f)
+            changes = self.tracker.detect_changes(current)
+            if changes:
+                comparison_file = self.generate_comparison_report(devices, changes, timestamp)
+
+        return report_file, comparison_file
+
+    def generate_comparison_report(self, current_devices, changes, timestamp):
+        """Generate comparison report HTML"""
+        if not changes or not changes.get("summary"):
+            return None
+
+        from jinja2 import Environment, FileSystemLoader
+
+        # Get previous scan timestamp for comparison report naming
+        scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
+        if len(scan_files) < 2:
+            return None
+
+        # Load previous scan info
+        previous_scan_file = scan_files[1]
+        previous_timestamp = previous_scan_file.stem.replace("scan_", "")
+        previous_time = datetime.strptime(previous_timestamp, "%Y%m%d_%H%M%S")
+        current_time = datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+
+        # Calculate unchanged devices
+        total_current = len(current_devices)
+        new_count = len(changes.get("new_devices", []))
+        changed_count = len(changes.get("changed_devices", []))
+        unchanged_count = total_current - new_count - changed_count
+
+        # Setup Jinja2
+        env = Environment(loader=FileSystemLoader(self.base_path / "templates"))
+        template = env.get_template("comparison_report.html")
+
+        # Prepare comparison data
+        comparison_data = {
+            "comparison_date": datetime.now().strftime("%B %d, %Y"),
+            "previous_scan_time": previous_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "current_scan_time": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "previous_device_count": changes["summary"].get("total_previous", 0),
+            "current_device_count": changes["summary"].get("total_current", 0),
+            "new_devices": changes.get("new_devices", []),
+            "missing_devices": changes.get("missing_devices", []),
+            "changed_devices": changes.get("changed_devices", []),
+            "unchanged_count": unchanged_count,
+            "current_scan_timestamp": timestamp,
+        }
+
+        # Render and save comparison report
+        comparison_file = self.output_path / "reports" / f"comparison_{timestamp}.html"
+        html_content = template.render(**comparison_data)
+
+        with open(comparison_file, "w") as f:
+            f.write(html_content)
+
+        console.print(f"[green]✓ Comparison report generated[/green]")
+        return comparison_file
 
     def _count_device_types(self, devices):
         """Count devices by type"""

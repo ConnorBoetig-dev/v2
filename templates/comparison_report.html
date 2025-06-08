@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Scan Comparison - {{ comparison_date }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .scan-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .change-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .change-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .change-card h3 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .change-card .number {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+
+        .change-card.new {
+            border-top: 4px solid #48bb78;
+        }
+
+        .change-card.new h3 {
+            color: #48bb78;
+        }
+
+        .change-card.missing {
+            border-top: 4px solid #f56565;
+        }
+
+        .change-card.missing h3 {
+            color: #f56565;
+        }
+
+        .change-card.modified {
+            border-top: 4px solid #ed8936;
+        }
+
+        .change-card.modified h3 {
+            color: #ed8936;
+        }
+
+        .change-card.unchanged {
+            border-top: 4px solid #4299e1;
+        }
+
+        .change-card.unchanged h3 {
+            color: #4299e1;
+        }
+
+        .section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .device-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1rem;
+        }
+
+        .device-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+            transition: all 0.2s;
+        }
+
+        .device-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .device-card.new {
+            background: #d4edda;
+            border-color: #48bb78;
+        }
+
+        .device-card.missing {
+            background: #f8d7da;
+            border-color: #f56565;
+        }
+
+        .device-card.modified {
+            background: #fff3cd;
+            border-color: #ed8936;
+        }
+
+        .device-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .device-ip {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .device-type {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .type-router {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .type-switch {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+
+        .type-server {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .type-workstation {
+            background: #e9d5ff;
+            color: #7c3aed;
+        }
+
+        .type-printer {
+            background: #fed7aa;
+            color: #ea580c;
+        }
+
+        .type-iot {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .type-unknown {
+            background: #e5e7eb;
+            color: #6b7280;
+        }
+
+        .device-details {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .device-details div {
+            margin: 0.25rem 0;
+        }
+
+        .change-details {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .change-item {
+            background: white;
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin: 0.25rem 0;
+            font-size: 0.875rem;
+        }
+
+        .change-field {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .added {
+            color: #48bb78;
+        }
+
+        .removed {
+            color: #f56565;
+        }
+
+        .changed {
+            color: #ed8936;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a60d8;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #2d3748;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+
+        @media (max-width: 768px) {
+            .change-summary {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .device-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .scan-info {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+        }
+
+        @media print {
+            .actions {
+                display: none;
+            }
+
+            body {
+                background: white;
+            }
+
+            .container {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Network Scan Comparison</h1>
+            <div class="scan-info">
+                <div>
+                    <strong>Previous Scan:</strong> {{ previous_scan_time }}<br>
+                    <strong>Devices:</strong> {{ previous_device_count }}
+                </div>
+                <div>
+                    <strong>Current Scan:</strong> {{ current_scan_time }}<br>
+                    <strong>Devices:</strong> {{ current_device_count }}
+                </div>
+            </div>
+        </header>
+
+        <div class="change-summary">
+            <div class="change-card new">
+                <h3>New Devices</h3>
+                <div class="number">{{ new_devices|length }}</div>
+            </div>
+
+            <div class="change-card missing">
+                <h3>Missing Devices</h3>
+                <div class="number">{{ missing_devices|length }}</div>
+            </div>
+
+            <div class="change-card modified">
+                <h3>Modified Devices</h3>
+                <div class="number">{{ changed_devices|length }}</div>
+            </div>
+
+            <div class="change-card unchanged">
+                <h3>Unchanged Devices</h3>
+                <div class="number">{{ unchanged_count }}</div>
+            </div>
+        </div>
+
+        {% if new_devices %}
+        <div class="section">
+            <h2>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#48bb78" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                </svg>
+                New Devices ({{ new_devices|length }})
+            </h2>
+            <div class="device-grid">
+                {% for device in new_devices %}
+                <div class="device-card new">
+                    <div class="device-header">
+                        <span class="device-ip">{{ device.ip }}</span>
+                        <span class="device-type type-{{ device.type }}">{{ device.type }}</span>
+                    </div>
+                    <div class="device-details">
+                        {% if device.hostname %}<div><strong>Hostname:</strong> {{ device.hostname }}</div>{% endif %}
+                        {% if device.vendor %}<div><strong>Vendor:</strong> {{ device.vendor }}</div>{% endif %}
+                        {% if device.os %}<div><strong>OS:</strong> {{ device.os }}</div>{% endif %}
+                        {% if device.services %}
+                        <div><strong>Services:</strong> {{ device.services[:3]|join(', ') }}{% if device.services|length
+                            > 3 %}...{% endif %}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if missing_devices %}
+        <div class="section">
+            <h2>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f56565" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+                Missing Devices ({{ missing_devices|length }})
+            </h2>
+            <div class="device-grid">
+                {% for device in missing_devices %}
+                <div class="device-card missing">
+                    <div class="device-header">
+                        <span class="device-ip">{{ device.ip }}</span>
+                        <span class="device-type type-{{ device.type }}">{{ device.type }}</span>
+                    </div>
+                    <div class="device-details">
+                        {% if device.hostname %}<div><strong>Hostname:</strong> {{ device.hostname }}</div>{% endif %}
+                        {% if device.vendor %}<div><strong>Vendor:</strong> {{ device.vendor }}</div>{% endif %}
+                        {% if device.critical %}<div class="removed"><strong>⚠️ CRITICAL DEVICE</strong></div>{% endif
+                        %}
+                        <div><strong>Last seen:</strong> {{ device.last_seen }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if changed_devices %}
+        <div class="section">
+            <h2>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ed8936" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 2v10l4 2"></path>
+                </svg>
+                Modified Devices ({{ changed_devices|length }})
+            </h2>
+            <div class="device-grid">
+                {% for device in changed_devices %}
+                <div class="device-card modified">
+                    <div class="device-header">
+                        <span class="device-ip">{{ device.ip }}</span>
+                        <span class="device-type type-{{ device.type }}">{{ device.type }}</span>
+                    </div>
+                    <div class="device-details">
+                        {% if device.hostname %}<div><strong>Hostname:</strong> {{ device.hostname }}</div>{% endif %}
+                        <div class="change-details">
+                            {% for change in device.changes %}
+                            <div class="change-item">
+                                <span class="change-field">{{ change.field|title }}:</span>
+                                {% if change.action == 'added' %}
+                                <span class="added">Added {{ change.values|join(', ') }}</span>
+                                {% elif change.action == 'removed' %}
+                                <span class="removed">Removed {{ change.values|join(', ') }}</span>
+                                {% elif change.action == 'opened' %}
+                                <span class="added">Opened ports {{ change.values|join(', ') }}</span>
+                                {% elif change.action == 'closed' %}
+                                <span class="removed">Closed ports {{ change.values|join(', ') }}</span>
+                                {% elif change.action == 'changed' %}
+                                <span class="changed">{{ change.old_value }} → {{ change.new_value }}</span>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if not new_devices and not missing_devices and not changed_devices %}
+        <div class="section">
+            <div class="empty-state">
+                <h2>No Changes Detected</h2>
+                <p>The network configuration remains unchanged since the last scan.</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="actions">
+            <a href="report_{{ current_scan_timestamp }}.html" class="btn btn-primary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                View Current Report
+            </a>
+
+            <button class="btn btn-secondary" onclick="window.print()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8" rx="1"></rect>
+                </svg>
+                Print Comparison
+            </button>
+        </div>
+    </div>
+</body>
+
+</html>
