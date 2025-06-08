@@ -1,9 +1,9 @@
 import json
+import os
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 
 class NetworkScanner:
@@ -58,14 +58,18 @@ class NetworkScanner:
 
     def _run_masscan(self, target: str) -> List[Dict]:
         """Run masscan for fast discovery"""
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+        # Create temp file in a writable location
+        temp_dir = tempfile.gettempdir()
+        temp_file = os.path.join(temp_dir, f"masscan_{os.getpid()}.json")
+
+        try:
             cmd = [
                 "sudo",
                 "masscan",
                 "-p0",  # Ping scan
                 "--rate=10000",  # 10k packets/sec
                 "-oJ",
-                tmp.name,  # JSON output
+                temp_file,  # JSON output
                 target,
             ]
 
@@ -75,20 +79,28 @@ class NetworkScanner:
                 raise Exception(f"Masscan failed: {proc.stderr}")
 
             # Parse JSON output
-            with open(tmp.name) as f:
-                data = f.read()
-                if data.strip():
-                    results = []
-                    # Masscan JSON is line-delimited
-                    for line in data.strip().split("\n"):
-                        if line.strip() and line != "{" and line != "}":
-                            try:
-                                entry = json.loads(line.rstrip(","))
-                                results.append(entry)
-                            except json.JSONDecodeError:
-                                continue
-                    return results
-                return []
+            if os.path.exists(temp_file):
+                with open(temp_file) as f:
+                    data = f.read()
+                    if data.strip():
+                        results = []
+                        # Masscan JSON is line-delimited
+                        for line in data.strip().split("\n"):
+                            if line.strip() and line != "{" and line != "}":
+                                try:
+                                    entry = json.loads(line.rstrip(","))
+                                    results.append(entry)
+                                except json.JSONDecodeError:
+                                    continue
+                        return results
+            return []
+        finally:
+            # Clean up temp file
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except:
+                    pass
 
     def _parse_nmap_xml(self, xml_file: str) -> List[Dict]:
         """Parse nmap XML output"""

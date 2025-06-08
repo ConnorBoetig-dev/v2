@@ -44,7 +44,6 @@ class NetworkUtils:
     def get_subnet(ip: str) -> str:
         """Get /24 subnet for an IP"""
         try:
-            ip_obj = ipaddress.ip_address(ip)
             # Create /24 network
             network = ipaddress.ip_network(f"{ip}/24", strict=False)
             return str(network)

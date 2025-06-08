@@ -30,10 +30,12 @@ python3 mapper.py
 
 ## 🔧 System Requirements
 
+## 🔧 System Requirements
+
 - Python 3.8+
-- nmap (required)
-- masscan (optional, for faster discovery)
-- arp-scan (optional, for MAC address discovery)
+- nmap
+- masscan
+- arp-scan
 
 ## 📁 Project Structure
 

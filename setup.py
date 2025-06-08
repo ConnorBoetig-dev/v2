@@ -3,7 +3,6 @@
 NetworkMapper v2 - Automated Setup Script
 """
 
-import os
 import platform
 import subprocess
 import sys
@@ -45,8 +44,8 @@ class SetupManager:
 
         print("\n✓ Setup complete!")
         print("\nTo start using NetworkMapper:")
-        print(f"  1. Activate virtual environment: source venv/bin/activate")
-        print(f"  2. Run the tool: python3 mapper.py")
+        print("  1. Activate virtual environment: source venv/bin/activate")
+        print("  2. Run the tool: python3 mapper.py")
 
         return True
 
@@ -63,28 +62,25 @@ class SetupManager:
         """Check and install system dependencies"""
         print("\nChecking system dependencies...")
 
+        # ALL dependencies are now required for full functionality
         deps = {
-            "nmap": "Network scanner (required)",
-            "masscan": "Fast host discovery (optional)",
-            "arp-scan": "Layer 2 discovery (optional)",
+            "nmap": "Network scanner",
+            "masscan": "Fast host discovery",
+            "arp-scan": "Layer 2 discovery",
         }
 
         missing = []
-        optional_missing = []
 
         for cmd, desc in deps.items():
             if self.command_exists(cmd):
                 print(f"  ✓ {cmd}: {desc}")
             else:
-                if "required" in desc:
-                    missing.append(cmd)
-                    print(f"  ❌ {cmd}: {desc}")
-                else:
-                    optional_missing.append(cmd)
-                    print(f"  ⚠️  {cmd}: {desc}")
+                missing.append(cmd)
+                print(f"  ❌ {cmd}: {desc}")
 
         if missing:
             print(f"\n❌ Missing required dependencies: {', '.join(missing)}")
+            print("\nThese tools are required for full NetworkMapper functionality.")
 
             if self.os_type == "linux":
                 print("\nTo install on Ubuntu/Debian:")
@@ -93,12 +89,10 @@ class SetupManager:
                 print("\nTo install on macOS (using Homebrew):")
                 print(f"  brew install {' '.join(missing)}")
 
+            print("\nPlease install all missing dependencies and run setup again.")
             return False
 
-        if optional_missing:
-            print(f"\n⚠️  Optional tools not found: {', '.join(optional_missing)}")
-            print("  NetworkMapper will work but some features may be limited.")
-
+        print("\n✓ All system dependencies installed!")
         return True
 
     def command_exists(self, cmd):
@@ -167,21 +161,26 @@ class SetupManager:
 
         config_content = """# NetworkMapper v2 Configuration
 
-# Default scan settings
+# Scan settings
 scan:
-  default_target: "192.168.1.0/24"
+  example_target: "192.168.1.0/24"  # Just an example format
   default_type: "discovery"
   timeout: 300  # seconds
-  
-# Report settings  
+
+# Scanner preferences
+scanners:
+  prefer_masscan: false  # Use masscan for discovery when available
+  nmap_timing: "-T4"     # Nmap timing template (T0-T5)
+
+# Report settings
 report:
   auto_open: true
   include_3d_view: true
-  
+
 # Device classification thresholds
 classification:
   confidence_threshold: 70
-  
+
 # Change detection
 changes:
   track_services: true

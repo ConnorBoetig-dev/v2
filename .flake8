@@ -1,7 +1,10 @@
 [flake8]
 max-line-length = 100
-extend-ignore = E203, W503
-exclude = 
+extend-ignore = E203, W503, E722
+# E203: whitespace before ':'
+# W503: line break before binary operator
+# E722: bare except (we use this for network operations)
+exclude =
     .git,
     __pycache__,
     venv,

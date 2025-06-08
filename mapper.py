@@ -5,11 +5,8 @@ NetworkMapper 2.0 - Network Discovery and Mapping Tool
 
 import csv
 import json
-import os
-import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -101,7 +98,7 @@ class NetworkMapper:
         console.print("\n[bold]Network Scan Wizard[/bold]")
 
         # Get target
-        target = Prompt.ask("Enter target network", default="192.168.1.0/24")
+        target = Prompt.ask("Enter target network (example: 192.168.1.0/24)")
 
         # Select scan type
         scan_types = {
@@ -150,7 +147,7 @@ class NetworkMapper:
             self.save_changes(changes, timestamp)
 
         # Summary
-        console.print(f"\n[green]✓ Scan complete![/green]")
+        console.print("[green]✓ Scan complete![/green]")
         console.print(f"Found {len(devices)} devices")
         console.print(f"Results saved to: {scan_file}")
 
@@ -217,7 +214,8 @@ class NetworkMapper:
                 f.write("-" * 30 + "\n")
                 for device in changes["new_devices"]:
                     f.write(
-                        f"  • {device['ip']} - {device.get('hostname', 'N/A')} ({device.get('type', 'unknown')})\n"
+                        f"  • {device['ip']} - {device.get('hostname', 'N/A')} "
+                        f"({device.get('type', 'unknown')})\n"
                     )
                 f.write("\n")
 
@@ -226,7 +224,8 @@ class NetworkMapper:
                 f.write("-" * 30 + "\n")
                 for device in changes["missing_devices"]:
                     f.write(
-                        f"  • {device['ip']} - {device.get('hostname', 'N/A')} ({device.get('type', 'unknown')})\n"
+                        f"  • {device['ip']} - {device.get('hostname', 'N/A')} "
+                        f"({device.get('type', 'unknown')})\n"
                     )
                 f.write("\n")
 
@@ -281,7 +280,7 @@ class NetworkMapper:
         webbrowser.open(file_url)
 
         # Show clickable link in terminal
-        console.print(f"\n[green]✓ Report generated![/green]")
+        console.print("[green]✓ Report generated![/green]")
         console.print(f"Report saved to: [link={file_url}]{report_file}[/link]")
 
     def _count_device_types(self, devices):
@@ -359,14 +358,16 @@ class NetworkMapper:
             console.print(f"[green]NEW DEVICES ({len(changes['new_devices'])})[/green]")
             for device in changes["new_devices"]:
                 console.print(
-                    f"  • {device['ip']} - {device.get('hostname', 'N/A')} ({device.get('type', 'unknown')})"
+                    f"  • {device['ip']} - {device.get('hostname', 'N/A')} "
+                    f"({device.get('type', 'unknown')})"
                 )
 
         if changes.get("missing_devices"):
             console.print(f"\n[red]MISSING DEVICES ({len(changes['missing_devices'])})[/red]")
             for device in changes["missing_devices"]:
                 console.print(
-                    f"  • {device['ip']} - {device.get('hostname', 'N/A')} ({device.get('type', 'unknown')})"
+                    f"  • {device['ip']} - {device.get('hostname', 'N/A')} "
+                    f"({device.get('type', 'unknown')})"
                 )
 
         if changes.get("changed_devices"):
@@ -426,7 +427,7 @@ class NetworkMapper:
 
             file_url = f"file://{report_files[0].absolute()}"
             webbrowser.open(file_url)
-            console.print(f"[green]Opening network map in browser...[/green]")
+            console.print("[green]Opening network map in browser...[/green]")
         else:
             console.print("[yellow]No reports found. Generate a report first.[/yellow]")
         input("\nPress Enter to continue...")

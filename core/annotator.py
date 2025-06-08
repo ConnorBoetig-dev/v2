@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
