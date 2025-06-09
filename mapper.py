@@ -106,6 +106,7 @@ class NetworkMapper:
             "1": ("discovery", "Discovery Scan", "~30 seconds", False),
             "2": ("inventory", "Inventory Scan", "~5 minutes", True),
             "3": ("deep", "Deep Scan", "~15 minutes", True),
+            "4": ("arp", "ARP Scan (Layer 2)", "~10 seconds", True),
         }
 
         console.print("\n[bold]Scan Types:[/bold]")
@@ -122,12 +123,17 @@ class NetworkMapper:
             use_masscan = Confirm.ask("Use masscan for faster discovery?", default=False)
 
         # Run scan
-        console.print(f"\n[yellow]Starting {scan_name} on {target}...[/yellow]")
+        console.print(f"\n[yellow]Starting {scan_name} on {target}...[/yellow]\n")
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        results = self.scanner.scan(
-            target=target, scan_type=scan_type, use_masscan=use_masscan, needs_root=needs_root
-        )
+        
+        # Handle ARP scan separately
+        if scan_type == "arp":
+            results = self.scanner._run_arp_scan(target)
+        else:
+            results = self.scanner.scan(
+                target=target, scan_type=scan_type, use_masscan=use_masscan, needs_root=needs_root
+            )
 
         # Parse and classify
         devices = self.parser.parse_results(results)
@@ -174,7 +180,6 @@ class NetworkMapper:
 
         if Confirm.ask("\nGenerate HTML report?"):
             report_file, comparison_file = self.generate_html_report(devices, timestamp)
-    # Comparison is already generated inside generate_html_report if applicable
 
             # Show report paths
             console.print(f"\n[bold]Report Files:[/bold]")

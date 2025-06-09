@@ -11,7 +11,18 @@ scan:
 scanners:
   prefer_masscan: false  # Use masscan for discovery when available
   nmap_timing: "-T4"     # Nmap timing template (T0-T5)
-
+  
+  # Progress display settings
+  progress_details: false  # Show detailed scan progress output (default: minimal)
+  progress_refresh_rate: 4  # Progress bar refresh rate (Hz)
+  
+  # Hang detection
+  hang_threshold: 30  # Seconds without progress before warning
+  auto_kill_hung: false  # Automatically kill hung scans after timeout
+  
+  # Stats output intervals
+  nmap_stats_interval: "1s"  # How often nmap reports progress
+  
 # Report settings
 report:
   auto_open: true
