@@ -1,80 +1,164 @@
+import os
 import platform
 import re
 import subprocess
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional
 
 
 class MACLookup:
-    def __init__(self):
-        # Common MAC vendor prefixes (OUI)
-        # In production, this would load from IEEE OUI database
-        self.vendor_db = {
-            "00:00:0c": "Cisco Systems",
-            "00:01:42": "Cisco Systems",
-            "00:1b:54": "Cisco Systems",
-            "00:23:ea": "Cisco Systems",
-            "00:50:56": "VMware",
-            "00:0c:29": "VMware",
-            "00:05:69": "VMware",
-            "00:15:5d": "Microsoft Corp",
-            "00:03:ff": "Microsoft Corp",
-            "00:50:f2": "Microsoft Corp",
-            "00:17:42": "Dell Inc.",
-            "00:1c:23": "Dell Inc.",
-            "00:24:e8": "Dell Inc.",
-            "3c:d9:2b": "HP Inc.",
-            "00:1e:0b": "Hewlett Packard",
-            "00:25:b3": "Hewlett Packard",
-            "00:50:ba": "D-Link",
-            "00:05:5d": "D-Link",
-            "00:0f:3d": "D-Link",
-            "00:1f:1f": "Edimax",
-            "00:0e:2e": "Edimax",
-            "74:da:88": "Edimax",
-            "b8:27:eb": "Raspberry Pi Foundation",
-            "dc:a6:32": "Raspberry Pi Foundation",
-            "e4:5f:01": "Raspberry Pi Foundation",
-            "00:11:32": "Synology",
-            "00:50:43": "Marvell",
-            "00:1b:21": "Intel Corporate",
-            "00:1f:29": "Intel Corporate",
-            "00:21:6a": "Intel Corporate",
-            "a4:c3:f0": "Intel Corporate",
-            "00:26:b9": "Dell Inc.",
-            "f0:4d:a2": "Dell Inc.",
-            "18:db:f2": "Dell Inc.",
-            "00:14:22": "Dell Inc.",
-            "00:21:70": "Dell Inc.",
-            "00:22:19": "Dell Inc.",
-            "00:a0:c9": "3Com",
-            "00:04:75": "3Com",
-            "00:06:5b": "3Com",
-            "00:1e:c9": "Apple",
-            "00:23:12": "Apple",
-            "00:25:4b": "Apple",
-            "00:26:bb": "Apple",
-            "10:dd:b1": "Apple",
-            "00:16:cb": "Apple",
-            "00:17:f2": "Apple",
-            "00:19:e3": "Apple",
-            "00:1b:63": "Apple",
-            "00:1c:b3": "Apple",
-            "00:1d:4f": "Apple",
-            "00:1e:52": "Apple",
-            "00:1f:5b": "Apple",
-            "00:21:e9": "Apple",
-            "00:22:41": "Apple",
-            "00:23:32": "Apple",
-            "00:23:6c": "Apple",
-            "00:23:df": "Apple",
-            "00:24:36": "Apple",
-            "00:25:00": "Apple",
-            "00:25:bc": "Apple",
-            "00:26:08": "Apple",
-            "00:26:4a": "Apple",
-            "00:26:b0": "Apple",
-        }
+    def __init__(self, cache_dir: Path = None):
         self.system = platform.system()
+
+        # Setup cache directory
+        if cache_dir is None:
+            cache_dir = Path(__file__).parent.parent / "cache"
+        self.cache_dir = cache_dir
+        self.cache_dir.mkdir(exist_ok=True)
+
+        self.oui_file = self.cache_dir / "oui.txt"
+        self.vendor_cache = {}
+
+        # Load OUI database
+        self._load_oui_database()
+
+        # Virtual machine patterns
+        self.virtual_patterns = [
+            "00:50:56",  # VMware
+            "00:0C:29",  # VMware
+            "00:05:69",  # VMware
+            "00:15:5D",  # Hyper-V
+            "00:03:FF",  # Microsoft Virtual PC
+            "08:00:27",  # VirtualBox
+            "52:54:00",  # QEMU/KVM
+            "00:16:3E",  # Xen
+            "02:42:",    # Docker
+        ]
+
+    def _load_oui_database(self):
+        """Load IEEE OUI database from cache or download if needed"""
+        # Check if we need to download/update
+        if self._should_update_oui():
+            print("[INFO] Updating IEEE OUI database...")
+            self._download_oui_database()
+
+        # Parse the OUI file
+        if self.oui_file.exists():
+            self._parse_oui_file()
+        else:
+            print("[WARNING] No OUI database found. Using online lookups only.")
+            # Fallback to minimal hardcoded database for critical vendors
+            self.vendor_cache = {
+                "00:00:0c": "Cisco Systems, Inc",
+                "00:50:56": "VMware, Inc.",
+                "00:0c:29": "VMware, Inc.",
+                "00:15:5d": "Microsoft Corporation",
+                "00:1c:23": "Dell Inc.",
+                "b8:27:eb": "Raspberry Pi Foundation",
+                "00:1b:21": "Intel Corporate",
+            }
+
+    def _should_update_oui(self) -> bool:
+        """Check if OUI database needs updating (older than 30 days)"""
+        if not self.oui_file.exists():
+            return True
+
+        # Check file age
+        file_time = datetime.fromtimestamp(self.oui_file.stat().st_mtime)
+        age = datetime.now() - file_time
+
+        return age > timedelta(days=30)
+
+    def _download_oui_database(self):
+        """Download the IEEE OUI database"""
+        try:
+            import requests
+
+            # IEEE OUI database URL
+            url = "http://standards-oui.ieee.org/oui/oui.txt"
+
+            # Download with timeout
+            response = requests.get(url, timeout=30, stream=True)
+            response.raise_for_status()
+
+            # Write to temporary file first
+            temp_file = self.oui_file.with_suffix('.tmp')
+            with open(temp_file, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+
+            # Move to final location
+            temp_file.replace(self.oui_file)
+            print(f"[INFO] OUI database updated successfully ({self.oui_file.stat().st_size // 1024} KB)")
+
+        except Exception as e:
+            print(f"[WARNING] Failed to download OUI database: {e}")
+            # Try alternative source
+            self._download_oui_alternative()
+
+    def _download_oui_alternative(self):
+        """Try alternative OUI database source"""
+        try:
+            import requests
+
+            # Alternative: Wireshark's manuf database (smaller, curated)
+            url = "https://gitlab.com/wireshark/wireshark/-/raw/master/manuf"
+
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            # Convert to OUI format and save
+            temp_file = self.oui_file.with_suffix('.tmp')
+            with open(temp_file, 'w') as f:
+                for line in response.text.split('\n'):
+                    if line and not line.startswith('#'):
+                        parts = line.split('\t')
+                        if len(parts) >= 2:
+                            mac = parts[0].replace(':', '-').upper()
+                            vendor = parts[1]
+                            f.write(f"{mac}\t{vendor}\n")
+
+            temp_file.replace(self.oui_file)
+            print("[INFO] Alternative OUI database downloaded successfully")
+
+        except Exception as e:
+            print(f"[WARNING] Failed to download alternative OUI database: {e}")
+
+    def _parse_oui_file(self):
+        """Parse the OUI database file"""
+        self.vendor_cache = {}
+
+        try:
+            with open(self.oui_file, 'r', encoding='utf-8', errors='ignore') as f:
+                for line in f:
+                    line = line.strip()
+
+                    # IEEE format: XX-XX-XX   (hex)    Organization Name
+                    if re.match(r'^[0-9A-F]{2}-[0-9A-F]{2}-[0-9A-F]{2}', line):
+                        parts = line.split('\t')
+                        if len(parts) >= 2:
+                            oui = parts[0].replace('-', ':').lower()
+                            # Extract organization name (may have (hex) prefix)
+                            vendor_parts = [p.strip() for p in parts[1:] if p.strip() and p.strip() != '(hex)']
+                            vendor = ' '.join(vendor_parts)
+
+                            if vendor:
+                                self.vendor_cache[oui] = vendor
+
+                    # Alternative format from Wireshark manuf file
+                    elif '\t' in line:
+                        parts = line.split('\t', 1)
+                        if len(parts) == 2:
+                            oui = parts[0].replace('-', ':').lower()
+                            if re.match(r'^[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}', oui):
+                                self.vendor_cache[oui] = parts[1].strip()
+
+            print(f"[INFO] Loaded {len(self.vendor_cache)} OUI entries")
+
+        except Exception as e:
+            print(f"[ERROR] Failed to parse OUI file: {e}")
 
     def get_arp_cache(self) -> Dict[str, str]:
         """Get MAC addresses from system ARP cache (cross-platform)"""
@@ -116,8 +200,7 @@ class MACLookup:
             if result.returncode == 0:
                 arp_cache = {}
                 for line in result.stdout.split("\n"):
-                    # Parse lines like: 192.168.1.1 dev eth0 lladdr
-                    # aa:bb:cc:dd:ee:ff REACHABLE
+                    # Parse lines like: 192.168.1.1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE
                     match = re.search(r"(\d+\.\d+\.\d+\.\d+).*lladdr\s+([0-9a-fA-F:]+)", line)
                     if match:
                         ip = match.group(1)
@@ -167,7 +250,6 @@ class MACLookup:
 
     def lookup_vendor_online(self, mac: str) -> Optional[str]:
         """Lookup vendor using online API (requires internet)"""
-        # Note: In production, consider caching results to avoid rate limits
         try:
             import requests
 
@@ -184,6 +266,9 @@ class MACLookup:
                 if response.status_code == 200:
                     vendor = response.text.strip()
                     if vendor and "Not Found" not in vendor:
+                        # Cache the result
+                        oui = mac[:8].lower()
+                        self.vendor_cache[oui] = vendor
                         return vendor
             except Exception:
                 pass
@@ -196,7 +281,11 @@ class MACLookup:
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("company"):
-                        return data["company"]
+                        vendor = data["company"]
+                        # Cache the result
+                        oui = mac[:8].lower()
+                        self.vendor_cache[oui] = vendor
+                        return vendor
             except Exception:
                 pass
 
@@ -221,23 +310,17 @@ class MACLookup:
         # Check OUI (first 3 octets)
         oui = mac[:8].lower()
 
-        # Direct lookup in local database
-        if oui in self.vendor_db:
-            return self.vendor_db[oui]
-
-        # Check for VMware variants
-        if mac.upper().startswith(("00:50:56", "00:0C:29", "00:05:69")):
-            return "VMware"
+        # Direct lookup in cache
+        if oui in self.vendor_cache:
+            return self.vendor_cache[oui]
 
         # Check for virtual machine patterns
         if self._is_virtual_mac(mac):
             return "Virtual Machine"
 
-        # Try online lookup as fallback (if enabled)
+        # Try online lookup as fallback
         vendor = self.lookup_vendor_online(mac)
         if vendor:
-            # Cache the result for future use
-            self.vendor_db[oui] = vendor
             return vendor
 
         return None
@@ -263,20 +346,8 @@ class MACLookup:
 
     def _is_virtual_mac(self, mac: str) -> bool:
         """Check if MAC indicates virtual machine"""
-        virtual_patterns = [
-            "00:50:56",  # VMware
-            "00:0C:29",  # VMware
-            "00:05:69",  # VMware
-            "00:15:5D",  # Hyper-V
-            "00:03:FF",  # Microsoft Virtual PC
-            "08:00:27",  # VirtualBox
-            "52:54:00",  # QEMU/KVM
-            "00:16:3E",  # Xen
-            "02:42:",  # Docker
-        ]
-
         mac_start = mac[:8].upper()
-        return any(mac_start.startswith(pattern.upper()) for pattern in virtual_patterns)
+        return any(mac_start.startswith(pattern.upper()) for pattern in self.virtual_patterns)
 
     def enrich_with_arp_cache(self, devices: List[Dict]) -> List[Dict]:
         """Enrich devices with MAC addresses from ARP cache"""
@@ -313,3 +384,20 @@ class MACLookup:
                     device["is_virtual"] = True
 
         return device
+
+    def update_database(self):
+        """Manually trigger OUI database update"""
+        print("[INFO] Forcing OUI database update...")
+        self._download_oui_database()
+        self._parse_oui_file()
+
+    def get_stats(self) -> Dict:
+        """Get statistics about the MAC lookup database"""
+        return {
+            "vendor_count": len(self.vendor_cache),
+            "database_file": str(self.oui_file),
+            "database_exists": self.oui_file.exists(),
+            "database_size": self.oui_file.stat().st_size if self.oui_file.exists() else 0,
+            "database_age_days": (datetime.now() - datetime.fromtimestamp(
+                self.oui_file.stat().st_mtime)).days if self.oui_file.exists() else -1
+        }
