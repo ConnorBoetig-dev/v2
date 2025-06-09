@@ -283,7 +283,7 @@
         .visualization {
             width: 100%;
             height: 600px;
-            background: #f5f5f5;
+            background: #ffffff;
             border-radius: 10px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             position: relative;
@@ -669,57 +669,52 @@
             }
         }
 
-        /* Enhanced styles for network connections */
-        .network-link {
+        /* Enhanced styles for network connections - FIXED */
+        .links line {
             fill: none;
-            stroke-opacity: 0.8;
-            transition: stroke-opacity 0.3s, stroke-width 0.3s;
+            stroke-opacity: 0.6;
+            stroke-width: 2;
         }
 
-        .network-link:hover {
-            stroke-opacity: 1;
-            stroke-width: 4;
-        }
-
-        .network-link.backbone {
+        .links line.backbone {
             stroke: #ff4444;
             stroke-width: 3;
         }
 
-        .network-link.uplink {
+        .links line.uplink {
             stroke: #0088cc;
             stroke-width: 2.5;
         }
 
-        .network-link.server_link {
+        .links line.server_link {
             stroke: #00aa44;
             stroke-width: 2;
         }
 
-        .network-link.access {
+        .links line.access {
             stroke: #8844aa;
             stroke-width: 1.5;
         }
 
-        .network-link.peripheral {
+        .links line.peripheral {
             stroke: #ffaa00;
             stroke-width: 1;
             stroke-dasharray: 5, 5;
         }
 
-        .network-link.application {
+        .links line.application {
             stroke: #0066ff;
             stroke-width: 2;
             stroke-dasharray: 3, 3;
         }
 
-        .network-link.critical {
+        .links line.critical {
             stroke: #ff0000;
             stroke-width: 3;
         }
 
-        .network-link.default {
-            stroke: #999999;
+        .links line.default {
+            stroke: #666666;
             stroke-width: 1.5;
         }
 
@@ -1033,7 +1028,7 @@
                 </div>
                 <div class="map-control-group">
                     <label>
-                        <input type="checkbox" id="auto-rotate" checked onchange="toggle3DRotation()"> Auto Rotate
+                        <input type="checkbox" id="auto-rotate" onchange="toggle3DRotation()"> Auto Rotate
                     </label>
                 </div>
                 <div class="map-control-group">
@@ -1110,7 +1105,7 @@
         let nodes3D = [];
         let connections3D = [];
         let labels3D = [];
-        let autoRotate = true;
+        let autoRotate = false; // CHANGED: Default to false
         let showConnections = true;
         let show3DLabels = true;
         let manualRotation = false;
@@ -1233,12 +1228,73 @@
             const nodes = d3Data.nodes.map(d => ({ ...d }));
             const links = d3Data.links.map(d => ({ ...d }));
 
+            // FIXED: Create links FIRST (so they appear behind nodes)
+            link = g.append("g")
+                .attr("class", "links")
+                .selectAll("line")
+                .data(links)
+                .enter().append("line")
+                .attr("class", d => d.type || 'default')
+                .style("stroke", d => {
+                    const linkColors = {
+                        backbone: "#ff4444",
+                        uplink: "#0088cc",
+                        critical: "#ff0000",
+                        server_link: "#00aa44",
+                        access: "#8844aa",
+                        peripheral: "#ffaa00",
+                        application: "#0066ff",
+                        default: "#666666"
+                    };
+                    return linkColors[d.type] || "#666666";
+                })
+                .style("stroke-width", d => {
+                    const widths = {
+                        backbone: 3,
+                        uplink: 2.5,
+                        critical: 3,
+                        server_link: 2,
+                        access: 1.5,
+                        peripheral: 1,
+                        application: 2,
+                        default: 1.5
+                    };
+                    return widths[d.type] || 1.5;
+                })
+                .style("stroke-opacity", 0.6)
+                .style("stroke-dasharray", d => {
+                    if (d.type === 'peripheral') return "5, 5";
+                    if (d.type === 'application') return "3, 3";
+                    return null;
+                });
+
+            // Create nodes (after links)
+            node = g.append("g")
+                .attr("class", "nodes")
+                .selectAll("circle")
+                .data(nodes)
+                .enter().append("circle")
+                .attr("r", d => {
+                    if (d.critical) return 14;
+                    if (d.type === 'router' || d.type === 'switch') return 12;
+                    return 10;
+                })
+                .style("fill", d => getNodeColor(d.type))
+                .style("stroke", d => d.critical ? "#ff0000" : "#333")
+                .style("stroke-width", d => d.critical ? 3 : 2)
+                .style("cursor", "pointer")
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            // Set up simulation
             if (currentLayout === 'force') {
                 simulation = d3.forceSimulation(nodes)
-                    .force("link", d3.forceLink(links).id(d => d.id).distance(120).strength(0.3))
-                    .force("charge", d3.forceManyBody().strength(-600))
+                    .force("link", d3.forceLink(links).id(d => d.id).distance(100).strength(0.5))
+                    .force("charge", d3.forceManyBody().strength(-500))
                     .force("center", d3.forceCenter(width / 2, height / 2))
-                    .force("collision", d3.forceCollide().radius(50))
+                    .force("collision", d3.forceCollide().radius(30))
                     .alphaMin(0.001)
                     .alphaDecay(0.02);
             } else if (currentLayout === 'circular') {
@@ -1265,78 +1321,11 @@
                     node.fy = Math.floor(i / cols) * cellHeight + cellHeight / 2;
                 });
 
-                simulation = d3.forceSimulation(nodes);
+                simulation = d3.forceSimulation(nodes)
+                    .force("link", d3.forceLink(links).id(d => d.id));
             }
 
-            // Create links with proper styling
-            link = g.append("g")
-                .attr("class", "links")
-                .selectAll("line")
-                .data(links)
-                .enter().append("line")
-                .attr("class", d => `network-link ${d.type || 'default'}`)
-                .style("stroke", d => {
-                    const linkColors = {
-                        backbone: "#ff4444",
-                        uplink: "#0088cc",
-                        critical: "#ff0000",
-                        server_link: "#00aa44",
-                        access: "#8844aa",
-                        peripheral: "#ffaa00",
-                        application: "#0066ff"
-                    };
-                    return linkColors[d.type] || "#666666";
-                })
-                .style("stroke-width", d => (d.value || 2) * 1.5)
-                .style("stroke-opacity", 0.8);
-
-            // Create arrow markers for directed connections
-            svg.append("defs").selectAll("marker")
-                .data(["backbone", "uplink", "server_link", "access", "peripheral", "application"])
-                .enter().append("marker")
-                .attr("id", d => `arrow-${d}`)
-                .attr("viewBox", "0 -5 10 10")
-                .attr("refX", 15)
-                .attr("refY", 0)
-                .attr("markerWidth", 6)
-                .attr("markerHeight", 6)
-                .attr("orient", "auto")
-                .append("path")
-                .attr("d", "M0,-5L10,0L0,5")
-                .attr("fill", d => {
-                    const colors = {
-                        backbone: "#ff4444",
-                        uplink: "#0088cc",
-                        server_link: "#00aa44",
-                        access: "#8844aa",
-                        peripheral: "#ffaa00",
-                        application: "#0066ff"
-                    };
-                    return colors[d] || "#666666";
-                });
-
-            // Apply markers to appropriate links
-            link.attr("marker-end", d => `url(#arrow-${d.type || 'default'})`);
-
-            node = g.append("g")
-                .attr("class", "nodes")
-                .selectAll("circle")
-                .data(nodes)
-                .enter().append("circle")
-                .attr("r", d => {
-                    if (d.critical) return 14;
-                    if (d.type === 'router' || d.type === 'switch') return 12;
-                    return 10;
-                })
-                .style("fill", d => getNodeColor(d.type))
-                .style("stroke", d => d.critical ? "#ff0000" : "#333")
-                .style("stroke-width", d => d.critical ? 3 : 2)
-                .style("cursor", "pointer")
-                .call(d3.drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended));
-
+            // Add hover effects to nodes
             node
                 .on("mouseover", function (event, d) {
                     showTooltip2D(event, d);
@@ -1344,9 +1333,7 @@
 
                     // Highlight connected links
                     link.style("stroke-opacity", l =>
-                        l.source === d || l.target === d ? 1 : 0.2
-                    ).style("stroke-width", l =>
-                        l.source === d || l.target === d ? (l.value || 2) * 2 : (l.value || 2) * 1.5
+                        (l.source === d || l.target === d || l.source.id === d.id || l.target.id === d.id) ? 1 : 0.2
                     );
                 })
                 .on("mouseout", function (event, d) {
@@ -1355,13 +1342,13 @@
                         .style("stroke", d.critical ? "#ff0000" : "#333");
 
                     // Reset link opacity
-                    link.style("stroke-opacity", 0.8)
-                        .style("stroke-width", l => (l.value || 2) * 1.5);
+                    link.style("stroke-opacity", 0.6);
                 })
                 .on("click", function (event, d) {
                     showDeviceDetails(d);
                 });
 
+            // Add labels
             if (showLabels) {
                 label = g.append("g")
                     .attr("class", "labels")
@@ -1377,6 +1364,7 @@
                     .style("text-shadow", "0 0 3px white, 0 0 3px white, 0 0 3px white");
             }
 
+            // CRITICAL FIX: Update positions on simulation tick
             if (simulation) {
                 simulation.on("tick", () => {
                     link
@@ -1601,10 +1589,6 @@
                 d.fx = null;
                 d.fy = null;
             }
-            // Restore normal stroke
-            d3.select(event.sourceEvent.target)
-                .style("stroke", d.critical ? "#ff0000" : "#333")
-                .style("stroke-width", d.critical ? 3 : 2);
         }
 
         // 3D Network Functions
@@ -1779,23 +1763,18 @@
             let mouseDown = false;
             let mouseX = 0;
             let mouseY = 0;
-            let manualRotation = false;
 
             renderer.domElement.addEventListener('mousedown', (event) => {
                 if (event.button === 0) { // Left click only
                     mouseDown = true;
-                    manualRotation = true;
                     mouseX = event.clientX;
                     mouseY = event.clientY;
+                    manualRotation = true; // Stop auto-rotation when user interacts
                 }
             });
 
             renderer.domElement.addEventListener('mouseup', () => {
                 mouseDown = false;
-                // Resume auto-rotation after 2 seconds
-                setTimeout(() => {
-                    if (!mouseDown) manualRotation = false;
-                }, 2000);
             });
 
             renderer.domElement.addEventListener('mousemove', (event) => {
@@ -1824,29 +1803,19 @@
                 camera.position.clampLength(8, 150);
             });
 
-            // Animation loop
+            // Animation loop - FIXED
             function animate() {
                 requestAnimationFrame(animate);
 
-                const time = Date.now() * 0.001;
+                // REMOVED: The problematic floating animation
+                // No more sin wave movement for nodes
 
-                // Animate nodes
-                nodes3D.forEach((nodeData, i) => {
-                    if (nodeData.mesh) {
-                        const baseY = nodeData.position.y;
-                        nodeData.mesh.position.y = baseY + Math.sin(time + i) * 0.2;
-
-                        if (nodeData.device && nodeData.device.critical) {
-                            nodeData.mesh.rotation.y = time * 0.5;
-                        }
-                    }
-                });
-
-                // Auto rotate
+                // Auto rotate - FIXED: only when enabled and not manually rotating
                 if (autoRotate && !mouseDown && !manualRotation) {
+                    const time = Date.now() * 0.001;
                     const radius = camera.position.length();
-                    camera.position.x = Math.cos(time * 0.2) * radius;
-                    camera.position.z = Math.sin(time * 0.2) * radius;
+                    camera.position.x = Math.cos(time * 0.1) * radius; // Slower rotation
+                    camera.position.z = Math.sin(time * 0.1) * radius;
                     camera.lookAt(0, 0, 0);
                 }
 
@@ -1981,6 +1950,7 @@
             if (camera) {
                 camera.position.set(25, 20, 25);
                 camera.lookAt(0, 0, 0);
+                manualRotation = false; // Allow auto-rotation again if enabled
             }
         }
 
@@ -2000,6 +1970,9 @@
 
         function toggle3DRotation() {
             autoRotate = document.getElementById('auto-rotate').checked;
+            if (!autoRotate) {
+                manualRotation = false; // Reset manual rotation flag
+            }
         }
 
         function toggle3DConnections() {
