@@ -32,9 +32,9 @@ class NetworkScanner:
                 "description": "Service and OS detection",
             },
             "deep": {
-                # Changed from -p- (all ports) to top 5000 ports for reasonable timing
-                "nmap": ["-sS", "-sV", "-O", "--top-ports", "5000", "--script", "default"],
-                "description": "Deep scan with top 5000 ports",
+                # Added -PR for ARP discovery to ensure all hosts are found
+                "nmap": ["-PR", "-sS", "-sV", "-O", "--top-ports", "5000", "--script", "default"],
+                "description": "Deep scan with top 5000 ports + ARP discovery",
             },
         }
         self.console = Console()
@@ -164,10 +164,9 @@ class NetworkScanner:
             timing = self.config["scanners"].get("nmap_timing", "-T4")
             cmd.append(timing)
             
-            # For deep scans, always disable DNS to prevent hanging
+            # DNS resolution is now enabled for all scan types
             if scan_type in ["deep", "inventory"]:
-                cmd.append("-n")  # No DNS resolution
-                self.console.print("[dim]Note: DNS resolution disabled for faster scanning[/dim]")
+                self.console.print("[dim]Note: DNS resolution enabled for hostname discovery[/dim]")
             
             # Add profile options
             cmd.extend(profile["nmap"])
@@ -195,6 +194,8 @@ class NetworkScanner:
                 self.console.print(f"  • Estimated hosts: {self.total_hosts}")
                 self.console.print(f"  • Ports to scan: {'All 65535' if '-p-' in cmd else 'Top 5000'}")
                 self.console.print(f"  • Scripts enabled: Yes")
+                self.console.print(f"  • ARP discovery: Yes")
+                self.console.print(f"  • DNS resolution: Yes")
                 self.console.print(f"  • This scan will take time, progress will update as hosts complete\n")
 
             # Create progress display
@@ -366,6 +367,9 @@ class NetworkScanner:
                         if "Ping Scan" in line:
                             current_phase = "discovery"
                             progress.update(task, status="Phase: Host discovery")
+                        elif "ARP Ping Scan" in line:
+                            current_phase = "arp"
+                            progress.update(task, status="Phase: ARP discovery")
                         elif "SYN Stealth Scan" in line:
                             current_phase = "portscan"
                             progress.update(task, status="Phase: Port scanning")
