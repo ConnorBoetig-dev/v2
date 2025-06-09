@@ -9,6 +9,8 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import yaml
 from pathlib import Path
+import sys
+import threading
 
 from rich.console import Console
 from rich.live import Live
@@ -30,14 +32,17 @@ class NetworkScanner:
                 "description": "Service and OS detection",
             },
             "deep": {
-                "nmap": ["-sS", "-sV", "-O", "-p-", "--script", "default"],
-                "description": "Full port scan with scripts",
+                # Changed from -p- (all ports) to top 5000 ports for reasonable timing
+                "nmap": ["-sS", "-sV", "-O", "--top-ports", "5000", "--script", "default"],
+                "description": "Deep scan with top 5000 ports",
             },
         }
         self.console = Console()
         self.config = self._load_config()
         self.last_progress_update = time.time()
         self.hang_detected = False
+        self.total_hosts = 0
+        self.hosts_completed = 0
 
     def _load_config(self):
         """Load configuration from config.yaml"""
@@ -55,7 +60,8 @@ class NetworkScanner:
                     "progress_details": False,
                     "hang_threshold": 30,
                     "nmap_stats_interval": "1s",
-                    "progress_refresh_rate": 4
+                    "progress_refresh_rate": 4,
+                    "nmap_timing": "-T4"
                 }
             }
 
@@ -85,12 +91,65 @@ class NetworkScanner:
             return True
         return False
 
+    def _estimate_total_hosts(self, target: str) -> int:
+        """Estimate number of hosts in target range"""
+        if "/" in target:
+            # CIDR notation
+            try:
+                prefix = int(target.split("/")[1])
+                return 2 ** (32 - prefix) - 2  # Subtract network and broadcast
+            except:
+                return 256  # Default to /24
+        else:
+            return 1  # Single host
+
+    def _ensure_sudo_access(self):
+        """Ensure we have sudo access before starting scan"""
+        try:
+            # First check if we already have sudo cached
+            result = subprocess.run(["sudo", "-n", "true"], capture_output=True)
+            if result.returncode == 0:
+                return True
+            
+            # We need to authenticate
+            self.console.print("\n[yellow]This scan requires administrator privileges.[/yellow]")
+            self.console.print("[dim]You may be prompted for your password.[/dim]\n")
+            
+            # IMPORTANT: Don't capture output so password prompt shows
+            result = subprocess.run(["sudo", "-v"])
+            
+            if result.returncode != 0:
+                return False
+                
+            # Verify it worked
+            result = subprocess.run(["sudo", "-n", "true"], capture_output=True)
+            return result.returncode == 0
+            
+        except Exception as e:
+            self.console.print(f"[red]Error checking sudo access: {e}[/red]")
+            return False
+
     def _run_nmap(self, target: str, scan_type: str, needs_root: bool) -> List[Dict]:
         """Run nmap scan with real-time progress"""
         profile = self.scan_profiles[scan_type]
         show_details = self.config["scanners"].get("progress_details", False)
         stats_interval = self.config["scanners"].get("nmap_stats_interval", "1s")
         refresh_rate = self.config["scanners"].get("progress_refresh_rate", 4)
+
+        # Check if nmap is available
+        try:
+            subprocess.run(["which", "nmap"], check=True, capture_output=True)
+        except subprocess.CalledProcessError:
+            raise Exception("nmap not found. Please install nmap: sudo apt install nmap")
+
+        # For scans that need root, ensure we have sudo access
+        if needs_root:
+            if not self._ensure_sudo_access():
+                raise Exception("Failed to obtain sudo access. Please try again.")
+
+        # Estimate total hosts for better progress tracking
+        self.total_hosts = self._estimate_total_hosts(target)
+        self.hosts_completed = 0
 
         # Generate a unique temp filename
         temp_dir = tempfile.gettempdir()
@@ -99,15 +158,49 @@ class NetworkScanner:
 
         try:
             # Build command with stats output
-            cmd = ["nmap", "-oX", temp_path, "--stats-every", stats_interval] + profile["nmap"] + [target]
+            cmd = ["nmap", "-oX", temp_path, "--stats-every", stats_interval]
+            
+            # Add timing template from config
+            timing = self.config["scanners"].get("nmap_timing", "-T4")
+            cmd.append(timing)
+            
+            # For deep scans, always disable DNS to prevent hanging
+            if scan_type in ["deep", "inventory"]:
+                cmd.append("-n")  # No DNS resolution
+                self.console.print("[dim]Note: DNS resolution disabled for faster scanning[/dim]")
+            
+            # Add profile options
+            cmd.extend(profile["nmap"])
+            
+            # Add target
+            cmd.append(target)
 
             if needs_root:
-                cmd = ["sudo"] + cmd
+                cmd = ["sudo", "-n"] + cmd  # -n flag means non-interactive
+                
+            # Always show the command for transparency
+            self.console.print(f"[dim]Command: {' '.join(cmd)}[/dim]\n")
 
-            # Create progress display without Live wrapper
+            # Add scan type description to progress
+            scan_desc = {
+                "discovery": "Quick host discovery",
+                "inventory": "Service detection (1000 ports)",
+                "deep": "Deep scan (5000 ports + scripts)"
+            }.get(scan_type, scan_type.capitalize())
+            
+            # Show initial scan information
+            if scan_type == "deep":
+                self.console.print(f"[yellow]Deep Scan Information:[/yellow]")
+                self.console.print(f"  • Target: {target}")
+                self.console.print(f"  • Estimated hosts: {self.total_hosts}")
+                self.console.print(f"  • Ports to scan: {'All 65535' if '-p-' in cmd else 'Top 5000'}")
+                self.console.print(f"  • Scripts enabled: Yes")
+                self.console.print(f"  • This scan will take time, progress will update as hosts complete\n")
+
+            # Create progress display
             with Progress(
                 SpinnerColumn(),
-                TextColumn("[bold blue]Nmap {task.fields[scan_type]} scan[/bold blue]"),
+                TextColumn("[bold blue]{task.fields[scan_desc]}[/bold blue]"),
                 BarColumn(complete_style="green", finished_style="green"),
                 TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
                 TimeElapsedColumn(),
@@ -120,8 +213,8 @@ class NetworkScanner:
                 task = progress.add_task(
                     f"Scanning {target}",
                     total=100,
-                    scan_type=scan_type.capitalize(),
-                    status="Initializing..."
+                    scan_desc=scan_desc,
+                    status="Starting nmap..."
                 )
 
                 # Progress tracking variables
@@ -131,26 +224,113 @@ class NetworkScanner:
                 last_percent = 0
                 self.last_progress_update = start_time
                 self.hang_detected = False
+                current_phase = "init"
+                ports_found = 0
                 
-                proc = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True,
-                    bufsize=1
-                )
+                # Start the nmap process with line buffering
+                try:
+                    self.console.print(f"[dim]Starting process at {datetime.now().strftime('%H:%M:%S')}[/dim]")
+                    
+                    # Use line buffering for real-time output
+                    proc = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        universal_newlines=True,
+                        bufsize=1,  # Line buffered
+                        env={**os.environ, 'PYTHONUNBUFFERED': '1'}  # Force unbuffered
+                    )
+                    
+                    # Check if process started
+                    time.sleep(0.5)
+                    if proc.poll() is not None:
+                        stderr_output = proc.stderr.read()
+                        if "sudo:" in stderr_output:
+                            raise Exception("Sudo authentication failed. Please run the scan again.")
+                        else:
+                            raise Exception(f"Nmap failed to start: {stderr_output}")
+                    
+                except Exception as e:
+                    raise Exception(f"Failed to start nmap: {e}")
 
-                for line in proc.stdout:
+                # Track scan phases for better progress
+                discovery_complete = False
+                hosts_discovered = 0
+                lines_processed = 0
+                output_started = False
+                
+                # Create a thread to monitor stderr
+                def monitor_stderr():
+                    try:
+                        for line in proc.stderr:
+                            if line.strip():
+                                self.console.print(f"[red]Nmap error: {line.strip()}[/red]")
+                    except:
+                        pass
+                
+                stderr_thread = threading.Thread(target=monitor_stderr, daemon=True)
+                stderr_thread.start()
+                
+                # Process output line by line
+                while True:
+                    line = proc.stdout.readline()
+                    
+                    # Check if process has ended
+                    if not line:
+                        if proc.poll() is not None:
+                            break
+                        # No line but process still running
+                        time.sleep(0.1)
+                        
+                        # Check for timeout on first output
+                        if not output_started and (time.time() - start_time) > 10:
+                            progress.update(task, status=f"Waiting for nmap output... ({int(time.time() - start_time)}s)")
+                            
+                            # Provide troubleshooting after 30 seconds
+                            if (time.time() - start_time) > 30:
+                                self.console.print("\n[yellow]Nmap is taking unusually long to start.[/yellow]")
+                                self.console.print("[yellow]This might be due to:[/yellow]")
+                                self.console.print("  • Large network range")
+                                self.console.print("  • Firewall blocking scans")
+                                self.console.print("  • Slow network response")
+                                self.console.print("\n[dim]You can press Ctrl+C to cancel[/dim]\n")
+                                output_started = True  # Prevent repeating message
+                        continue
+                    
                     line = line.strip()
+                    if not line:
+                        continue
+                        
                     current_time = time.time()
+                    lines_processed += 1
+                    
+                    # Mark that we've received output
+                    if not output_started:
+                        output_started = True
+                        progress.update(task, status="Nmap is running...")
                     
                     # Detailed output if enabled
-                    if show_details and line:
+                    if show_details:
                         self.console.print(f"[dim]{line}[/dim]")
                     
-                    # Parse nmap progress output
-                    if "Stats:" in line:
-                        # Extract percentage from stats line
+                    # Parse various nmap output patterns
+                    
+                    # Host discovery completion
+                    if "Nmap done:" in line and "IP address" in line:
+                        discovery_complete = True
+                        match = re.search(r'(\d+)\s+IP\s+address(?:es)?\s+\((\d+)\s+host(?:s)?\s+up\)', line)
+                        if match:
+                            total_scanned = int(match.group(1))
+                            hosts_discovered = int(match.group(2))
+                            if hosts_discovered == 0:
+                                progress.update(task, completed=100, status="No hosts found")
+                                break
+                            else:
+                                progress.update(task, completed=10, status=f"Discovery complete: {hosts_discovered} hosts up • Starting detailed scan...")
+                                self.last_progress_update = current_time
+                    
+                    # Progress stats
+                    elif "Stats:" in line and "done" in line:
                         match = re.search(r'(\d+\.\d+)%.*done', line)
                         if match:
                             percent = float(match.group(1))
@@ -158,57 +338,146 @@ class NetworkScanner:
                                 last_percent = percent
                                 self.last_progress_update = current_time
                                 self.hang_detected = False
-                            progress.update(task, completed=percent)
+                            
+                            # Extract timing info
+                            time_match = re.search(r'(\d+:\d+:\d+)\s+remaining', line)
+                            time_remaining = time_match.group(1) if time_match else ""
+                            
+                            # Adjust percentage if past discovery
+                            if discovery_complete and percent < 10:
+                                percent = 10 + (percent * 0.9)
+                            
+                            status_msg = f"Progress: {percent:.1f}%"
+                            if time_remaining:
+                                status_msg += f" • ETA: {time_remaining}"
+                            if devices_found > 0:
+                                status_msg += f" • {devices_found} hosts"
+                            
+                            progress.update(task, completed=percent, status=status_msg)
                     
-                    elif "Scanning" in line and "(" in line:
-                        # Extract current host being scanned
-                        match = re.search(r'Scanning\s+([^\s]+)\s+\(([^)]+)\)', line)
+                    # Starting Nmap
+                    elif "Starting Nmap" in line:
+                        current_phase = "discovery"
+                        progress.update(task, status="Nmap started • Beginning scan...")
+                        self.last_progress_update = current_time
+                    
+                    # Scan phase detection
+                    elif "Initiating" in line:
+                        if "Ping Scan" in line:
+                            current_phase = "discovery"
+                            progress.update(task, status="Phase: Host discovery")
+                        elif "SYN Stealth Scan" in line:
+                            current_phase = "portscan"
+                            progress.update(task, status="Phase: Port scanning")
+                        elif "Service scan" in line:
+                            current_phase = "service"
+                            progress.update(task, status="Phase: Service detection")
+                        elif "OS detection" in line:
+                            current_phase = "os"
+                            progress.update(task, status="Phase: OS detection")
+                        elif "NSE" in line:
+                            current_phase = "scripts"
+                            progress.update(task, status="Phase: Running scripts")
+                        self.last_progress_update = current_time
+                    
+                    # Host discovery
+                    elif "Host is up" in line:
+                        if not discovery_complete:
+                            hosts_discovered += 1
+                            if self.total_hosts > 0:
+                                discovery_progress = min((hosts_discovered / self.total_hosts) * 10, 10)
+                                progress.update(
+                                    task,
+                                    completed=discovery_progress,
+                                    status=f"Discovering hosts: {hosts_discovered} found..."
+                                )
+                        self.last_progress_update = current_time
+                    
+                    # Currently scanning host
+                    elif "Scanning" in line:
+                        match = re.search(r'Scanning\s+([^\s\[]+)', line)
                         if match:
-                            current_host = f"{match.group(1)} ({match.group(2)})"
-                            progress.update(task, status=f"Scanning {current_host}")
-                            if show_details:
-                                self.console.print(f"[green]→ Found host: {current_host}[/green]")
+                            current_host = match.group(1)
+                            self.hosts_completed += 1
+                            
+                            status_msg = f"Scanning {current_host}"
+                            if current_phase == "portscan":
+                                status_msg += " • Checking ports"
+                            elif current_phase == "service":
+                                status_msg += " • Identifying services"
+                            
+                            progress.update(task, status=status_msg)
+                            self.last_progress_update = current_time
                     
+                    # Port discovered
                     elif "Discovered open port" in line:
-                        # Found an open port
                         match = re.search(r'port\s+(\d+)/(\w+)\s+on\s+(.+)', line)
                         if match:
-                            port_info = f"{match.group(1)}/{match.group(2)} on {match.group(3)}"
-                            progress.update(task, status=f"Found: {port_info}")
-                            if show_details:
-                                self.console.print(f"[cyan]  ↳ Open port: {port_info}[/cyan]")
+                            ports_found += 1
+                            port_info = f"{match.group(1)}/{match.group(2)}"
+                            host = match.group(3)
+                            progress.update(task, status=f"Found port {port_info} on {host}")
+                            self.last_progress_update = current_time
                     
+                    # Host report
                     elif "Nmap scan report for" in line:
-                        # Found a live host
                         devices_found += 1
                         elapsed = time.time() - start_time
-                        progress.update(
-                            task, 
-                            status=f"Found {devices_found} devices • {elapsed:.0f}s"
-                        )
+                        
+                        # Update progress
+                        if not discovery_complete or last_percent < 10:
+                            estimated_progress = min(10 + (devices_found / max(hosts_discovered, 1)) * 80, 90)
+                            progress.update(task, completed=estimated_progress)
+                        
+                        if scan_type == "deep":
+                            status_msg = f"Completed: {devices_found} hosts • {ports_found} ports • {elapsed:.0f}s"
+                        else:
+                            status_msg = f"Found {devices_found} devices • {elapsed:.0f}s"
+                        
+                        progress.update(task, status=status_msg)
+                        self.last_progress_update = current_time
                     
+                    # Final summary
                     elif "hosts up" in line:
-                        # Final summary
                         match = re.search(r'(\d+)\s+host[s]?\s+up', line)
                         if match:
                             total_up = match.group(1)
                             progress.update(
                                 task,
                                 completed=100,
-                                status=f"Complete: {total_up} hosts up"
+                                status=f"Complete: {total_up} hosts up • {ports_found} open ports"
                             )
                     
-                    # Check for hang
-                    self._check_hang(current_time, task, progress)
+                    # Update every 10 lines to show activity
+                    elif lines_processed % 10 == 0:
+                        progress.update(task, status=f"Processing... ({lines_processed} lines)")
 
+                # Wait for process to complete
                 proc.wait()
 
                 if proc.returncode != 0:
-                    raise Exception(f"Nmap failed with return code {proc.returncode}")
+                    stderr_output = proc.stderr.read()
+                    error_msg = f"Nmap failed with return code {proc.returncode}"
+                    if stderr_output:
+                        error_msg += f": {stderr_output}"
+                    raise Exception(error_msg)
 
             # Parse XML output
-            return self._parse_nmap_xml(temp_path)
+            if os.path.exists(temp_path):
+                try:
+                    return self._parse_nmap_xml(temp_path)
+                except Exception as e:
+                    self.console.print(f"[red]Error parsing scan results: {e}[/red]")
+                    raise
+            else:
+                raise Exception("Scan output file not found")
             
+        except KeyboardInterrupt:
+            self.console.print("\n[yellow]Scan interrupted by user[/yellow]")
+            raise
+        except Exception as e:
+            self.console.print(f"\n[red]Scan error: {e}[/red]")
+            raise
         finally:
             # Clean up temp file
             try:
@@ -225,6 +494,10 @@ class NetworkScanner:
         show_details = self.config["scanners"].get("progress_details", False)
         refresh_rate = self.config["scanners"].get("progress_refresh_rate", 4)
         
+        # Ensure sudo access for masscan
+        if not self._ensure_sudo_access():
+            raise Exception("Masscan requires sudo access")
+        
         # Generate a unique temp filename
         temp_dir = tempfile.gettempdir()
         temp_filename = f"masscan_{os.getpid()}_{os.urandom(4).hex()}.json"
@@ -232,7 +505,7 @@ class NetworkScanner:
 
         try:
             cmd = [
-                "sudo",
+                "sudo", "-n",
                 "masscan",
                 "-p0",  # Ping scan
                 "--rate=10000",  # 10k packets/sec
@@ -241,7 +514,7 @@ class NetworkScanner:
                 target,
             ]
 
-            # Create progress display for masscan without Live wrapper
+            # Create progress display for masscan
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[bold cyan]Masscan discovery[/bold cyan]"),
@@ -360,14 +633,18 @@ class NetworkScanner:
         show_details = self.config["scanners"].get("progress_details", False)
         refresh_rate = self.config["scanners"].get("progress_refresh_rate", 4)
         
+        # Ensure sudo access for arp-scan
+        if not self._ensure_sudo_access():
+            raise Exception("ARP scan requires sudo access")
+        
         try:
-            cmd = ["sudo", "arp-scan", "--localnet", "--retry=2"]
+            cmd = ["sudo", "-n", "arp-scan", "--localnet", "--retry=2"]
             
             # Add target if specified
             if "/" in target:
-                cmd = ["sudo", "arp-scan", target, "--retry=2"]
+                cmd = ["sudo", "-n", "arp-scan", target, "--retry=2"]
 
-            # Create progress display without Live wrapper
+            # Create progress display
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[bold green]ARP scan[/bold green]"),

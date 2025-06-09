@@ -12,8 +12,12 @@ scanners:
   prefer_masscan: false  # Use masscan for discovery when available
   nmap_timing: "-T4"     # Nmap timing template (T0-T5)
   
+  # Deep scan options
+  deep_scan_ports: "5000"  # Number of top ports for deep scan (use "all" for -p-)
+  deep_scan_scripts: true  # Enable NSE scripts in deep scan
+  
   # Progress display settings
-  progress_details: false  # Show detailed scan progress output (default: minimal)
+  progress_details: true  # Show detailed scan progress output (default: minimal)
   progress_refresh_rate: 4  # Progress bar refresh rate (Hz)
   
   # Hang detection
