@@ -104,6 +104,21 @@
         .btn-info:hover {
             background: #3badd6;
         }
+        
+        .btn-info.has-changes {
+            background: #ce9178;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .btn-info.has-changes:hover {
+            background: #bb8166;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
 
         .btn-warning {
             background: #ce9178;
@@ -1085,13 +1100,16 @@
                     Download CSV
                 </button>
 
-                <button class="action-btn btn-info" onclick="compareToLastScan()">
+                <button class="action-btn btn-info{% if has_changes %} has-changes{% endif %}" onclick="compareToLastScan()">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="18" cy="18" r="3"></circle>
                         <circle cx="6" cy="6" r="3"></circle>
                         <path d="M13 6h3a2 2 0 012 2v7M6 11h3a2 2 0 002-2V6"></path>
                     </svg>
                     Compare to Last Scan
+                    {% if has_changes %}
+                    <span class="badge" style="background: #ce9178; color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.75rem; margin-left: 0.5rem;">Changes!</span>
+                    {% endif %}
                 </button>
 
                 <button class="action-btn btn-warning" onclick="refreshScan()">
@@ -1618,18 +1636,24 @@
         }
 
         function compareToLastScan() {
-            const comparisonUrl = `comparison_${scanTimestamp}.html`;
-            fetch(comparisonUrl, { method: 'HEAD' })
-                .then(response => {
-                    if (response.ok) {
-                        window.location.href = comparisonUrl;
-                    } else {
-                        alert('No comparison report available. This might be your first scan or there are no previous scans to compare against.');
-                    }
-                })
-                .catch(() => {
-                    window.location.href = comparisonUrl;
-                });
+            // Check if comparison file is available from template
+            {% if comparison_file %}
+                window.location.href = '{{ comparison_file }}';
+            {% else %}
+                // Fallback to checking if comparison file exists
+                const comparisonUrl = `comparison_${scanTimestamp}.html`;
+                fetch(comparisonUrl, { method: 'HEAD' })
+                    .then(response => {
+                        if (response.ok) {
+                            window.location.href = comparisonUrl;
+                        } else {
+                            alert('No comparison report available. Run at least 2 scans of the same network to see comparisons.');
+                        }
+                    })
+                    .catch(() => {
+                        alert('No comparison report available. Run at least 2 scans of the same network to see comparisons.');
+                    });
+            {% endif %}
         }
 
         function refreshScan() {

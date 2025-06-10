@@ -488,6 +488,11 @@ class NetworkMapper:
             except:
                 pass
 
+        # Check if comparison report exists
+        comparison_file_name = None
+        if self.last_changes and self.last_changes.get("summary", {}).get("total_changes", 0) > 0:
+            comparison_file_name = f"comparison_{timestamp}.html"
+        
         # Prepare report data with enhanced metadata
         report_data = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -502,6 +507,8 @@ class NetworkMapper:
             "subnet_summary": self._get_subnet_summary(devices),
             "changes": changes,  # Include changes data
             "scan_metadata": scan_metadata,  # Include scan metadata for footer
+            "comparison_file": comparison_file_name,  # Include comparison file name
+            "has_changes": bool(self.last_changes and self.last_changes.get("summary", {}).get("total_changes", 0) > 0),
         }
 
         # Generate BOTH reports
@@ -817,22 +824,27 @@ class NetworkMapper:
         if changes.get("summary", {}).get("total_changes", 0) > 0:
             console.print("\n[yellow]Generating comparison report...[/yellow]")
 
-            # Get timestamp from most recent scan
-            timestamp = scan_files[0].stem.replace("scan_", "")
+            try:
+                # Get timestamp from most recent scan
+                timestamp = scan_files[0].stem.replace("scan_", "")
 
-            # Generate the comparison report
-            comparison_file = self.generate_comparison_report(current_devices, changes, timestamp)
+                # Generate the comparison report
+                comparison_file = self.generate_comparison_report(current_devices, changes, timestamp)
 
-            if comparison_file and comparison_file.exists():
-                # Open in browser
-                comparison_url = f"file://{comparison_file.absolute()}"
-                webbrowser.open(comparison_url)
-                console.print(f"\n[bold green]✓ Comparison report opened in browser![/bold green]")
-                console.print(
-                    f"[yellow]Report location:[/yellow] [underline]{comparison_url}[/underline]"
-                )
-            else:
-                console.print("[red]Failed to generate comparison report[/red]")
+                if comparison_file and comparison_file.exists():
+                    # Open in browser
+                    comparison_url = f"file://{comparison_file.absolute()}"
+                    webbrowser.open(comparison_url)
+                    console.print(f"\n[bold green]✓ Comparison report opened in browser![/bold green]")
+                    console.print(
+                        f"[yellow]Report location:[/yellow] [underline]{comparison_url}[/underline]"
+                    )
+                else:
+                    console.print("[red]Failed to generate comparison report[/red]")
+            except Exception as e:
+                console.print(f"[red]Error: {e}[/red]")
+                import traceback
+                logger.error(f"Error generating comparison report: {traceback.format_exc()}")
         else:
             console.print("\n[green]No changes detected between scans[/green]")
 
@@ -1365,25 +1377,32 @@ class NetworkMapper:
         if changes.get("new_devices"):
             console.print(f"[green]NEW DEVICES ({len(changes['new_devices'])})[/green]")
             for device in changes["new_devices"]:
+                hostname = device.get('hostname', '')
+                if not hostname:
+                    hostname = ''
                 console.print(
-                    f"  • {device['ip']} - {device.get('hostname', 'N/A')} "
+                    f"  • {device['ip']} - {hostname} "
                     f"({device.get('type', 'unknown')})"
                 )
 
         if changes.get("missing_devices"):
             console.print(f"\n[red]MISSING DEVICES ({len(changes['missing_devices'])})[/red]")
             for device in changes["missing_devices"]:
+                hostname = device.get('hostname', '')
+                if not hostname:
+                    hostname = ''
                 console.print(
-                    f"  • {device['ip']} - {device.get('hostname', 'N/A')} "
+                    f"  • {device['ip']} - {hostname} "
                     f"({device.get('type', 'unknown')})"
                 )
 
         if changes.get("changed_devices"):
             console.print(f"\n[yellow]CHANGED DEVICES ({len(changes['changed_devices'])})[/yellow]")
             for device in changes["changed_devices"]:
-                console.print(f"  • {device['ip']} - {device.get('hostname', 'N/A')}")
-
-        input("\nPress Enter to continue...")
+                hostname = device.get('hostname', '')
+                if not hostname:
+                    hostname = ''
+                console.print(f"  • {device['ip']} - {hostname}")
 
     def annotate_devices(self):
         """Annotate devices"""

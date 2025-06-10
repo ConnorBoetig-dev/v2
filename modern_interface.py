@@ -726,6 +726,13 @@ class ModernInterface:
         except:
             tools_branch.add("[yellow]○[/yellow] arp-scan (optional)")
             
+        # Check for masscan
+        try:
+            subprocess.run(["masscan", "--version"], capture_output=True, check=True)
+            tools_branch.add("[green]✓[/green] masscan")
+        except:
+            tools_branch.add("[yellow]○[/yellow] masscan (optional)")
+            
         return Panel(
             status_tree,
             title="[bold white]Dashboard[/bold white]",

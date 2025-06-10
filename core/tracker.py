@@ -242,7 +242,7 @@ class ChangeTracker:
                 {
                     "field": "services",
                     "action": "added",
-                    "values": sorted(list(new_services)),
+                    "port_list": sorted(list(new_services)),
                     "severity": "warning",
                 }
             )
@@ -253,7 +253,7 @@ class ChangeTracker:
                 {
                     "field": "services",
                     "action": "removed",
-                    "values": sorted(list(removed_services)),
+                    "port_list": sorted(list(removed_services)),
                     "severity": "warning",
                 }
             )
@@ -271,7 +271,7 @@ class ChangeTracker:
                 {
                     "field": "ports",
                     "action": "opened",
-                    "values": sorted(list(new_ports)),
+                    "port_list": sorted(list(new_ports)),
                     "severity": severity,
                     "dangerous_ports": dangerous_ports,
                 }
@@ -283,7 +283,7 @@ class ChangeTracker:
                 {
                     "field": "ports",
                     "action": "closed",
-                    "values": sorted(list(closed_ports)),
+                    "port_list": sorted(list(closed_ports)),
                     "severity": "info",
                 }
             )
