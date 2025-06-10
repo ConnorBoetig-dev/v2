@@ -4,11 +4,11 @@ This module analyzes device characteristics (ports, services, OS, vendor)
 to determine the most likely device type.
 """
 
-import re
 import logging
-from typing import Dict, List, Tuple, Set, Optional
+import re
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Dict, List, Optional, Set, Tuple
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class DeviceType(Enum):
     """Enumeration of supported device types."""
+
     ROUTER = "router"
     SWITCH = "switch"
     FIREWALL = "firewall"
@@ -38,6 +39,7 @@ class DeviceType(Enum):
 @dataclass
 class DeviceSignature:
     """Device type signature definition."""
+
     device_type: DeviceType
     ports: List[int] = field(default_factory=list)
     services: List[str] = field(default_factory=list)
@@ -51,13 +53,13 @@ class DeviceSignature:
 
 class DeviceClassifier:
     """Classifies network devices based on their characteristics."""
-    
+
     def __init__(self):
         """Initialize classifier with device signatures."""
         self.signatures = self._build_signatures()
         self.vendor_patterns = self._build_vendor_patterns()
         self.service_hints = self._build_service_hints()
-        
+
     def _build_signatures(self) -> Dict[DeviceType, DeviceSignature]:
         """Build device signature database."""
         return {
@@ -65,9 +67,18 @@ class DeviceClassifier:
                 device_type=DeviceType.ROUTER,
                 ports=[22, 23, 53, 80, 443, 161, 179],  # SSH, Telnet, DNS, HTTP(S), SNMP, BGP
                 services=["ssh", "telnet", "dns", "domain", "http", "https", "snmp", "bgp"],
-                keywords=["router", "gateway", "cisco", "juniper", "mikrotik", "fortinet", "pfsense", "edgerouter"],
+                keywords=[
+                    "router",
+                    "gateway",
+                    "cisco",
+                    "juniper",
+                    "mikrotik",
+                    "fortinet",
+                    "pfsense",
+                    "edgerouter",
+                ],
                 vendor_patterns=["Cisco", "Juniper", "MikroTik", "Ubiquiti", "Netgear"],
-                priority=90
+                priority=90,
             ),
             DeviceType.SWITCH: DeviceSignature(
                 device_type=DeviceType.SWITCH,
@@ -75,51 +86,100 @@ class DeviceClassifier:
                 services=["ssh", "telnet", "snmp", "http", "https"],
                 keywords=["switch", "catalyst", "procurve", "powerconnect", "managed", "vlan"],
                 vendor_patterns=["Cisco", "HP", "Dell", "Aruba"],
-                priority=85
+                priority=85,
             ),
             DeviceType.FIREWALL: DeviceSignature(
                 device_type=DeviceType.FIREWALL,
                 ports=[22, 443, 500, 4500, 1701],  # SSH, HTTPS, VPN ports
                 services=["ssh", "https", "isakmp", "ipsec", "l2tp"],
-                keywords=["firewall", "fortigate", "palo alto", "checkpoint", "sonicwall", "asa", "pfsense"],
+                keywords=[
+                    "firewall",
+                    "fortigate",
+                    "palo alto",
+                    "checkpoint",
+                    "sonicwall",
+                    "asa",
+                    "pfsense",
+                ],
                 vendor_patterns=["Fortinet", "Palo Alto", "Check Point", "SonicWall"],
-                priority=88
+                priority=88,
             ),
             DeviceType.DATABASE: DeviceSignature(
                 device_type=DeviceType.DATABASE,
                 ports=[3306, 5432, 1433, 1521, 27017, 6379, 5984, 9200],  # Added Elasticsearch
-                services=["mysql", "postgresql", "ms-sql", "oracle", "mongodb", "redis", "couchdb", "elasticsearch"],
-                keywords=["mysql", "mariadb", "postgres", "oracle", "mongodb", "database", "redis", "nosql"],
-                priority=80
+                services=[
+                    "mysql",
+                    "postgresql",
+                    "ms-sql",
+                    "oracle",
+                    "mongodb",
+                    "redis",
+                    "couchdb",
+                    "elasticsearch",
+                ],
+                keywords=[
+                    "mysql",
+                    "mariadb",
+                    "postgres",
+                    "oracle",
+                    "mongodb",
+                    "database",
+                    "redis",
+                    "nosql",
+                ],
+                priority=80,
             ),
             DeviceType.WEB_SERVER: DeviceSignature(
                 device_type=DeviceType.WEB_SERVER,
                 ports=[80, 443, 8080, 8443, 8000, 8888, 3000, 5000, 9000],
                 services=["http", "https", "http-proxy", "http-alt", "webmin", "nginx", "apache"],
-                keywords=["apache", "nginx", "iis", "tomcat", "webserver", "httpd", "node", "express"],
-                priority=75
+                keywords=[
+                    "apache",
+                    "nginx",
+                    "iis",
+                    "tomcat",
+                    "webserver",
+                    "httpd",
+                    "node",
+                    "express",
+                ],
+                priority=75,
             ),
             DeviceType.MAIL_SERVER: DeviceSignature(
                 device_type=DeviceType.MAIL_SERVER,
                 ports=[25, 110, 143, 465, 587, 993, 995],
                 services=["smtp", "pop3", "imap", "smtps", "submission", "imaps", "pop3s"],
                 keywords=["mail", "exchange", "postfix", "sendmail", "zimbra", "dovecot", "exim"],
-                priority=70
+                priority=70,
             ),
             DeviceType.DNS_SERVER: DeviceSignature(
                 device_type=DeviceType.DNS_SERVER,
                 ports=[53],
                 services=["dns", "domain"],
                 keywords=["bind", "named", "dns", "resolver", "unbound", "powerdns"],
-                priority=85
+                priority=85,
             ),
             DeviceType.WINDOWS_SERVER: DeviceSignature(
                 device_type=DeviceType.WINDOWS_SERVER,
                 ports=[135, 139, 445, 3389, 88, 389, 636],  # RPC, SMB, RDP, Kerberos, LDAP
-                services=["msrpc", "netbios", "microsoft-ds", "ms-wbt-server", "kerberos", "ldap", "ldaps"],
-                keywords=["windows", "microsoft", "active directory", "domain controller", "server"],
+                services=[
+                    "msrpc",
+                    "netbios",
+                    "microsoft-ds",
+                    "ms-wbt-server",
+                    "kerberos",
+                    "ldap",
+                    "ldaps",
+                ],
+                keywords=[
+                    "windows",
+                    "microsoft",
+                    "active directory",
+                    "domain controller",
+                    "server",
+                ],
                 vendor_patterns=["Microsoft"],
-                priority=65
+                priority=65,
             ),
             DeviceType.LINUX_SERVER: DeviceSignature(
                 device_type=DeviceType.LINUX_SERVER,
@@ -127,31 +187,58 @@ class DeviceClassifier:
                 services=["ssh", "rpcbind", "nfs"],
                 keywords=["linux", "ubuntu", "centos", "debian", "redhat", "suse", "fedora"],
                 exclude_ports=[139, 445, 3389],  # No Windows services
-                priority=60
+                priority=60,
             ),
             DeviceType.PRINTER: DeviceSignature(
                 device_type=DeviceType.PRINTER,
                 ports=[515, 631, 9100, 80, 443],
                 services=["lpd", "ipp", "jetdirect", "http", "https"],
-                keywords=["printer", "print", "cups", "hp", "canon", "epson", "brother", "xerox", "laserjet"],
+                keywords=[
+                    "printer",
+                    "print",
+                    "cups",
+                    "hp",
+                    "canon",
+                    "epson",
+                    "brother",
+                    "xerox",
+                    "laserjet",
+                ],
                 vendor_patterns=["HP", "Canon", "Epson", "Brother", "Xerox"],
-                priority=50
+                priority=50,
             ),
             DeviceType.NAS: DeviceSignature(
                 device_type=DeviceType.NAS,
                 ports=[139, 445, 548, 2049, 873, 5000, 5001],  # SMB, AFP, NFS, rsync, Synology
                 services=["netbios", "microsoft-ds", "afp", "nfs", "rsync", "http", "https"],
-                keywords=["nas", "synology", "qnap", "freenas", "truenas", "storage", "openmediavault"],
+                keywords=[
+                    "nas",
+                    "synology",
+                    "qnap",
+                    "freenas",
+                    "truenas",
+                    "storage",
+                    "openmediavault",
+                ],
                 vendor_patterns=["Synology", "QNAP", "Western Digital", "Netgear"],
-                priority=70
+                priority=70,
             ),
             DeviceType.HYPERVISOR: DeviceSignature(
                 device_type=DeviceType.HYPERVISOR,
                 ports=[443, 902, 5900, 8006],  # vSphere, Proxmox VNC
                 services=["https", "vmware", "vnc", "proxmox"],
-                keywords=["vmware", "esxi", "vsphere", "proxmox", "hyper-v", "xenserver", "kvm", "virtualbox"],
+                keywords=[
+                    "vmware",
+                    "esxi",
+                    "vsphere",
+                    "proxmox",
+                    "hyper-v",
+                    "xenserver",
+                    "kvm",
+                    "virtualbox",
+                ],
                 vendor_patterns=["VMware", "Proxmox", "Citrix"],
-                priority=85
+                priority=85,
             ),
             DeviceType.WORKSTATION: DeviceSignature(
                 device_type=DeviceType.WORKSTATION,
@@ -160,15 +247,25 @@ class DeviceClassifier:
                 keywords=["workstation", "desktop", "windows 10", "windows 11", "macbook", "imac"],
                 vendor_patterns=["Apple", "Dell", "HP", "Lenovo"],
                 max_ports=15,
-                priority=40
+                priority=40,
             ),
             DeviceType.IOT: DeviceSignature(
                 device_type=DeviceType.IOT,
                 ports=[80, 443, 8080, 1883, 8883, 5683, 1900],  # HTTP, MQTT, CoAP, UPnP
                 services=["http", "https", "mqtt", "coap", "upnp"],
-                keywords=["camera", "sensor", "iot", "smart", "esp", "arduino", "tasmota", "zigbee", "hue"],
+                keywords=[
+                    "camera",
+                    "sensor",
+                    "iot",
+                    "smart",
+                    "esp",
+                    "arduino",
+                    "tasmota",
+                    "zigbee",
+                    "hue",
+                ],
                 vendor_patterns=["Espressif", "Raspberry", "Arduino", "Tuya", "Philips"],
-                priority=30
+                priority=30,
             ),
             DeviceType.VOIP: DeviceSignature(
                 device_type=DeviceType.VOIP,
@@ -176,17 +273,17 @@ class DeviceClassifier:
                 services=["sip", "sips", "rtp", "asterisk", "iax"],
                 keywords=["voip", "asterisk", "3cx", "phone", "pbx", "sip", "cisco phone"],
                 vendor_patterns=["Cisco", "Polycom", "Yealink", "Grandstream"],
-                priority=55
+                priority=55,
             ),
             DeviceType.MEDIA_SERVER: DeviceSignature(
                 device_type=DeviceType.MEDIA_SERVER,
                 ports=[8096, 32400, 8200, 554],  # Jellyfin, Plex, RTSP
                 services=["http", "plex", "jellyfin", "rtsp", "dlna"],
                 keywords=["plex", "jellyfin", "emby", "kodi", "media", "streaming"],
-                priority=45
+                priority=45,
             ),
         }
-    
+
     def _build_vendor_patterns(self) -> Dict[str, List[DeviceType]]:
         """Build vendor to device type mapping."""
         return {
@@ -208,7 +305,6 @@ class DeviceClassifier:
             "Microsoft": [DeviceType.WINDOWS_SERVER, DeviceType.WORKSTATION],
         }
 
-    
     def _build_service_hints(self) -> Dict[str, DeviceType]:
         """Build service name to device type hints."""
         return {
@@ -241,10 +337,10 @@ class DeviceClassifier:
 
     def classify_devices(self, devices: List[Dict]) -> List[Dict]:
         """Classify a list of devices.
-        
+
         Args:
             devices: List of device dictionaries
-            
+
         Returns:
             Updated device list with type and confidence fields
         """
@@ -254,28 +350,30 @@ class DeviceClassifier:
             device_type, confidence = self._classify_single_device(device)
             classified_device["type"] = device_type.value
             classified_device["confidence"] = confidence
-            classified_device["classification_method"] = self._get_classification_method(device, device_type)
+            classified_device["classification_method"] = self._get_classification_method(
+                device, device_type
+            )
             classified.append(classified_device)
-            
+
             logger.debug(
                 f"Classified {device.get('ip', 'unknown')} as {device_type.value} "
                 f"(confidence: {confidence:.2f})"
             )
-            
+
         return classified
 
     def _classify_single_device(self, device: Dict) -> Tuple[DeviceType, float]:
         """Classify a single device and return type with confidence.
-        
+
         Args:
             device: Device dictionary
-            
+
         Returns:
             Tuple of (DeviceType, confidence_score)
         """
         # Extract device characteristics
         device_info = self._extract_device_info(device)
-        
+
         # Calculate scores for each device type
         scores = {}
         for device_type, signature in self.signatures.items():
@@ -295,7 +393,7 @@ class DeviceClassifier:
                 if re.search(pattern, device_info.vendor, re.IGNORECASE):
                     for dtype in device_types:
                         scores[dtype] = scores.get(dtype, 0) + 10
-        
+
         # Special handling for infrastructure devices
         if self._is_infrastructure_device(device_info):
             for infra_type in [DeviceType.ROUTER, DeviceType.SWITCH, DeviceType.FIREWALL]:
@@ -309,20 +407,20 @@ class DeviceClassifier:
             # Adjusted max score based on typical scoring patterns
             max_possible_score = 50  # More realistic maximum
             confidence = min(best_score / max_possible_score, 1.0)
-            
+
             # Check minimum confidence threshold
             signature = self.signatures.get(best_type)
             if signature and confidence >= signature.min_confidence:
                 return best_type, confidence
-        
+
         return DeviceType.UNKNOWN, 0.0
 
-    def _extract_device_info(self, device: Dict) -> 'DeviceInfo':
+    def _extract_device_info(self, device: Dict) -> "DeviceInfo":
         """Extract and normalize device information."""
         # Handle None values gracefully
         open_ports = device.get("open_ports") or []
         services = device.get("services") or []
-        
+
         return DeviceInfo(
             ports=set(open_ports) if open_ports else set(),
             services=[s.split(":")[0].lower() for s in services if s],
@@ -331,18 +429,20 @@ class DeviceClassifier:
             vendor=(device.get("vendor") or "").lower(),
             mac=(device.get("mac") or "").upper(),
         )
-    
-    def _calculate_signature_score(self, device_info: 'DeviceInfo', signature: DeviceSignature) -> float:
+
+    def _calculate_signature_score(
+        self, device_info: "DeviceInfo", signature: DeviceSignature
+    ) -> float:
         """Calculate how well a device matches a signature."""
         score = 0.0
-        
+
         # Port matching (weighted by priority)
         if signature.ports and device_info.ports:
             matching_ports = device_info.ports.intersection(signature.ports)
             if matching_ports:
                 port_weight = 3 * (signature.priority / 100)
                 score += len(matching_ports) * port_weight
-        
+
         # Service matching (most reliable indicator)
         if signature.services:
             for service in device_info.services:
@@ -350,76 +450,72 @@ class DeviceClassifier:
                     if sig_service in service:
                         service_weight = 5 * (signature.priority / 100)
                         score += service_weight
-        
+
         # Keyword matching in OS/hostname/vendor
         if signature.keywords:
             text = f"{device_info.os_info} {device_info.hostname} {device_info.vendor}"
             for keyword in signature.keywords:
                 if keyword in text:
                     score += 15  # Increased weight for keyword matches
-        
+
         # Vendor pattern matching
         if signature.vendor_patterns and device_info.vendor:
             for pattern in signature.vendor_patterns:
                 if re.search(pattern, device_info.vendor, re.IGNORECASE):
                     score += 10
-        
+
         # Negative scoring for excluded ports
         if signature.exclude_ports:
             if device_info.ports.intersection(signature.exclude_ports):
                 score -= 20
-        
+
         # Check max ports constraint
         if signature.max_ports and len(device_info.ports) > signature.max_ports:
             score -= 10
-            
+
         return max(0, score)
-    
+
     def _get_classification_method(self, device: Dict, device_type: DeviceType) -> str:
         """Determine how the device was classified."""
         if device_type == DeviceType.UNKNOWN:
             return "unclassified"
-            
+
         # Check if it was vendor-based
         vendor = device.get("vendor", "").lower()
         for pattern, types in self.vendor_patterns.items():
             if re.search(pattern, vendor, re.IGNORECASE) and device_type in types:
                 return "vendor_match"
-        
+
         # Check if it was service-based
         services = [s.split(":")[0].lower() for s in device.get("services", [])]
         for service in services:
             if service in self.service_hints and self.service_hints[service] == device_type:
                 return "service_match"
-        
+
         # Otherwise it was signature-based
         return "signature_match"
-    
-    def _is_infrastructure_device(self, device_info: 'DeviceInfo') -> bool:
+
+    def _is_infrastructure_device(self, device_info: "DeviceInfo") -> bool:
         """Check if device appears to be network infrastructure."""
         infra_indicators = {
             "ports": {22, 23, 161, 443},  # SSH, Telnet, SNMP, HTTPS
-            "services": ["ssh", "telnet", "snmp", "https"]
+            "services": ["ssh", "telnet", "snmp", "https"],
         }
-        
+
         # Count infrastructure service indicators
         infra_port_count = len(device_info.ports.intersection(infra_indicators["ports"]))
         infra_service_count = sum(
-            1 for s in device_info.services 
-            if any(ind in s for ind in infra_indicators["services"])
-        )
-        
-        # Infrastructure devices typically have management services and limited ports
-        return (
-            (infra_port_count >= 2 or infra_service_count >= 2) and 
-            len(device_info.ports) < 20
+            1 for s in device_info.services if any(ind in s for ind in infra_indicators["services"])
         )
 
+        # Infrastructure devices typically have management services and limited ports
+        return (infra_port_count >= 2 or infra_service_count >= 2) and len(device_info.ports) < 20
 
 
 @dataclass
 class DeviceInfo:
     """Normalized device information for classification."""
+
     ports: Set[int]
     services: List[str]
     os_info: str

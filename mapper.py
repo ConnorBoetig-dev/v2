@@ -21,9 +21,9 @@ from core.classifier import DeviceClassifier
 from core.parser import ScanParser
 from core.scanner import NetworkScanner
 from core.tracker import ChangeTracker
-from utils.visualization import MapGenerator
 from utils.export_manager import ExportManager
 from utils.snmp_config import SNMPConfig
+from utils.visualization import MapGenerator
 from utils.vulnerability_scanner import VulnerabilityScanner
 
 app = typer.Typer()
@@ -76,11 +76,12 @@ class NetworkMapper:
                 "1": "🔍 Run Network Scan",
                 "2": "📊 View Recent Scans",
                 "3": "🔄 Check Changes",
-                "4": "✏️  Annotate Devices",
-                "5": "📈 Generate Reports",
-                "6": "🗺️  View Network Map",
-                "7": "📤 Export Data",
-                "8": "❌ Exit",
+                "4": "🔀 Compare Scans",
+                "5": "✏️  Annotate Devices",
+                "6": "📈 Generate Reports",
+                "7": "🗺️  View Network Map",
+                "8": "📤 Export Data",
+                "9": "❌ Exit",
             }
 
             for key, value in choices.items():
@@ -95,14 +96,16 @@ class NetworkMapper:
             elif choice == "3":
                 self.check_changes()
             elif choice == "4":
-                self.annotate_devices()
+                self.compare_scans_interactive()
             elif choice == "5":
-                self.generate_reports()
+                self.annotate_devices()
             elif choice == "6":
-                self.view_network_map()
+                self.generate_reports()
             elif choice == "7":
-                self.export_data()
+                self.view_network_map()
             elif choice == "8":
+                self.export_data()
+            elif choice == "9":
                 if Confirm.ask("Exit NetworkMapper?"):
                     break
 
@@ -118,7 +121,7 @@ class NetworkMapper:
 
         # Interactive SNMP setup (unless disabled via CLI)
         snmp_enabled, snmp_config = self._handle_snmp_setup()
-        
+
         # Interactive vulnerability scanning setup
         vuln_enabled = self._handle_vulnerability_setup()
 
@@ -126,29 +129,29 @@ class NetworkMapper:
         console.print(f"\n[yellow]Starting {scan_name} on {target}...[/yellow]\n")
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
         # Handle ARP scan separately
         if scan_type == "arp":
             results = self.scanner._run_arp_scan(target)
         else:
             results = self.scanner.scan(
-                target=target, 
-                scan_type=scan_type, 
-                use_masscan=use_masscan, 
+                target=target,
+                scan_type=scan_type,
+                use_masscan=use_masscan,
                 needs_root=needs_root,
-                snmp_config=snmp_config if snmp_enabled else None
+                snmp_config=snmp_config if snmp_enabled else None,
             )
 
         # Parse and classify
         devices = self.parser.parse_results(results)
         devices = self.classifier.classify_devices(devices)
-        
+
         # Vulnerability scanning if enabled
         if vuln_enabled:
             console.print("\n[cyan]Scanning for vulnerabilities...[/cyan]")
             try:
                 devices = self.vuln_scanner.scan_devices(devices)
-                
+
                 # Generate vulnerability report
                 vuln_report = self.vuln_scanner.generate_vulnerability_report(devices)
                 self._display_vulnerability_summary(vuln_report)
@@ -241,17 +244,19 @@ class NetworkMapper:
 
             for device in devices:
                 # Create vulnerability summary
-                vulns = device.get('vulnerabilities', [])
+                vulns = device.get("vulnerabilities", [])
                 vuln_summary = ""
                 if vulns:
-                    high_severity = [v for v in vulns if v.get('severity') in ['CRITICAL', 'HIGH']]
+                    high_severity = [v for v in vulns if v.get("severity") in ["CRITICAL", "HIGH"]]
                     if high_severity:
-                        vuln_summary = f"{len(high_severity)} high-risk issues: " + "; ".join([v.get('cve_id', 'Unknown') for v in high_severity[:3]])
+                        vuln_summary = f"{len(high_severity)} high-risk issues: " + "; ".join(
+                            [v.get("cve_id", "Unknown") for v in high_severity[:3]]
+                        )
                     else:
                         vuln_summary = f"{len(vulns)} issues detected"
                 else:
                     vuln_summary = "No vulnerabilities detected"
-                
+
                 row = {
                     "ip": device.get("ip"),
                     "hostname": device.get("hostname", ""),
@@ -330,7 +335,7 @@ class NetworkMapper:
 
         # Setup Jinja2
         env = Environment(loader=FileSystemLoader(self.base_path / "templates"))
-        
+
         # Get changes if available
         changes = {}
         if self.last_changes:
@@ -353,35 +358,36 @@ class NetworkMapper:
 
         # Generate BOTH reports
         generated_files = []
-        
+
         # 1. Generate original detailed report
         original_template = env.get_template("report.html")
         original_report_file = self.output_path / "reports" / f"report_{timestamp}.html"
         original_html = original_template.render(**report_data)
-        
+
         with open(original_report_file, "w") as f:
             f.write(original_html)
-        
+
         generated_files.append(("Detailed Report", original_report_file))
-        
+
         # 2. Generate new interactive visualization
         viz_template = env.get_template("network_visualization.html")
         viz_report_file = self.output_path / "reports" / f"network_map_{timestamp}.html"
         viz_html = viz_template.render(**report_data)
-        
+
         with open(viz_report_file, "w") as f:
             f.write(viz_html)
-            
+
         generated_files.append(("Network Map", viz_report_file))
 
         # Open BOTH in browser (visualization first, then report)
         viz_url = f"file://{viz_report_file.absolute()}"
         original_url = f"file://{original_report_file.absolute()}"
-        
+
         # Open visualization first
         webbrowser.open(viz_url)
         # Small delay then open report
         import time
+
         time.sleep(0.5)
         webbrowser.open(original_url)
 
@@ -506,7 +512,7 @@ class NetworkMapper:
         input("\nPress Enter to continue...")
 
     def check_changes(self):
-        """Check for network changes"""
+        """Check for network changes - basic version for backward compatibility"""
         # Get most recent scan
         scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
         if not scan_files:
@@ -525,6 +531,531 @@ class NetworkMapper:
             return
 
         # Display changes
+        self._display_changes_summary(changes)
+        input("\nPress Enter to continue...")
+
+    def compare_scans_interactive(self):
+        """Interactive scan comparison with subnet detection"""
+        scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
+
+        if len(scan_files) < 2:
+            console.print("[yellow]Need at least 2 scans to compare[/yellow]")
+            input("\nPress Enter to continue...")
+            return
+
+        # Group scans by subnet
+        subnet_scans = self._group_scans_by_subnet(scan_files[:20])  # Last 20 scans
+
+        if not subnet_scans:
+            console.print("[yellow]No valid scans found[/yellow]")
+            input("\nPress Enter to continue...")
+            return
+
+        # Let user choose subnet if multiple available
+        subnet = self._select_subnet_for_comparison(subnet_scans)
+        if not subnet:
+            return
+
+        # Get scans for selected subnet
+        available_scans = subnet_scans[subnet]
+
+        if len(available_scans) < 2:
+            console.print(f"[yellow]Only one scan found for subnet {subnet}[/yellow]")
+            input("\nPress Enter to continue...")
+            return
+
+        # Display available scans
+        console.print(f"\n[bold cyan]Available scans for subnet {subnet}:[/bold cyan]")
+        scan_table = Table()
+        scan_table.add_column("#", style="cyan", width=4)
+        scan_table.add_column("Date/Time", style="yellow")
+        scan_table.add_column("Devices", style="green", justify="right")
+        scan_table.add_column("Filename", style="dim")
+
+        for i, (scan_file, info) in enumerate(available_scans[:10]):  # Show max 10
+            scan_table.add_row(
+                str(i + 1), info["date_str"], str(info["device_count"]), scan_file.name
+            )
+
+        console.print(scan_table)
+
+        # Select scans to compare
+        console.print("\n[bold]Select two scans to compare:[/bold]")
+
+        try:
+            older_idx = int(Prompt.ask("Older scan number")) - 1
+            newer_idx = int(Prompt.ask("Newer scan number")) - 1
+
+            if not (
+                0 <= older_idx < len(available_scans) and 0 <= newer_idx < len(available_scans)
+            ):
+                raise ValueError("Invalid selection")
+
+            if older_idx == newer_idx:
+                console.print("[red]Cannot compare a scan with itself[/red]")
+                input("\nPress Enter to continue...")
+                return
+
+        except (ValueError, KeyboardInterrupt):
+            console.print("[red]Invalid selection[/red]")
+            input("\nPress Enter to continue...")
+            return
+
+        # Load the selected scans
+        older_scan_file = available_scans[older_idx][0]
+        newer_scan_file = available_scans[newer_idx][0]
+
+        with open(older_scan_file) as f:
+            older_devices = json.load(f)
+        with open(newer_scan_file) as f:
+            newer_devices = json.load(f)
+
+        # Perform comparison
+        console.print("\n[yellow]Analyzing changes...[/yellow]")
+        changes = self._compare_device_lists(older_devices, newer_devices)
+
+        # Display results
+        self._display_detailed_comparison(changes, older_scan_file, newer_scan_file)
+
+        # Export options
+        if Confirm.ask("\nExport comparison results?"):
+            self._export_comparison_results(changes, older_scan_file, newer_scan_file)
+
+        input("\nPress Enter to continue...")
+
+    def _group_scans_by_subnet(self, scan_files):
+        """Group scan files by subnet"""
+        subnet_scans = {}
+
+        for scan_file in scan_files:
+            try:
+                with open(scan_file) as f:
+                    devices = json.load(f)
+
+                if not devices:
+                    continue
+
+                # Detect subnet from device IPs
+                subnet = self._detect_subnet(devices)
+                if subnet:
+                    timestamp = scan_file.stem.replace("scan_", "")
+                    date_str = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+
+                    if subnet not in subnet_scans:
+                        subnet_scans[subnet] = []
+
+                    subnet_scans[subnet].append(
+                        (
+                            scan_file,
+                            {
+                                "timestamp": timestamp,
+                                "date_str": date_str,
+                                "device_count": len(devices),
+                            },
+                        )
+                    )
+
+            except Exception as e:
+                logger.error(f"Error processing scan file {scan_file}: {e}")
+                continue
+
+        return subnet_scans
+
+    def _detect_subnet(self, devices):
+        """Detect the primary subnet from a list of devices"""
+        if not devices:
+            return None
+
+        # Count devices per subnet
+        subnet_counts = {}
+        for device in devices:
+            ip = device.get("ip", "")
+            if ip:
+                # Extract /24 subnet
+                parts = ip.split(".")
+                if len(parts) == 4:
+                    subnet = f"{parts[0]}.{parts[1]}.{parts[2]}.0/24"
+                    subnet_counts[subnet] = subnet_counts.get(subnet, 0) + 1
+
+        # Return the most common subnet
+        if subnet_counts:
+            return max(subnet_counts, key=subnet_counts.get)
+        return None
+
+    def _select_subnet_for_comparison(self, subnet_scans):
+        """Let user select subnet if multiple available"""
+        if len(subnet_scans) == 1:
+            return list(subnet_scans.keys())[0]
+
+        console.print("\n[bold]Multiple subnets found. Select one:[/bold]")
+        subnet_list = list(subnet_scans.keys())
+
+        for i, subnet in enumerate(subnet_list):
+            scan_count = len(subnet_scans[subnet])
+            console.print(f"  {i + 1}. {subnet} ({scan_count} scans)")
+
+        try:
+            choice = int(Prompt.ask("Select subnet", default="1")) - 1
+            if 0 <= choice < len(subnet_list):
+                return subnet_list[choice]
+        except ValueError:
+            pass
+
+        console.print("[red]Invalid selection[/red]")
+        return None
+
+    def _compare_device_lists(self, older_devices, newer_devices):
+        """Compare two device lists and return detailed changes"""
+        # Create lookup maps
+        older_map = {d["ip"]: d for d in older_devices}
+        newer_map = {d["ip"]: d for d in newer_devices}
+
+        # Find changes
+        new_ips = set(newer_map.keys()) - set(older_map.keys())
+        missing_ips = set(older_map.keys()) - set(newer_map.keys())
+        common_ips = set(older_map.keys()) & set(newer_map.keys())
+
+        # Build change data
+        changes = {
+            "new_devices": [newer_map[ip] for ip in new_ips],
+            "missing_devices": [older_map[ip] for ip in missing_ips],
+            "modified_devices": [],
+            "unchanged_devices": [],
+        }
+
+        # Check for modifications in common devices
+        for ip in common_ips:
+            older = older_map[ip]
+            newer = newer_map[ip]
+
+            modifications = self._detect_device_changes(older, newer)
+            if modifications:
+                changes["modified_devices"].append(
+                    {"ip": ip, "older": older, "newer": newer, "changes": modifications}
+                )
+            else:
+                changes["unchanged_devices"].append(newer)
+
+        # Add summary
+        changes["summary"] = {
+            "total_older": len(older_devices),
+            "total_newer": len(newer_devices),
+            "new_count": len(changes["new_devices"]),
+            "missing_count": len(changes["missing_devices"]),
+            "modified_count": len(changes["modified_devices"]),
+            "unchanged_count": len(changes["unchanged_devices"]),
+        }
+
+        return changes
+
+    def _detect_device_changes(self, older, newer):
+        """Detect specific changes between two device records"""
+        changes = []
+
+        # Fields to compare
+        fields = ["hostname", "mac", "vendor", "type", "os", "services", "open_ports"]
+
+        for field in fields:
+            old_val = older.get(field, "")
+            new_val = newer.get(field, "")
+
+            # Special handling for lists
+            if isinstance(old_val, list) and isinstance(new_val, list):
+                old_set = set(old_val)
+                new_set = set(new_val)
+
+                if old_set != new_set:
+                    added = new_set - old_set
+                    removed = old_set - new_set
+
+                    if added:
+                        changes.append({"field": field, "type": "added", "values": list(added)})
+                    if removed:
+                        changes.append({"field": field, "type": "removed", "values": list(removed)})
+            else:
+                # Simple field comparison
+                if old_val != new_val:
+                    changes.append(
+                        {
+                            "field": field,
+                            "type": "changed",
+                            "old_value": old_val,
+                            "new_value": new_val,
+                        }
+                    )
+
+        return changes
+
+    def _display_detailed_comparison(self, changes, older_scan_file, newer_scan_file):
+        """Display detailed comparison results with color coding"""
+        # Extract timestamps for display
+        older_timestamp = older_scan_file.stem.replace("scan_", "")
+        newer_timestamp = newer_scan_file.stem.replace("scan_", "")
+        older_date = datetime.strptime(older_timestamp, "%Y%m%d_%H%M%S").strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        newer_date = datetime.strptime(newer_timestamp, "%Y%m%d_%H%M%S").strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
+        # Header
+        console.print("\n[bold cyan]Network Comparison Results[/bold cyan]")
+        console.print(f"[dim]Older scan: {older_date}[/dim]")
+        console.print(f"[dim]Newer scan: {newer_date}[/dim]")
+
+        # Summary table
+        summary_table = Table(show_header=False, box=None, padding=(0, 2))
+        summary_table.add_column("Metric", style="cyan")
+        summary_table.add_column("Count", style="yellow")
+
+        summary = changes["summary"]
+        summary_table.add_row("Devices in older scan", str(summary["total_older"]))
+        summary_table.add_row("Devices in newer scan", str(summary["total_newer"]))
+        summary_table.add_row("New devices", f"[green]+{summary['new_count']}[/green]")
+        summary_table.add_row("Missing devices", f"[red]-{summary['missing_count']}[/red]")
+        summary_table.add_row("Modified devices", f"[yellow]~{summary['modified_count']}[/yellow]")
+        summary_table.add_row("Unchanged devices", str(summary["unchanged_count"]))
+
+        console.print("\n[bold]Summary:[/bold]")
+        console.print(summary_table)
+
+        # New devices
+        if changes["new_devices"]:
+            console.print("\n[bold green]NEW DEVICES[/bold green]")
+            new_table = Table()
+            new_table.add_column("IP", style="green")
+            new_table.add_column("Hostname", style="green")
+            new_table.add_column("Type", style="green")
+            new_table.add_column("Vendor", style="green")
+            new_table.add_column("Services", style="green")
+
+            for device in changes["new_devices"]:
+                services = ", ".join(device.get("services", [])[:3])
+                if len(device.get("services", [])) > 3:
+                    services += "..."
+
+                new_table.add_row(
+                    device["ip"],
+                    device.get("hostname", "N/A"),
+                    device.get("type", "unknown"),
+                    device.get("vendor", "N/A"),
+                    services or "None",
+                )
+
+            console.print(new_table)
+
+        # Missing devices
+        if changes["missing_devices"]:
+            console.print("\n[bold red]MISSING DEVICES[/bold red]")
+            missing_table = Table()
+            missing_table.add_column("IP", style="red")
+            missing_table.add_column("Hostname", style="red")
+            missing_table.add_column("Type", style="red")
+            missing_table.add_column("Last Known Services", style="red")
+
+            for device in changes["missing_devices"]:
+                services = ", ".join(device.get("services", [])[:3])
+                if len(device.get("services", [])) > 3:
+                    services += "..."
+
+                missing_table.add_row(
+                    device["ip"],
+                    device.get("hostname", "N/A"),
+                    device.get("type", "unknown"),
+                    services or "None",
+                )
+
+            console.print(missing_table)
+
+        # Modified devices
+        if changes["modified_devices"]:
+            console.print("\n[bold yellow]MODIFIED DEVICES[/bold yellow]")
+            for device_change in changes["modified_devices"]:
+                ip = device_change["ip"]
+                hostname = device_change["newer"].get("hostname", "N/A")
+
+                console.print(f"\n[yellow]• {ip} - {hostname}[/yellow]")
+
+                for change in device_change["changes"]:
+                    field = change["field"]
+                    change_type = change["type"]
+
+                    if change_type == "changed":
+                        old_val = change["old_value"] or "None"
+                        new_val = change["new_value"] or "None"
+                        console.print(f"  {field}: [red]{old_val}[/red] → [green]{new_val}[/green]")
+                    elif change_type == "added":
+                        values = ", ".join(str(v) for v in change["values"])
+                        console.print(f"  {field}: [green]+{values}[/green]")
+                    elif change_type == "removed":
+                        values = ", ".join(str(v) for v in change["values"])
+                        console.print(f"  {field}: [red]-{values}[/red]")
+
+    def _export_comparison_results(self, changes, older_scan_file, newer_scan_file):
+        """Export comparison results to multiple formats"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Extract scan timestamps for filename
+        older_timestamp = older_scan_file.stem.replace("scan_", "")
+        newer_timestamp = newer_scan_file.stem.replace("scan_", "")
+
+        # Ensure exports directory exists
+        export_dir = self.output_path / "exports"
+        export_dir.mkdir(exist_ok=True)
+
+        console.print("\n[bold]Export Format Options:[/bold]")
+        console.print("  1. JSON (complete data)")
+        console.print("  2. CSV (summary format)")
+        console.print("  3. HTML report")
+        console.print("  4. All formats")
+
+        choice = Prompt.ask("Select export format", choices=["1", "2", "3", "4"], default="4")
+
+        exported_files = []
+
+        # JSON Export
+        if choice in ["1", "4"]:
+            json_file = export_dir / f"comparison_{older_timestamp}_to_{newer_timestamp}.json"
+            export_data = {
+                "comparison_timestamp": datetime.now().isoformat(),
+                "older_scan": {
+                    "file": older_scan_file.name,
+                    "timestamp": older_timestamp,
+                    "date": datetime.strptime(older_timestamp, "%Y%m%d_%H%M%S").isoformat(),
+                },
+                "newer_scan": {
+                    "file": newer_scan_file.name,
+                    "timestamp": newer_timestamp,
+                    "date": datetime.strptime(newer_timestamp, "%Y%m%d_%H%M%S").isoformat(),
+                },
+                "changes": changes,
+            }
+
+            with open(json_file, "w") as f:
+                json.dump(export_data, f, indent=2)
+
+            exported_files.append(("JSON", json_file))
+
+        # CSV Export
+        if choice in ["2", "4"]:
+            csv_file = export_dir / f"comparison_{older_timestamp}_to_{newer_timestamp}.csv"
+
+            with open(csv_file, "w", newline="") as f:
+                writer = csv.writer(f)
+
+                # Write header info
+                writer.writerow(["Network Comparison Report"])
+                writer.writerow(
+                    [
+                        "Older Scan",
+                        datetime.strptime(older_timestamp, "%Y%m%d_%H%M%S").strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                    ]
+                )
+                writer.writerow(
+                    [
+                        "Newer Scan",
+                        datetime.strptime(newer_timestamp, "%Y%m%d_%H%M%S").strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                    ]
+                )
+                writer.writerow([])
+
+                # Summary
+                writer.writerow(["Summary"])
+                writer.writerow(["Type", "Count"])
+                writer.writerow(["Total devices (older)", changes["summary"]["total_older"]])
+                writer.writerow(["Total devices (newer)", changes["summary"]["total_newer"]])
+                writer.writerow(["New devices", changes["summary"]["new_count"]])
+                writer.writerow(["Missing devices", changes["summary"]["missing_count"]])
+                writer.writerow(["Modified devices", changes["summary"]["modified_count"]])
+                writer.writerow(["Unchanged devices", changes["summary"]["unchanged_count"]])
+                writer.writerow([])
+
+                # New devices
+                if changes["new_devices"]:
+                    writer.writerow(["NEW DEVICES"])
+                    writer.writerow(["IP", "Hostname", "Type", "Vendor", "Services"])
+                    for device in changes["new_devices"]:
+                        writer.writerow(
+                            [
+                                device["ip"],
+                                device.get("hostname", "N/A"),
+                                device.get("type", "unknown"),
+                                device.get("vendor", "N/A"),
+                                "; ".join(device.get("services", [])),
+                            ]
+                        )
+                    writer.writerow([])
+
+                # Missing devices
+                if changes["missing_devices"]:
+                    writer.writerow(["MISSING DEVICES"])
+                    writer.writerow(["IP", "Hostname", "Type", "Last Known Services"])
+                    for device in changes["missing_devices"]:
+                        writer.writerow(
+                            [
+                                device["ip"],
+                                device.get("hostname", "N/A"),
+                                device.get("type", "unknown"),
+                                "; ".join(device.get("services", [])),
+                            ]
+                        )
+                    writer.writerow([])
+
+                # Modified devices
+                if changes["modified_devices"]:
+                    writer.writerow(["MODIFIED DEVICES"])
+                    writer.writerow(["IP", "Hostname", "Field", "Change Type", "Details"])
+                    for device_change in changes["modified_devices"]:
+                        ip = device_change["ip"]
+                        hostname = device_change["newer"].get("hostname", "N/A")
+
+                        for change in device_change["changes"]:
+                            if change["type"] == "changed":
+                                details = f"{change['old_value']} → {change['new_value']}"
+                            elif change["type"] == "added":
+                                details = f"+{', '.join(str(v) for v in change['values'])}"
+                            else:  # removed
+                                details = f"-{', '.join(str(v) for v in change['values'])}"
+
+                            writer.writerow(
+                                [ip, hostname, change["field"], change["type"], details]
+                            )
+
+            exported_files.append(("CSV", csv_file))
+
+        # HTML Export
+        if choice in ["3", "4"]:
+            # Use the existing comparison report generator
+            comparison_file = self.generate_comparison_report(
+                changes.get("unchanged_devices", []) + changes.get("modified_devices", []),
+                changes,
+                newer_timestamp,
+            )
+            if comparison_file:
+                exported_files.append(("HTML", comparison_file))
+
+        # Display results
+        if exported_files:
+            console.print("\n[green]✓ Export complete![/green]")
+            console.print("\n[bold]Exported files:[/bold]")
+
+            for format_name, file_path in exported_files:
+                console.print(f"  {format_name}: [yellow]{file_path}[/yellow]")
+
+            if Confirm.ask("\nOpen exported files?"):
+                import webbrowser
+
+                for _, file_path in exported_files:
+                    webbrowser.open(f"file://{file_path.absolute()}")
+
+    def _display_changes_summary(self, changes):
+        """Display a summary of changes"""
         console.print("\n[bold]Network Changes Summary[/bold]\n")
 
         if changes.get("new_devices"):
@@ -594,12 +1125,16 @@ class NetworkMapper:
     def view_network_map(self):
         """Launch network map viewer"""
         # Get most recent network map
-        report_files = sorted((self.output_path / "reports").glob("network_map_*.html"), reverse=True)
-        
+        report_files = sorted(
+            (self.output_path / "reports").glob("network_map_*.html"), reverse=True
+        )
+
         # Fall back to old report format if no new maps found
         if not report_files:
-            report_files = sorted((self.output_path / "reports").glob("report_*.html"), reverse=True)
-            
+            report_files = sorted(
+                (self.output_path / "reports").glob("report_*.html"), reverse=True
+            )
+
         if report_files:
             import webbrowser
 
@@ -609,43 +1144,49 @@ class NetworkMapper:
             console.print(f"\n[bold cyan]Network map location:[/bold cyan]")
             console.print(f"[yellow underline]{file_url}[/yellow underline]")
         else:
-            console.print("[yellow]No network maps found. Run a scan first to generate a visualization.[/yellow]")
+            console.print(
+                "[yellow]No network maps found. Run a scan first to generate a visualization.[/yellow]"
+            )
         input("\nPress Enter to continue...")
 
     def _handle_snmp_setup(self) -> Tuple[bool, Dict]:
         """Handle SNMP setup with CLI override support
-        
+
         Returns:
             Tuple of (enabled, config_dict)
         """
         # Check for CLI override to disable SNMP
-        if self.cli_overrides.get('disable_snmp'):
+        if self.cli_overrides.get("disable_snmp"):
             console.print("\n[dim]SNMP enrichment disabled via CLI argument[/dim]")
             return False, {}
-            
+
         # Check for CLI override with specific settings
-        if self.cli_overrides.get('snmp_community') or self.cli_overrides.get('snmp_version'):
+        if self.cli_overrides.get("snmp_community") or self.cli_overrides.get("snmp_version"):
             config = {}
-            
-            version = self.cli_overrides.get('snmp_version', 'v2c')
-            if version not in ['v1', 'v2c', 'v3']:
+
+            version = self.cli_overrides.get("snmp_version", "v2c")
+            if version not in ["v1", "v2c", "v3"]:
                 console.print(f"[red]Invalid SNMP version '{version}'. Using v2c.[/red]")
-                version = 'v2c'
-                
-            config['version'] = version
-            
-            if version in ['v1', 'v2c']:
-                community = self.cli_overrides.get('snmp_community', 'public')
-                config['community'] = community
-                console.print(f"\n[green]✓ SNMP enrichment enabled via CLI: {version} with community '{community}'[/green]")
+                version = "v2c"
+
+            config["version"] = version
+
+            if version in ["v1", "v2c"]:
+                community = self.cli_overrides.get("snmp_community", "public")
+                config["community"] = community
+                console.print(
+                    f"\n[green]✓ SNMP enrichment enabled via CLI: {version} with community '{community}'[/green]"
+                )
             else:
-                console.print(f"\n[yellow]SNMPv3 specified via CLI but credentials missing. Using interactive setup.[/yellow]")
+                console.print(
+                    f"\n[yellow]SNMPv3 specified via CLI but credentials missing. Using interactive setup.[/yellow]"
+                )
                 return self.snmp_config.interactive_setup()
-                
-            config['timeout'] = 2
-            config['retries'] = 1
+
+            config["timeout"] = 2
+            config["retries"] = 1
             return True, config
-            
+
         # Use interactive setup
         return self.snmp_config.interactive_setup()
 
@@ -657,27 +1198,27 @@ class NetworkMapper:
         console.print("[dim]• Network range: 192.168.1.0/24[/dim]")
         console.print("[dim]• IP range: 192.168.1.1-50[/dim]")
         console.print("[dim]• Hostname: example.com[/dim]")
-        
+
         while True:
             target = Prompt.ask("\nTarget").strip()
-            
+
             if not target:
                 console.print("[red]Target cannot be empty[/red]")
                 continue
-                
+
             # Basic validation
             if self._validate_target(target):
                 return target
             else:
                 console.print("[red]Invalid target format. Please check your input.[/red]")
-                
+
     def _validate_target(self, target: str) -> bool:
         """Basic validation for scan targets"""
         import re
-        
+
         if not target or target.isspace():
             return False
-            
+
         # IP address patterns with proper range validation
         def is_valid_ip_octet(octet):
             try:
@@ -685,64 +1226,72 @@ class NetworkMapper:
                 return 0 <= num <= 255
             except ValueError:
                 return False
-        
+
         # Single IP address
-        ip_match = re.match(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$', target)
+        ip_match = re.match(r"^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$", target)
         if ip_match:
             return all(is_valid_ip_octet(octet) for octet in ip_match.groups())
-            
+
         # CIDR notation
-        cidr_match = re.match(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})$', target)
+        cidr_match = re.match(r"^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})$", target)
         if cidr_match:
             octets = cidr_match.groups()[:4]
             prefix = int(cidr_match.group(5))
             return all(is_valid_ip_octet(octet) for octet in octets) and 0 <= prefix <= 32
-            
+
         # IP range
-        range_match = re.match(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})-(\d{1,3})$', target)
+        range_match = re.match(r"^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})-(\d{1,3})$", target)
         if range_match:
             octets = range_match.groups()[:4]
             end_range = int(range_match.group(5))
-            return (all(is_valid_ip_octet(octet) for octet in octets) and 
-                    0 <= end_range <= 255 and 
-                    end_range >= int(octets[3]))
-        
+            return (
+                all(is_valid_ip_octet(octet) for octet in octets)
+                and 0 <= end_range <= 255
+                and end_range >= int(octets[3])
+            )
+
         # Hostname pattern (basic but more restrictive)
-        hostname_pattern = r'^[a-zA-Z0-9][a-zA-Z0-9\.-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$'
+        hostname_pattern = r"^[a-zA-Z0-9][a-zA-Z0-9\.-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$"
         if re.match(hostname_pattern, target):
             # Additional hostname validation
             if len(target) > 253:  # Max hostname length
                 return False
-            if '..' in target:  # No consecutive dots
+            if ".." in target:  # No consecutive dots
                 return False
-            if target.startswith('.') or target.endswith('.'):  # No leading/trailing dots
+            if target.startswith(".") or target.endswith("."):  # No leading/trailing dots
                 return False
             return True
-            
+
         return False
-        
+
     def _select_scan_type(self) -> Tuple[str, str, bool, bool]:
         """Select scan type with improved UX"""
         console.print("\n[bold]Scan Type[/bold]")
-        
+
         scan_options = [
             ("discovery", "Discovery Scan", "Quick host discovery", "30 seconds", False),
-            ("inventory", "Inventory Scan", "Service detection and OS fingerprinting", "5 minutes", True),
+            (
+                "inventory",
+                "Inventory Scan",
+                "Service detection and OS fingerprinting",
+                "5 minutes",
+                True,
+            ),
             ("deep", "Deep Scan", "Comprehensive analysis with scripts", "15 minutes", True),
             ("arp", "ARP Scan", "Layer 2 discovery for local networks", "10 seconds", True),
         ]
-        
+
         for i, (_, name, desc, time, needs_root) in enumerate(scan_options, 1):
             sudo_text = " (requires sudo)" if needs_root else ""
             console.print(f"{i}. [bold]{name}[/bold] – {desc}")
             console.print(f"   [dim]Duration: ~{time}{sudo_text}[/dim]")
-            
+
         while True:
             try:
                 choice = Prompt.ask("\nSelect scan type", choices=["1", "2", "3", "4"], default="1")
                 choice_idx = int(choice) - 1
                 scan_type, scan_name, _, _, needs_root = scan_options[choice_idx]
-                
+
                 # Handle masscan option for discovery scans
                 use_masscan = False
                 if scan_type == "discovery":
@@ -752,61 +1301,68 @@ class NetworkMapper:
                         console.print("[green]→ Using masscan for faster scanning[/green]")
                     else:
                         console.print("[dim]→ Using standard nmap discovery[/dim]")
-                
+
                 return scan_type, scan_name, needs_root, use_masscan
-                
+
             except (ValueError, IndexError):
                 console.print("[red]Please select a valid option (1-4)[/red]")
-                
+
     def _handle_vulnerability_setup(self) -> bool:
         """Handle vulnerability scanning setup"""
         console.print("\n[bold]Vulnerability Analysis[/bold]")
         console.print("Check discovered services against multiple CVE databases")
         console.print("[dim]Uses OSV (Google) and CIRCL APIs - no registration required[/dim]")
-        
+
         enabled = Confirm.ask("Enable vulnerability scanning", default=True)
-        
+
         if enabled:
-            console.print("[green]→ Vulnerability scanning enabled (OSV + CIRCL + Local patterns)[/green]")
+            console.print(
+                "[green]→ Vulnerability scanning enabled (OSV + CIRCL + Local patterns)[/green]"
+            )
         else:
             console.print("[dim]→ Vulnerability scanning disabled[/dim]")
-            
+
         return enabled
 
     def _display_vulnerability_summary(self, vuln_report: Dict):
         """Display vulnerability scan summary"""
-        if vuln_report['total_vulnerabilities'] == 0:
+        if vuln_report["total_vulnerabilities"] == 0:
             console.print("[green]✓ No vulnerabilities found[/green]")
             return
-            
+
         console.print(f"\n[bold red]Vulnerability Summary[/bold red]")
-        
+
         # Create summary table
         summary_table = Table(show_header=False, box=None, padding=(0, 2))
         summary_table.add_column("Metric", style="cyan")
         summary_table.add_column("Count", style="yellow")
-        
-        summary_table.add_row("Total vulnerabilities", str(vuln_report['total_vulnerabilities']))
-        summary_table.add_row("Vulnerable devices", f"{vuln_report['vulnerable_devices']}/{vuln_report['total_devices']}")
-        summary_table.add_row("Critical severity", str(vuln_report['critical_vulnerabilities']))
-        summary_table.add_row("High severity", str(vuln_report['high_vulnerabilities']))
-        
+
+        summary_table.add_row("Total vulnerabilities", str(vuln_report["total_vulnerabilities"]))
+        summary_table.add_row(
+            "Vulnerable devices",
+            f"{vuln_report['vulnerable_devices']}/{vuln_report['total_devices']}",
+        )
+        summary_table.add_row("Critical severity", str(vuln_report["critical_vulnerabilities"]))
+        summary_table.add_row("High severity", str(vuln_report["high_vulnerabilities"]))
+
         console.print(summary_table)
-        
+
         # Show top vulnerabilities
-        top_vulns = vuln_report['top_vulnerabilities'][:3]  # Show top 3
+        top_vulns = vuln_report["top_vulnerabilities"][:3]  # Show top 3
         if top_vulns:
             console.print("\n[bold]Top Vulnerabilities:[/bold]")
             for vuln in top_vulns:
                 severity_color = {
-                    'CRITICAL': 'red',
-                    'HIGH': 'orange1',
-                    'MEDIUM': 'yellow',
-                    'LOW': 'blue'
-                }.get(vuln.get('severity'), 'white')
-                
-                console.print(f"• [{severity_color}]{vuln.get('cve_id')}[/{severity_color}] "
-                            f"(CVSS: {vuln.get('cvss_score', 0):.1f}) - {vuln.get('device_ip')}")
+                    "CRITICAL": "red",
+                    "HIGH": "orange1",
+                    "MEDIUM": "yellow",
+                    "LOW": "blue",
+                }.get(vuln.get("severity"), "white")
+
+                console.print(
+                    f"• [{severity_color}]{vuln.get('cve_id')}[/{severity_color}] "
+                    f"(CVSS: {vuln.get('cvss_score', 0):.1f}) - {vuln.get('device_ip')}"
+                )
 
     def export_data(self):
         """Export data menu"""
@@ -845,25 +1401,25 @@ class NetworkMapper:
                 console.print("[yellow]Generating PDF report...[/yellow]")
                 export_file = self.export_mgr.export_to_pdf(devices, changes)
                 console.print(f"[green]✓ PDF report exported to: {export_file}[/green]")
-                
+
             elif choice == "2":
                 # Export to Excel
                 console.print("[yellow]Generating Excel workbook...[/yellow]")
                 export_file = self.export_mgr.export_to_excel(devices, changes)
                 console.print(f"[green]✓ Excel workbook exported to: {export_file}[/green]")
-                
+
             elif choice == "3":
                 # Export to Enhanced JSON
                 console.print("[yellow]Generating enhanced JSON export...[/yellow]")
                 export_file = self.export_mgr.export_to_json(devices, changes)
                 console.print(f"[green]✓ JSON export saved to: {export_file}[/green]")
-                
+
             elif choice == "4":
                 # Export to CSV (enhanced)
                 console.print("[yellow]Generating CSV export...[/yellow]")
                 export_file = self.export_mgr.export_to_csv_enhanced(devices)
                 console.print(f"[green]✓ CSV exported to: {export_file}[/green]")
-                
+
             elif choice == "5":
                 # Export critical devices only
                 critical = [d for d in devices if d.get("critical", False)]
@@ -874,28 +1430,33 @@ class NetworkMapper:
                     console.print(f"[green]✓ Critical devices exported to: {export_file}[/green]")
                 else:
                     console.print("[yellow]No critical devices found.[/yellow]")
-                    
+
             elif choice == "6":
                 # Export by device type
                 device_type = Prompt.ask("Enter device type (router/switch/server/etc)")
                 filtered = [d for d in devices if d.get("type") == device_type]
                 if filtered:
-                    export_file = self.output_path / "exports" / f"{device_type}_devices_{timestamp}.csv"
+                    export_file = (
+                        self.output_path / "exports" / f"{device_type}_devices_{timestamp}.csv"
+                    )
                     self.output_path.joinpath("exports").mkdir(exist_ok=True)
                     self.save_csv(filtered, export_file)
-                    console.print(f"[green]✓ {device_type} devices exported to: {export_file}[/green]")
+                    console.print(
+                        f"[green]✓ {device_type} devices exported to: {export_file}[/green]"
+                    )
                 else:
                     console.print(f"[yellow]No {device_type} devices found.[/yellow]")
 
             # Ask if user wants to open the export
-            if 'export_file' in locals() and Confirm.ask("\nOpen exported file?"):
+            if "export_file" in locals() and Confirm.ask("\nOpen exported file?"):
                 import webbrowser
+
                 file_url = f"file://{export_file.absolute()}"
                 webbrowser.open(file_url)
-                
+
         except Exception as e:
             console.print(f"[red]Export failed: {e}[/red]")
-            
+
         input("\nPress Enter to continue...")
 
 
@@ -912,11 +1473,11 @@ def main(
     try:
         # Set CLI overrides
         mapper.cli_overrides = {
-            'disable_snmp': disable_snmp,
-            'snmp_community': snmp_community,
-            'snmp_version': snmp_version
+            "disable_snmp": disable_snmp,
+            "snmp_community": snmp_community,
+            "snmp_version": snmp_version,
         }
-        
+
         mapper.interactive_menu()
     except KeyboardInterrupt:
         console.print("\n[red]Interrupted by user[/red]")
@@ -926,3 +1487,4 @@ def main(
 
 if __name__ == "__main__":
     app()
+

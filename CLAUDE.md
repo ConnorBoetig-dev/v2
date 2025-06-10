@@ -44,6 +44,9 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 - Detects new, missing, and modified devices
 - Tracks service/port changes
 - Maintains scan history for comparison
+- Advanced scan comparison with subnet auto-detection
+- Visual diff display with color coding
+- Export comparison results in multiple formats (JSON, CSV, HTML)
 
 ### 4. Visualization ✅ ENHANCED
 - **2D Network Map**: 

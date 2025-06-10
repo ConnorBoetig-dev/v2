@@ -9,10 +9,10 @@ This module handles user-defined annotations for devices including:
 
 import json
 import logging
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Set
-from dataclasses import dataclass, field, asdict
 
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DeviceAnnotation:
     """Annotation data for a device."""
+
     ip: str
     critical: bool = False
     notes: str = ""
@@ -35,20 +36,20 @@ class DeviceAnnotation:
     last_modified: str = field(default_factory=lambda: datetime.now().isoformat())
     created: str = field(default_factory=lambda: datetime.now().isoformat())
     custom_fields: Dict[str, str] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict:
         """Convert to dictionary for serialization."""
         return asdict(self)
-    
+
     @classmethod
-    def from_dict(cls, data: Dict) -> 'DeviceAnnotation':
+    def from_dict(cls, data: Dict) -> "DeviceAnnotation":
         """Create from dictionary."""
         # Filter valid fields
         valid_fields = {f.name for f in cls.__dataclass_fields__.values()}
         filtered_data = {k: v for k, v in data.items() if k in valid_fields}
         return cls(**filtered_data)
-    
-    def merge(self, other: 'DeviceAnnotation') -> None:
+
+    def merge(self, other: "DeviceAnnotation") -> None:
         """Merge another annotation into this one."""
         if other.critical:
             self.critical = True
@@ -68,23 +69,23 @@ class DeviceAnnotation:
 
 class DeviceAnnotator:
     """Manages device annotations and metadata."""
-    
+
     def __init__(self, output_path: Path = Path("output")):
         """Initialize annotator.
-        
+
         Args:
             output_path: Base output directory
         """
         self.output_path = output_path
         self.output_path.mkdir(exist_ok=True)
-        
+
         self.annotations_file = output_path / "annotations" / "device_annotations.json"
         self.annotations_file.parent.mkdir(exist_ok=True)
-        
+
         self.console = Console()
         self.annotations: Dict[str, DeviceAnnotation] = {}
         self.load_annotations()
-        
+
         # Track changes for undo functionality
         self._history: List[Dict[str, DeviceAnnotation]] = []
 
@@ -94,7 +95,7 @@ class DeviceAnnotator:
             try:
                 with open(self.annotations_file) as f:
                     data = json.load(f)
-                    
+
                 # Convert to DeviceAnnotation objects
                 self.annotations = {}
                 for ip, annotation_data in data.items():
@@ -108,7 +109,7 @@ class DeviceAnnotator:
                             logger.warning(f"Invalid annotation format for {ip}")
                     except Exception as e:
                         logger.error(f"Failed to load annotation for {ip}: {e}")
-                        
+
                 logger.info(f"Loaded {len(self.annotations)} device annotations")
             except Exception as e:
                 logger.error(f"Failed to load annotations file: {e}")
@@ -119,35 +120,35 @@ class DeviceAnnotator:
 
     def save_annotations(self) -> bool:
         """Save annotations to file.
-        
+
         Returns:
             True if successful
         """
         try:
             # Save current state to history
             self._save_to_history()
-            
+
             # Convert to serializable format
             data = {ip: ann.to_dict() for ip, ann in self.annotations.items()}
-            
+
             # Write to temporary file first
-            temp_file = self.annotations_file.with_suffix('.tmp')
-            with open(temp_file, 'w') as f:
+            temp_file = self.annotations_file.with_suffix(".tmp")
+            with open(temp_file, "w") as f:
                 json.dump(data, f, indent=2)
-                
+
             # Move to final location
             temp_file.replace(self.annotations_file)
-            
+
             logger.info(f"Saved {len(self.annotations)} annotations")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to save annotations: {e}")
             return False
 
     def annotate_device(self, device: Dict) -> None:
         """Interactive device annotation.
-        
+
         Args:
             device: Device dictionary to annotate
         """
@@ -155,10 +156,10 @@ class DeviceAnnotator:
         if not ip:
             self.console.print("[red]Device missing IP address[/red]")
             return
-            
+
         # Display device info
         self._display_device_info(device)
-        
+
         # Get or create annotation
         if ip in self.annotations:
             annotation = self.annotations[ip]
@@ -166,19 +167,16 @@ class DeviceAnnotator:
             self._display_annotation(annotation)
         else:
             annotation = DeviceAnnotation(ip=ip)
-            
+
         # Interactive annotation
         updated = False
-        
+
         # Critical flag
-        critical = Confirm.ask(
-            "Mark as critical infrastructure?",
-            default=annotation.critical
-        )
+        critical = Confirm.ask("Mark as critical infrastructure?", default=annotation.critical)
         if critical != annotation.critical:
             annotation.critical = critical
             updated = True
-            
+
         # Notes
         if annotation.notes:
             self.console.print(f"\nCurrent notes: {annotation.notes}")
@@ -192,49 +190,40 @@ class DeviceAnnotator:
             if notes:
                 annotation.notes = notes
                 updated = True
-                
+
         # Tags
         if annotation.tags:
             self.console.print(f"\nCurrent tags: {', '.join(annotation.tags)}")
-            
+
         new_tags = Prompt.ask("Enter tags (comma-separated, optional)", default="")
         if new_tags:
             tags = [t.strip() for t in new_tags.split(",") if t.strip()]
             if set(tags) != set(annotation.tags):
                 annotation.tags = tags
                 updated = True
-                
+
         # Location
-        location = Prompt.ask(
-            "Physical location",
-            default=annotation.location
-        )
+        location = Prompt.ask("Physical location", default=annotation.location)
         if location != annotation.location:
             annotation.location = location
             updated = True
-            
+
         # Owner/Department
-        owner = Prompt.ask(
-            "Owner",
-            default=annotation.owner
-        )
+        owner = Prompt.ask("Owner", default=annotation.owner)
         if owner != annotation.owner:
             annotation.owner = owner
             updated = True
-            
-        department = Prompt.ask(
-            "Department",
-            default=annotation.department
-        )
+
+        department = Prompt.ask("Department", default=annotation.department)
         if department != annotation.department:
             annotation.department = department
             updated = True
-            
+
         # Save if updated
         if updated:
             annotation.last_modified = datetime.now().isoformat()
             self.annotations[ip] = annotation
-            
+
             if self.save_annotations():
                 self.console.print("\n[green]✓ Annotation saved![/green]")
             else:
@@ -244,14 +233,14 @@ class DeviceAnnotator:
 
     def bulk_annotate(self, devices: List[Dict]) -> None:
         """Annotate multiple devices.
-        
+
         Args:
             devices: List of device dictionaries
         """
         if not devices:
             self.console.print("[yellow]No devices to annotate[/yellow]")
             return
-            
+
         # Display device table
         table = Table(title="Select Devices to Annotate")
         table.add_column("#", style="cyan", width=4)
@@ -261,14 +250,14 @@ class DeviceAnnotator:
         table.add_column("Vendor", width=15)
         table.add_column("Critical", style="red", width=8)
         table.add_column("Tags", width=20)
-        
+
         for i, device in enumerate(devices):
             ip = device.get("ip", "")
             annotation = self.annotations.get(ip)
-            
+
             critical = "✓" if annotation and annotation.critical else ""
             tags = ", ".join(annotation.tags) if annotation and annotation.tags else ""
-            
+
             table.add_row(
                 str(i + 1),
                 ip,
@@ -276,52 +265,52 @@ class DeviceAnnotator:
                 device.get("type", "unknown"),
                 device.get("vendor", "")[:15],
                 critical,
-                tags[:20]
+                tags[:20],
             )
-            
+
         self.console.print(table)
-        
+
         # Get selections
         self.console.print("\n[bold]Select devices to annotate[/bold]")
         self.console.print("Enter numbers separated by commas (e.g., 1,3,5)")
         self.console.print("Or use ranges (e.g., 1-5)")
         self.console.print("Enter 'all' to annotate all devices")
-        
+
         selection = Prompt.ask("Selection")
-        
+
         # Parse selection
         indices = self._parse_selection(selection, len(devices))
-        
+
         if not indices:
             self.console.print("[yellow]No valid selections[/yellow]")
             return
-            
+
         # Annotate selected devices
         self.console.print(f"\n[bold]Annotating {len(indices)} devices[/bold]")
-        
+
         for idx in indices:
             if 0 <= idx < len(devices):
                 self.console.print(f"\n[cyan]Device {idx + 1} of {len(indices)}[/cyan]")
                 self.annotate_device(devices[idx])
-                
+
         self.console.print("\n[green]Bulk annotation complete![/green]")
 
     def apply_annotations(self, devices: List[Dict]) -> List[Dict]:
         """Apply saved annotations to device list.
-        
+
         Args:
             devices: List of device dictionaries
-            
+
         Returns:
             Updated device list with annotations applied
         """
         annotated_count = 0
-        
+
         for device in devices:
             ip = device.get("ip")
             if ip and ip in self.annotations:
                 annotation = self.annotations[ip]
-                
+
                 # Apply annotation fields
                 device["critical"] = annotation.critical
                 device["notes"] = annotation.notes
@@ -330,16 +319,16 @@ class DeviceAnnotator:
                 device["owner"] = annotation.owner
                 device["department"] = annotation.department
                 device["annotation_modified"] = annotation.last_modified
-                
+
                 # Apply custom fields
                 for key, value in annotation.custom_fields.items():
                     device[f"custom_{key}"] = value
-                    
+
                 annotated_count += 1
-                
+
         logger.info(f"Applied annotations to {annotated_count} devices")
         return devices
-    
+
     def _display_device_info(self, device: Dict) -> None:
         """Display device information."""
         self.console.print(f"\n[bold]Device Information[/bold]")
@@ -348,10 +337,10 @@ class DeviceAnnotator:
         self.console.print(f"Type: {device.get('type', 'unknown')}")
         self.console.print(f"Vendor: {device.get('vendor', 'N/A')}")
         self.console.print(f"OS: {device.get('os', 'N/A')}")
-        
-        if device.get('services'):
+
+        if device.get("services"):
             self.console.print(f"Services: {', '.join(device['services'][:5])}...")
-            
+
     def _display_annotation(self, annotation: DeviceAnnotation) -> None:
         """Display existing annotation."""
         self.console.print(f"Critical: [red]{'✓' if annotation.critical else '✗'}[/red]")
@@ -365,21 +354,21 @@ class DeviceAnnotator:
             self.console.print(f"Owner: {annotation.owner}")
         if annotation.department:
             self.console.print(f"Department: {annotation.department}")
-            
+
     def _parse_selection(self, selection: str, max_value: int) -> List[int]:
         """Parse user selection string into indices."""
         indices = []
-        
-        if selection.lower() == 'all':
+
+        if selection.lower() == "all":
             return list(range(max_value))
-            
-        for part in selection.split(','):
+
+        for part in selection.split(","):
             part = part.strip()
-            
-            if '-' in part:
+
+            if "-" in part:
                 # Range
                 try:
-                    start, end = map(int, part.split('-'))
+                    start, end = map(int, part.split("-"))
                     indices.extend(range(start - 1, min(end, max_value)))
                 except ValueError:
                     continue
@@ -391,22 +380,21 @@ class DeviceAnnotator:
                         indices.append(idx)
                 except ValueError:
                     continue
-                    
+
         return list(set(indices))  # Remove duplicates
-    
+
     def _save_to_history(self) -> None:
         """Save current state to history for undo."""
         # Limit history size
         if len(self._history) >= 10:
             self._history.pop(0)
-            
+
         # Deep copy current state
         current_state = {
-            ip: DeviceAnnotation.from_dict(ann.to_dict())
-            for ip, ann in self.annotations.items()
+            ip: DeviceAnnotation.from_dict(ann.to_dict()) for ip, ann in self.annotations.items()
         }
         self._history.append(current_state)
-    
+
     def get_annotation_stats(self) -> Dict[str, int]:
         """Get statistics about annotations."""
         stats = {
@@ -417,11 +405,11 @@ class DeviceAnnotator:
             "with_location": sum(1 for ann in self.annotations.values() if ann.location),
             "with_owner": sum(1 for ann in self.annotations.values() if ann.owner),
         }
-        
+
         # Count unique tags
         all_tags = set()
         for ann in self.annotations.values():
             all_tags.update(ann.tags)
         stats["unique_tags"] = len(all_tags)
-        
+
         return stats

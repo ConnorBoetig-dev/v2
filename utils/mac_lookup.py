@@ -33,7 +33,7 @@ class MACLookup:
             "08:00:27",  # VirtualBox
             "52:54:00",  # QEMU/KVM
             "00:16:3E",  # Xen
-            "02:42:",    # Docker
+            "02:42:",  # Docker
         ]
 
     def _load_oui_database(self):
@@ -83,15 +83,17 @@ class MACLookup:
             response.raise_for_status()
 
             # Write to temporary file first
-            temp_file = self.oui_file.with_suffix('.tmp')
-            with open(temp_file, 'wb') as f:
+            temp_file = self.oui_file.with_suffix(".tmp")
+            with open(temp_file, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
 
             # Move to final location
             temp_file.replace(self.oui_file)
-            print(f"[INFO] OUI database updated successfully ({self.oui_file.stat().st_size // 1024} KB)")
+            print(
+                f"[INFO] OUI database updated successfully ({self.oui_file.stat().st_size // 1024} KB)"
+            )
 
         except Exception as e:
             print(f"[WARNING] Failed to download OUI database: {e}")
@@ -110,13 +112,13 @@ class MACLookup:
             response.raise_for_status()
 
             # Convert to OUI format and save
-            temp_file = self.oui_file.with_suffix('.tmp')
-            with open(temp_file, 'w') as f:
-                for line in response.text.split('\n'):
-                    if line and not line.startswith('#'):
-                        parts = line.split('\t')
+            temp_file = self.oui_file.with_suffix(".tmp")
+            with open(temp_file, "w") as f:
+                for line in response.text.split("\n"):
+                    if line and not line.startswith("#"):
+                        parts = line.split("\t")
                         if len(parts) >= 2:
-                            mac = parts[0].replace(':', '-').upper()
+                            mac = parts[0].replace(":", "-").upper()
                             vendor = parts[1]
                             f.write(f"{mac}\t{vendor}\n")
 
@@ -131,28 +133,30 @@ class MACLookup:
         self.vendor_cache = {}
 
         try:
-            with open(self.oui_file, 'r', encoding='utf-8', errors='ignore') as f:
+            with open(self.oui_file, "r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
                     line = line.strip()
 
                     # IEEE format: XX-XX-XX   (hex)    Organization Name
-                    if re.match(r'^[0-9A-F]{2}-[0-9A-F]{2}-[0-9A-F]{2}', line):
-                        parts = line.split('\t')
+                    if re.match(r"^[0-9A-F]{2}-[0-9A-F]{2}-[0-9A-F]{2}", line):
+                        parts = line.split("\t")
                         if len(parts) >= 2:
-                            oui = parts[0].replace('-', ':').lower()
+                            oui = parts[0].replace("-", ":").lower()
                             # Extract organization name (may have (hex) prefix)
-                            vendor_parts = [p.strip() for p in parts[1:] if p.strip() and p.strip() != '(hex)']
-                            vendor = ' '.join(vendor_parts)
+                            vendor_parts = [
+                                p.strip() for p in parts[1:] if p.strip() and p.strip() != "(hex)"
+                            ]
+                            vendor = " ".join(vendor_parts)
 
                             if vendor:
                                 self.vendor_cache[oui] = vendor
 
                     # Alternative format from Wireshark manuf file
-                    elif '\t' in line:
-                        parts = line.split('\t', 1)
+                    elif "\t" in line:
+                        parts = line.split("\t", 1)
                         if len(parts) == 2:
-                            oui = parts[0].replace('-', ':').lower()
-                            if re.match(r'^[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}', oui):
+                            oui = parts[0].replace("-", ":").lower()
+                            if re.match(r"^[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}", oui):
                                 self.vendor_cache[oui] = parts[1].strip()
 
             print(f"[INFO] Loaded {len(self.vendor_cache)} OUI entries")
@@ -398,6 +402,9 @@ class MACLookup:
             "database_file": str(self.oui_file),
             "database_exists": self.oui_file.exists(),
             "database_size": self.oui_file.stat().st_size if self.oui_file.exists() else 0,
-            "database_age_days": (datetime.now() - datetime.fromtimestamp(
-                self.oui_file.stat().st_mtime)).days if self.oui_file.exists() else -1
+            "database_age_days": (
+                datetime.now() - datetime.fromtimestamp(self.oui_file.stat().st_mtime)
+            ).days
+            if self.oui_file.exists()
+            else -1,
         }

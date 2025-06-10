@@ -12,7 +12,7 @@ A comprehensive Python-based network discovery and security assessment tool that
 - **🎯 Smart Device Classification**: Identifies 16+ device types using ML-like signatures
 - **🔐 Vulnerability Assessment**: Real-time CVE correlation using free APIs (OSV, CIRCL)
 - **📊 Interactive Visualizations**: Network topology maps with D3.js
-- **📈 Change Tracking**: Monitors network changes between scans
+- **📈 Change Tracking**: Monitors network changes between scans with advanced comparison tools
 - **🔌 SNMP Integration**: Device enrichment with SNMP v1/v2c/v3 support
 - **📑 Advanced Reporting**: HTML, PDF, Excel, CSV, and JSON exports
 - **🎨 Professional UI**: Rich CLI with progress tracking and intuitive menus

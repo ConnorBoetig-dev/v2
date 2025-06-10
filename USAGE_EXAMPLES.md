@@ -262,7 +262,7 @@ From main menu:
 
 ## Change Tracking
 
-### Viewing Changes
+### Quick Change Detection
 From main menu:
 1. Select "Check Changes"
 2. Summary shows:
@@ -270,9 +270,22 @@ From main menu:
    - Missing devices (red) 
    - Modified devices (yellow)
 
+### Advanced Scan Comparison
+From main menu:
+1. Select "Compare Scans" (option 4)
+2. System automatically:
+   - Groups scans by subnet
+   - Detects same-network scans
+   - Shows last 20 scans
+3. Choose subnet to compare
+4. Select two scans for comparison
+5. View detailed comparison with color coding
+6. Export results (JSON, CSV, HTML)
+
 ### Change Report Files
 - JSON format: `output/changes/changes_*.json`
 - Text summary: `output/changes/changes_*.txt`
+- Comparison exports: `output/exports/comparison_*.{json,csv,html}`
 
 ### Example Change Detection
 ```
@@ -290,6 +303,13 @@ CHANGED DEVICES (1)
   • 192.168.1.1 - main-router
     - services: added https:443
 ```
+
+### Comparison Features
+- **Subnet Auto-Detection**: Automatically groups scans by network
+- **Visual Diff Display**: Color-coded changes (green=new, red=missing, yellow=modified)
+- **Field-Level Changes**: Shows exactly what changed (ports, services, etc.)
+- **Multiple Export Formats**: JSON, CSV, HTML reports
+- **HTML Report Integration**: "Compare to Last Scan" button in reports
 
 ## Device Annotation
 

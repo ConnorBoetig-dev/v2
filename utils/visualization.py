@@ -30,7 +30,7 @@ class MapGenerator:
                 "critical": device.get("critical", False),
                 "services": device.get("services", []),
                 "vendor": device.get("vendor", ""),
-                "group": self._get_device_group(device)
+                "group": self._get_device_group(device),
             }
             nodes.append(device_node)
             node_map[device["ip"]] = device_node
@@ -69,7 +69,11 @@ class MapGenerator:
         # Categorize devices
         routers = [d for d in devices if d.get("type") == "router"]
         switches = [d for d in devices if d.get("type") == "switch"]
-        servers = [d for d in devices if "server" in d.get("type", "") or d.get("type") in ["web_server", "database"]]
+        servers = [
+            d
+            for d in devices
+            if "server" in d.get("type", "") or d.get("type") in ["web_server", "database"]
+        ]
         workstations = [d for d in devices if d.get("type") == "workstation"]
         others = [d for d in devices if d.get("type") in ["printer", "iot", "unknown"]]
 
@@ -78,47 +82,54 @@ class MapGenerator:
             # Connect routers in a ring for redundancy
             for i in range(len(routers)):
                 next_router = routers[(i + 1) % len(routers)]
-                links.append({
-                    "source": routers[i]["ip"],
-                    "target": next_router["ip"],
-                    "value": 4,
-                    "type": "backbone"
-                })
+                links.append(
+                    {
+                        "source": routers[i]["ip"],
+                        "target": next_router["ip"],
+                        "value": 4,
+                        "type": "backbone",
+                    }
+                )
 
         # Strategy 2: Connect switches to routers
         for switch in switches:
             if routers:
                 # Connect to nearest router (by IP proximity)
-                nearest_router = min(routers, key=lambda r: self._ip_distance(switch["ip"], r["ip"]))
-                links.append({
-                    "source": switch["ip"],
-                    "target": nearest_router["ip"],
-                    "value": 3,
-                    "type": "uplink"
-                })
+                nearest_router = min(
+                    routers, key=lambda r: self._ip_distance(switch["ip"], r["ip"])
+                )
+                links.append(
+                    {
+                        "source": switch["ip"],
+                        "target": nearest_router["ip"],
+                        "value": 3,
+                        "type": "uplink",
+                    }
+                )
 
         # Strategy 3: Connect servers intelligently
         for server in servers:
             # Critical servers connect directly to routers
             if server.get("critical", False) and routers:
                 router = min(routers, key=lambda r: self._ip_distance(server["ip"], r["ip"]))
-                links.append({
-                    "source": server["ip"],
-                    "target": router["ip"],
-                    "value": 3,
-                    "type": "critical"
-                })
+                links.append(
+                    {"source": server["ip"], "target": router["ip"], "value": 3, "type": "critical"}
+                )
             # Other servers connect to switches or routers
             else:
                 infrastructure = switches + routers
                 if infrastructure:
-                    target = min(infrastructure, key=lambda i: self._ip_distance(server["ip"], i["ip"]))
-                    links.append({
-                        "source": server["ip"],
-                        "target": target["ip"],
-                        "value": 2,
-                        "type": "server_link"
-                    })
+                    target = min(
+                        infrastructure, key=lambda i: self._ip_distance(server["ip"], i["ip"])
+                    )
+                    links.append(
+                        {
+                            "source": server["ip"],
+                            "target": target["ip"],
+                            "value": 2,
+                            "type": "server_link",
+                        }
+                    )
 
         # Strategy 4: Connect workstations to switches (or routers if no switches)
         for workstation in workstations:
@@ -126,24 +137,28 @@ class MapGenerator:
             if infrastructure:
                 # Distribute workstations among switches
                 target = infrastructure[hash(workstation["ip"]) % len(infrastructure)]
-                links.append({
-                    "source": workstation["ip"],
-                    "target": target["ip"],
-                    "value": 1,
-                    "type": "access"
-                })
+                links.append(
+                    {
+                        "source": workstation["ip"],
+                        "target": target["ip"],
+                        "value": 1,
+                        "type": "access",
+                    }
+                )
 
         # Strategy 5: Connect other devices (printers, IoT) to local infrastructure
         for device in others:
             infrastructure = switches + routers
             if infrastructure:
                 target = min(infrastructure, key=lambda i: self._ip_distance(device["ip"], i["ip"]))
-                links.append({
-                    "source": device["ip"],
-                    "target": target["ip"],
-                    "value": 1,
-                    "type": "peripheral"
-                })
+                links.append(
+                    {
+                        "source": device["ip"],
+                        "target": target["ip"],
+                        "value": 1,
+                        "type": "peripheral",
+                    }
+                )
 
         # Strategy 6: Add some cross-connections for realism
         if len(servers) > 1:
@@ -153,13 +168,17 @@ class MapGenerator:
 
             for web_server in web_servers:
                 if db_servers:
-                    db_server = min(db_servers, key=lambda d: self._ip_distance(web_server["ip"], d["ip"]))
-                    links.append({
-                        "source": web_server["ip"],
-                        "target": db_server["ip"],
-                        "value": 2,
-                        "type": "application"
-                    })
+                    db_server = min(
+                        db_servers, key=lambda d: self._ip_distance(web_server["ip"], d["ip"])
+                    )
+                    links.append(
+                        {
+                            "source": web_server["ip"],
+                            "target": db_server["ip"],
+                            "value": 2,
+                            "type": "application",
+                        }
+                    )
 
     def generate_threejs_data(self, devices: List[Dict]) -> Dict:
         """Generate Three.js 3D visualization data with improved positioning"""
@@ -174,16 +193,16 @@ class MapGenerator:
 
         # Enhanced color scheme for dark theme
         colors = {
-            "router": 0xf48771,      # Coral red
-            "switch": 0x7ca9dd,      # Light blue
-            "windows_server": 0x6fc28b,  # Green
-            "linux_server": 0x4ec9b0,    # Teal
-            "web_server": 0x569cd6,      # Blue
-            "database": 0xb99bd8,        # Purple
-            "workstation": 0x9cdcfe,     # Light cyan
-            "printer": 0xdaa674,         # Orange
-            "iot": 0xd4c896,            # Yellow
-            "unknown": 0x858585         # Gray
+            "router": 0xF48771,  # Coral red
+            "switch": 0x7CA9DD,  # Light blue
+            "windows_server": 0x6FC28B,  # Green
+            "linux_server": 0x4EC9B0,  # Teal
+            "web_server": 0x569CD6,  # Blue
+            "database": 0xB99BD8,  # Purple
+            "workstation": 0x9CDCFE,  # Light cyan
+            "printer": 0xDAA674,  # Orange
+            "iot": 0xD4C896,  # Yellow
+            "unknown": 0x858585,  # Gray
         }
 
         # Organize devices by type with improved layering
@@ -197,7 +216,7 @@ class MapGenerator:
             "workstation": {"y": -2, "radius": 10, "spread": 1.5},
             "printer": {"y": -1, "radius": 9, "spread": 1.0},
             "iot": {"y": -3, "radius": 12, "spread": 1.8},
-            "unknown": {"y": -4, "radius": 8, "spread": 1.0}
+            "unknown": {"y": -4, "radius": 8, "spread": 1.0},
         }
 
         positions = []
@@ -223,19 +242,21 @@ class MapGenerator:
                 position = {
                     "x": 0 + random.uniform(-0.5, 0.5),
                     "y": config["y"] + random.uniform(-0.3, 0.3),
-                    "z": 0 + random.uniform(-0.5, 0.5)
+                    "z": 0 + random.uniform(-0.5, 0.5),
                 }
                 # Store position and create visual elements
                 positions.append(position)
                 device_positions[device["ip"]] = position
                 device_colors.append(colors.get(device_type, colors["unknown"]))
 
-                labels.append({
-                    "text": device.get("hostname") or device["ip"],
-                    "position": position,
-                    "type": device_type,
-                    "critical": device.get("critical", False)
-                })
+                labels.append(
+                    {
+                        "text": device.get("hostname") or device["ip"],
+                        "position": position,
+                        "type": device_type,
+                        "critical": device.get("critical", False),
+                    }
+                )
             else:
                 # Multiple devices - arrange in expanding patterns
                 for i, device in enumerate(type_devices):
@@ -255,7 +276,7 @@ class MapGenerator:
                     position = {
                         "x": radius * math.cos(angle) + random.uniform(-0.3, 0.3),
                         "y": config["y"] + height_variation + random.uniform(-0.2, 0.2),
-                        "z": radius * math.sin(angle) + random.uniform(-0.3, 0.3)
+                        "z": radius * math.sin(angle) + random.uniform(-0.3, 0.3),
                     }
 
                     # Store position and create visual elements
@@ -263,12 +284,14 @@ class MapGenerator:
                     device_positions[device["ip"]] = position
                     device_colors.append(colors.get(device_type, colors["unknown"]))
 
-                    labels.append({
-                        "text": device.get("hostname") or device["ip"],
-                        "position": position,
-                        "type": device_type,
-                        "critical": device.get("critical", False)
-                    })
+                    labels.append(
+                        {
+                            "text": device.get("hostname") or device["ip"],
+                            "position": position,
+                            "type": device_type,
+                            "critical": device.get("critical", False),
+                        }
+                    )
 
         # Create enhanced connections
         connections = []
@@ -283,8 +306,8 @@ class MapGenerator:
             "metadata": {
                 "total_nodes": len(positions),
                 "device_types": list(devices_by_type.keys()),
-                "connections": len(connections)
-            }
+                "connections": len(connections),
+            },
         }
 
     def _create_3d_connections(self, devices: List[Dict], positions: Dict, connections: List[Dict]):
@@ -292,7 +315,11 @@ class MapGenerator:
         # Categorize devices
         routers = [d for d in devices if d.get("type") == "router"]
         switches = [d for d in devices if d.get("type") == "switch"]
-        servers = [d for d in devices if "server" in d.get("type", "") or d.get("type") in ["web_server", "database"]]
+        servers = [
+            d
+            for d in devices
+            if "server" in d.get("type", "") or d.get("type") in ["web_server", "database"]
+        ]
         clients = [d for d in devices if d.get("type") in ["workstation", "printer", "iot"]]
 
         # Connection types with different visual properties
@@ -301,20 +328,22 @@ class MapGenerator:
             "uplink": {"color": "#4ecdc4", "opacity": 0.7, "thickness": 2.5},
             "server": {"color": "#45b7d1", "opacity": 0.6, "thickness": 2},
             "access": {"color": "#96ceb4", "opacity": 0.4, "thickness": 1.5},
-            "peripheral": {"color": "#feca57", "opacity": 0.3, "thickness": 1}
+            "peripheral": {"color": "#feca57", "opacity": 0.3, "thickness": 1},
         }
 
         def add_connection(dev1, dev2, style_name):
             if dev1["ip"] in positions and dev2["ip"] in positions:
                 style = connection_styles[style_name]
-                connections.append({
-                    "start": positions[dev1["ip"]],
-                    "end": positions[dev2["ip"]],
-                    "color": style["color"],
-                    "opacity": style["opacity"],
-                    "thickness": style["thickness"],
-                    "type": style_name
-                })
+                connections.append(
+                    {
+                        "start": positions[dev1["ip"]],
+                        "end": positions[dev2["ip"]],
+                        "color": style["color"],
+                        "opacity": style["opacity"],
+                        "thickness": style["thickness"],
+                        "type": style_name,
+                    }
+                )
 
         # 1. Connect infrastructure backbone
         for i in range(len(routers)):
@@ -324,7 +353,9 @@ class MapGenerator:
         # 2. Connect switches to routers
         for switch in switches:
             if routers:
-                nearest_router = min(routers, key=lambda r: self._ip_distance(switch["ip"], r["ip"]))
+                nearest_router = min(
+                    routers, key=lambda r: self._ip_distance(switch["ip"], r["ip"])
+                )
                 add_connection(switch, nearest_router, "uplink")
 
         # 3. Connect servers strategically
@@ -336,13 +367,17 @@ class MapGenerator:
             else:
                 infrastructure = switches + routers
                 if infrastructure:
-                    target = min(infrastructure, key=lambda i: self._ip_distance(server["ip"], i["ip"]))
+                    target = min(
+                        infrastructure, key=lambda i: self._ip_distance(server["ip"], i["ip"])
+                    )
                     add_connection(server, target, "server")
 
         # 4. Connect clients to local infrastructure
         for client in clients:
             # Prefer switches for workstations, any infrastructure for others
-            infrastructure = switches if switches and client.get("type") == "workstation" else switches + routers
+            infrastructure = (
+                switches if switches and client.get("type") == "workstation" else switches + routers
+            )
             if infrastructure:
                 target = min(infrastructure, key=lambda i: self._ip_distance(client["ip"], i["ip"]))
                 connection_type = "access" if client.get("type") == "workstation" else "peripheral"
@@ -356,7 +391,9 @@ class MapGenerator:
             # Connect web servers to database servers
             for web_server in web_servers:
                 if db_servers:
-                    db_server = min(db_servers, key=lambda d: self._ip_distance(web_server["ip"], d["ip"]))
+                    db_server = min(
+                        db_servers, key=lambda d: self._ip_distance(web_server["ip"], d["ip"])
+                    )
                     add_connection(web_server, db_server, "server")
 
     def _ip_distance(self, ip1: str, ip2: str) -> int:
@@ -394,14 +431,16 @@ class MapGenerator:
                     "devices": [],
                     "device_count": 0,
                     "types": {},
-                    "critical_count": 0
+                    "critical_count": 0,
                 }
 
             subnets[subnet_key]["devices"].append(device)
             subnets[subnet_key]["device_count"] += 1
 
             device_type = device.get("type", "unknown")
-            subnets[subnet_key]["types"][device_type] = subnets[subnet_key]["types"].get(device_type, 0) + 1
+            subnets[subnet_key]["types"][device_type] = (
+                subnets[subnet_key]["types"].get(device_type, 0) + 1
+            )
 
             if device.get("critical", False):
                 subnets[subnet_key]["critical_count"] += 1
@@ -409,5 +448,5 @@ class MapGenerator:
         return {
             "subnets": list(subnets.values()),
             "total_subnets": len(subnets),
-            "total_devices": len(devices)
+            "total_devices": len(devices),
         }
