@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import subprocess
@@ -6,7 +7,7 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 import yaml
 from pathlib import Path
 import sys
@@ -17,6 +18,9 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class NetworkScanner:
@@ -43,6 +47,7 @@ class NetworkScanner:
         self.hang_detected = False
         self.total_hosts = 0
         self.hosts_completed = 0
+        self._scanner_availability = {}  # Cache for scanner availability checks
 
     def _load_config(self):
         """Load configuration from config.yaml"""
@@ -152,9 +157,7 @@ class NetworkScanner:
         self.hosts_completed = 0
 
         # Generate a unique temp filename
-        temp_dir = tempfile.gettempdir()
-        temp_filename = f"nmap_{os.getpid()}_{os.urandom(4).hex()}.xml"
-        temp_path = os.path.join(temp_dir, temp_filename)
+        temp_path = self._create_temp_file("nmap", ".xml")
 
         try:
             # Build command with stats output
@@ -289,12 +292,7 @@ class NetworkScanner:
                             
                             # Provide troubleshooting after 30 seconds
                             if (time.time() - start_time) > 30:
-                                self.console.print("\n[yellow]Nmap is taking unusually long to start.[/yellow]")
-                                self.console.print("[yellow]This might be due to:[/yellow]")
-                                self.console.print("  • Large network range")
-                                self.console.print("  • Firewall blocking scans")
-                                self.console.print("  • Slow network response")
-                                self.console.print("\n[dim]You can press Ctrl+C to cancel[/dim]\n")
+                                self._show_scan_troubleshooting()
                                 output_started = True  # Prevent repeating message
                         continue
                     
@@ -484,37 +482,48 @@ class NetworkScanner:
             raise
         finally:
             # Clean up temp file
-            try:
-                if os.path.exists(temp_path):
-                    if needs_root and os.stat(temp_path).st_uid == 0:
-                        subprocess.run(["sudo", "rm", temp_path], capture_output=True)
-                    else:
-                        os.remove(temp_path)
-            except:
-                pass
+            self._cleanup_temp_file(temp_path, needs_sudo=needs_root)
 
     def _run_masscan(self, target: str) -> List[Dict]:
-        """Run masscan for fast discovery with progress"""
+        """Run masscan for fast host discovery.
+        
+        Args:
+            target: Network target
+            
+        Returns:
+            List of discovered devices
+            
+        Raises:
+            RuntimeError: If masscan is not available or fails
+        """
+        # Check availability
+        if not self._check_scanner_available("masscan"):
+            raise RuntimeError(
+                "masscan not found. Please install masscan:\n"
+                "  Ubuntu/Debian: sudo apt install masscan\n"
+                "  macOS: brew install masscan\n"
+                "  From source: https://github.com/robertdavidgraham/masscan"
+            )
+        
         show_details = self.config["scanners"].get("progress_details", False)
         refresh_rate = self.config["scanners"].get("progress_refresh_rate", 4)
+        scan_rate = self.config["scanners"].get("masscan_rate", 10000)
         
         # Ensure sudo access for masscan
         if not self._ensure_sudo_access():
-            raise Exception("Masscan requires sudo access")
+            raise RuntimeError("Masscan requires sudo access")
         
         # Generate a unique temp filename
-        temp_dir = tempfile.gettempdir()
-        temp_filename = f"masscan_{os.getpid()}_{os.urandom(4).hex()}.json"
-        temp_file = os.path.join(temp_dir, temp_filename)
+        temp_file = self._create_temp_file("masscan", ".json")
 
         try:
             cmd = [
                 "sudo", "-n",
                 "masscan",
                 "-p0",  # Ping scan
-                "--rate=10000",  # 10k packets/sec
-                "-oJ",
-                temp_file,  # JSON output
+                f"--rate={scan_rate}",  # Configurable rate
+                "-oJ", temp_file,  # JSON output
+                "--wait", "3",  # Wait 3 seconds for responses
                 target,
             ]
 
@@ -609,44 +618,42 @@ class NetworkScanner:
                     raise Exception(f"Masscan failed with return code {proc.returncode}")
 
             # Parse JSON output
-            if os.path.exists(temp_file):
-                with open(temp_file) as f:
-                    data = f.read()
-                    if data.strip():
-                        results = []
-                        for line in data.strip().split("\n"):
-                            if line.strip() and line != "{" and line != "}":
-                                try:
-                                    entry = json.loads(line.rstrip(","))
-                                    results.append(entry)
-                                except json.JSONDecodeError:
-                                    continue
-                        return results
-            return []
+            return self._parse_masscan_output(temp_file)
             
         finally:
             # Clean up temp file
-            if os.path.exists(temp_file):
-                try:
-                    subprocess.run(["sudo", "rm", temp_file], capture_output=True)
-                except:
-                    pass
+            self._cleanup_temp_file(temp_file, needs_sudo=True)
 
     def _run_arp_scan(self, target: str) -> List[Dict]:
-        """Run arp-scan for layer 2 discovery with progress"""
+        """Run arp-scan for layer 2 discovery.
+        
+        Args:
+            target: Network target
+            
+        Returns:
+            List of discovered devices
+            
+        Raises:
+            RuntimeError: If arp-scan is not available or fails
+        """
+        # Check availability
+        if not self._check_scanner_available("arp-scan"):
+            raise RuntimeError(
+                "arp-scan not found. Please install arp-scan:\n"
+                "  Ubuntu/Debian: sudo apt install arp-scan\n"
+                "  macOS: brew install arp-scan"
+            )
+        
         show_details = self.config["scanners"].get("progress_details", False)
         refresh_rate = self.config["scanners"].get("progress_refresh_rate", 4)
         
         # Ensure sudo access for arp-scan
         if not self._ensure_sudo_access():
-            raise Exception("ARP scan requires sudo access")
+            raise RuntimeError("ARP scan requires sudo access")
         
         try:
-            cmd = ["sudo", "-n", "arp-scan", "--localnet", "--retry=2"]
-            
-            # Add target if specified
-            if "/" in target:
-                cmd = ["sudo", "-n", "arp-scan", target, "--retry=2"]
+            # Build command
+            cmd = self._build_arp_scan_command(target)
 
             # Create progress display
             with Progress(
@@ -716,63 +723,271 @@ class NetworkScanner:
                 return devices
 
         except subprocess.CalledProcessError as e:
-            raise Exception(f"ARP scan failed: {e}")
-        except FileNotFoundError:
-            raise Exception("arp-scan not found. Install with: sudo apt install arp-scan")
+            logger.error(f"ARP scan failed: {e}")
+            raise RuntimeError(f"ARP scan failed: {e}") from e
+        except Exception as e:
+            logger.error(f"Unexpected error in ARP scan: {e}")
+            raise RuntimeError(f"ARP scan error: {e}") from e
+
+    def _check_scanner_available(self, scanner: str) -> bool:
+        """Check if a scanner is available on the system.
+        
+        Args:
+            scanner: Scanner name (nmap, masscan, arp-scan)
+            
+        Returns:
+            True if scanner is available
+        """
+        if scanner in self._scanner_availability:
+            return self._scanner_availability[scanner]
+            
+        try:
+            result = subprocess.run(
+                ["which", scanner], 
+                capture_output=True, 
+                timeout=5
+            )
+            available = result.returncode == 0
+            self._scanner_availability[scanner] = available
+            return available
+        except Exception:
+            self._scanner_availability[scanner] = False
+            return False
+    
+    def _show_scan_troubleshooting(self) -> None:
+        """Display troubleshooting information for slow scans."""
+        self.console.print("\n[yellow]Scan is taking unusually long to start.[/yellow]")
+        self.console.print("[yellow]This might be due to:[/yellow]")
+        self.console.print("  • Large network range")
+        self.console.print("  • Firewall blocking scans")
+        self.console.print("  • Slow network response")
+        self.console.print("  • DNS resolution delays")
+        self.console.print("\n[dim]You can press Ctrl+C to cancel[/dim]\n")
 
     def _parse_nmap_xml(self, xml_file: str) -> List[Dict]:
-        """Parse nmap XML output"""
-        tree = ET.parse(xml_file)
-        root = tree.getroot()
+        """Parse nmap XML output into standardized format.
+        
+        Args:
+            xml_file: Path to nmap XML output file
+            
+        Returns:
+            List of device dictionaries
+            
+        Raises:
+            ET.ParseError: Invalid XML format
+        """
+        try:
+            tree = ET.parse(xml_file)
+            root = tree.getroot()
+        except ET.ParseError as e:
+            logger.error(f"Failed to parse nmap XML: {e}")
+            raise
 
         devices = []
         for host in root.findall(".//host"):
+            # Skip hosts that are down
             if host.find('.//status[@state="up"]') is None:
                 continue
 
-            device = {
-                "ip": "",
-                "mac": "",
-                "hostname": "",
-                "open_ports": [],
-                "services": [],
-                "os": "",
-                "vendor": "",
-            }
+            device = self._extract_host_info(host)
+            if device.get("ip"):  # Only add if we have an IP
+                devices.append(device)
+                logger.debug(f"Parsed device: {device['ip']}")
 
-            # IP address
-            ipv4 = host.find('.//address[@addrtype="ipv4"]')
-            if ipv4 is not None:
-                device["ip"] = ipv4.get("addr")
+        logger.info(f"Parsed {len(devices)} devices from nmap XML")
+        return devices
+    
+    def _extract_host_info(self, host_elem: ET.Element) -> Dict[str, Any]:
+        """Extract device information from nmap host element.
+        
+        Args:
+            host_elem: XML element containing host data
+            
+        Returns:
+            Device information dictionary
+        """
+        device = {
+            "ip": "",
+            "mac": "",
+            "hostname": "",
+            "open_ports": [],
+            "services": [],
+            "os": "",
+            "vendor": "",
+            "scan_time": datetime.now().isoformat(),
+        }
 
-            # MAC address
-            mac_elem = host.find('.//address[@addrtype="mac"]')
-            if mac_elem is not None:
-                device["mac"] = mac_elem.get("addr", "")
-                device["vendor"] = mac_elem.get("vendor", "")
+        # IP address
+        ipv4 = host_elem.find('.//address[@addrtype="ipv4"]')
+        if ipv4 is not None:
+            device["ip"] = ipv4.get("addr", "")
 
-            # Hostname
-            hostname_elem = host.find(".//hostname")
-            if hostname_elem is not None:
-                device["hostname"] = hostname_elem.get("name", "")
+        # MAC address
+        mac_elem = host_elem.find('.//address[@addrtype="mac"]')
+        if mac_elem is not None:
+            device["mac"] = mac_elem.get("addr", "").upper()
+            device["vendor"] = mac_elem.get("vendor", "")
 
-            # Ports and services
-            for port in host.findall(".//port"):
-                if port.find('.//state[@state="open"]') is not None:
-                    port_id = int(port.get("portid"))
+        # Hostname
+        hostname_elem = host_elem.find(".//hostname")
+        if hostname_elem is not None:
+            device["hostname"] = hostname_elem.get("name", "")
+
+        # Ports and services
+        for port in host_elem.findall(".//port"):
+            if port.find('.//state[@state="open"]') is not None:
+                port_id = int(port.get("portid", 0))
+                if port_id:
                     device["open_ports"].append(port_id)
 
                     service = port.find(".//service")
                     if service is not None:
                         service_name = service.get("name", "unknown")
-                        device["services"].append(f"{service_name}:{port_id}")
+                        service_product = service.get("product", "")
+                        service_version = service.get("version", "")
+                        
+                        service_info = f"{service_name}:{port_id}"
+                        if service_product:
+                            service_info += f" ({service_product}"
+                            if service_version:
+                                service_info += f" {service_version}"
+                            service_info += ")"
+                        
+                        device["services"].append(service_info)
 
-            # OS detection
-            osmatch = host.find(".//osmatch")
-            if osmatch is not None:
-                device["os"] = osmatch.get("name", "")
+        # OS detection with confidence
+        os_matches = host_elem.findall(".//osmatch")
+        if os_matches:
+            # Take the highest accuracy match
+            best_match = max(os_matches, key=lambda x: int(x.get("accuracy", 0)))
+            device["os"] = best_match.get("name", "")
+            device["os_accuracy"] = int(best_match.get("accuracy", 0))
 
-            if device["ip"]:  # Only add if we have an IP
-                devices.append(device)
-
-        return devices
+        return device
+    
+    def _create_temp_file(self, prefix: str, suffix: str) -> str:
+        """Create a unique temporary file.
+        
+        Args:
+            prefix: File prefix (e.g., 'nmap', 'masscan')
+            suffix: File suffix (e.g., '.xml', '.json')
+            
+        Returns:
+            Path to temporary file
+        """
+        temp_dir = tempfile.gettempdir()
+        unique_id = f"{os.getpid()}_{os.urandom(4).hex()}"
+        filename = f"{prefix}_{unique_id}{suffix}"
+        return os.path.join(temp_dir, filename)
+    
+    def _cleanup_temp_file(self, filepath: str, needs_sudo: bool = False) -> None:
+        """Safely clean up temporary file.
+        
+        Args:
+            filepath: Path to file to remove
+            needs_sudo: Whether sudo is needed to remove the file
+        """
+        if not os.path.exists(filepath):
+            return
+            
+        try:
+            if needs_sudo and os.stat(filepath).st_uid == 0:
+                subprocess.run(["sudo", "rm", filepath], capture_output=True, timeout=5)
+            else:
+                os.remove(filepath)
+        except Exception as e:
+            logger.warning(f"Failed to remove temp file {filepath}: {e}")
+    
+    def _parse_masscan_output(self, json_file: str) -> List[Dict]:
+        """Parse masscan JSON output.
+        
+        Args:
+            json_file: Path to masscan JSON output
+            
+        Returns:
+            List of device dictionaries
+        """
+        if not os.path.exists(json_file):
+            logger.warning(f"Masscan output file not found: {json_file}")
+            return []
+            
+        devices = {}
+        try:
+            with open(json_file) as f:
+                data = f.read()
+                if not data.strip():
+                    return []
+                    
+                # Masscan outputs one JSON object per line
+                for line in data.strip().split("\n"):
+                    line = line.strip()
+                    if not line or line in ["{}", "{ }", "[", "]"]:
+                        continue
+                        
+                    try:
+                        # Remove trailing comma if present
+                        if line.endswith(","):
+                            line = line[:-1]
+                            
+                        entry = json.loads(line)
+                        if "ip" in entry:
+                            ip = entry["ip"]
+                            if ip not in devices:
+                                devices[ip] = {
+                                    "ip": ip,
+                                    "mac": "",
+                                    "hostname": "",
+                                    "vendor": "",
+                                    "type": "unknown",
+                                    "os": "",
+                                    "services": [],
+                                    "open_ports": [],
+                                    "scan_time": datetime.now().isoformat(),
+                                }
+                            
+                            # Add port information if available
+                            if "ports" in entry:
+                                for port_info in entry["ports"]:
+                                    port = port_info.get("port", 0)
+                                    if port and port not in devices[ip]["open_ports"]:
+                                        devices[ip]["open_ports"].append(port)
+                                        devices[ip]["services"].append(f"unknown:{port}")
+                                        
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse masscan line: {line} - {e}")
+                        continue
+                        
+        except Exception as e:
+            logger.error(f"Failed to parse masscan output: {e}")
+            
+        return list(devices.values())
+    
+    def _build_arp_scan_command(self, target: str) -> List[str]:
+        """Build arp-scan command with appropriate options.
+        
+        Args:
+            target: Network target
+            
+        Returns:
+            Command list for subprocess
+        """
+        cmd = ["sudo", "-n", "arp-scan"]
+        
+        # Determine scan scope
+        if target == "localnet" or not target:
+            cmd.extend(["--localnet"])
+        elif "/" in target:
+            # CIDR notation
+            cmd.append(target)
+        else:
+            # Single host
+            cmd.append(target)
+            
+        # Add common options
+        cmd.extend([
+            "--retry=2",  # Retry twice for reliability
+            "--timeout=500",  # 500ms timeout
+            "--backoff=1.5",  # Backoff multiplier
+        ])
+        
+        return cmd
