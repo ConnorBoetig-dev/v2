@@ -12,6 +12,11 @@ scanners:
   prefer_masscan: false  # Use masscan for discovery when available
   nmap_timing: "-T4"     # Nmap timing template (T0-T5)
   
+  # Masscan optimization for large networks
+  masscan_rate: 25000  # Default packet rate for masscan
+  masscan_rate_large: 50000  # Rate for /16 or larger networks
+  large_network_threshold: 10000  # Networks with > 10k IPs get optimized settings
+  
   # Deep scan options
   deep_scan_ports: "5000"  # Number of top ports for deep scan (use "all" for -p-)
   deep_scan_scripts: true  # Enable NSE scripts in deep scan

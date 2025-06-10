@@ -270,16 +270,32 @@ class NetworkMapper:
         report_file, comparison_file = self.generate_html_report(devices, timestamp)
 
         # Show report paths
-        console.print(f"\n[bold]Generated Files:[/bold]")
+        console.print(f"\n[bold]Generated Reports:[/bold]")
         report_table = Table(show_header=False, box=None, padding=(0, 2))
         report_table.add_column("Type", style="cyan")
         report_table.add_column("Path", style="yellow")
 
-        report_table.add_row("Network Map:", str(report_file))
+        # Check which reports were generated
+        network_map = self.output_path / "reports" / f"network_map_{timestamp}.html"
+        detailed_report = self.output_path / "reports" / f"report_{timestamp}.html"
+        traffic_flow = self.output_path / "reports" / f"traffic_flow_{timestamp}.html"
+        
+        if network_map.exists():
+            report_table.add_row("Network Map (2D/3D):", str(network_map))
+        if detailed_report.exists():
+            report_table.add_row("Detailed Report:", str(detailed_report))
+        if traffic_flow.exists():
+            report_table.add_row("Traffic Flow:", str(traffic_flow))
         if comparison_file:
             report_table.add_row("Comparison:", str(comparison_file))
 
         console.print(report_table)
+        
+        # Show tips for viewing
+        if not traffic_flow.exists() and not passive_enabled:
+            console.print("\n[dim]💡 Tip: Enable passive traffic analysis to generate the traffic flow report[/dim]")
+        
+        console.print("\n[dim]💡 Tip: In the Network Map, use the 2D/3D toggle buttons to switch views[/dim]")
 
         input("\nPress Enter to continue...")
 

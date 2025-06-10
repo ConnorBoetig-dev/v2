@@ -124,16 +124,26 @@ class ScanParser:
         first = raw_results[0]
 
         if isinstance(first, dict):
-            if "ip" in first and "services" in first:
-                # Likely nmap format
-                logger.debug("Auto-detected nmap format")
-                return self._parse_nmap_results(raw_results)
+            # Check for scanner-specific markers
+            if "discovery_method" in first and first["discovery_method"] == "masscan":
+                # Explicitly marked as masscan
+                logger.debug("Auto-detected masscan format (by discovery_method)")
+                return self._parse_nmap_results(raw_results)  # Already parsed, just pass through
+            elif "ip" in first and "services" in first and "open_ports" in first:
+                # Likely already parsed format (from any scanner)
+                logger.debug("Auto-detected pre-parsed format")
+                return self._parse_nmap_results(raw_results)  # Just pass through
             elif "ip" in first or "ports" in first:
-                # Likely masscan format
-                logger.debug("Auto-detected masscan format")
+                # Likely raw masscan format
+                logger.debug("Auto-detected raw masscan format")
                 return self._parse_masscan_results(raw_results)
 
-        logger.warning("Could not auto-detect scan format")
+        logger.warning(f"Could not auto-detect scan format. First result type: {type(first)}")
+        # Try to return as-is if it looks like valid device data
+        if isinstance(first, dict) and "ip" in first:
+            logger.info("Returning raw results as they appear to be valid device data")
+            return raw_results
+        
         return []
 
     def _standardize_devices(self, devices: List[Any]) -> List[Dict]:
@@ -229,10 +239,12 @@ class ScanParser:
 
         for entry in results:
             if not isinstance(entry, dict):
+                logger.debug(f"Skipping non-dict masscan entry: {type(entry)}")
                 continue
 
             ip = entry.get("ip")
             if not ip:
+                logger.debug(f"Skipping masscan entry without IP: {entry}")
                 continue
 
             # Create or update device entry

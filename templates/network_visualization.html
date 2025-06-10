@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Network Visualization - {{ scan_date }}</title>
+    
+    <!-- D3.js for 2D visualization -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    
+    <!-- Three.js for 3D visualization -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- OrbitControls for Three.js -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
     <style>
         /* Modern Dark Theme Design System */
         :root {
@@ -1779,56 +1789,70 @@
             }
 
             setupControls() {
-                // Mouse controls
-                let mouseDown = false;
-                let mouseX = 0;
-                let mouseY = 0;
+                // Use OrbitControls for better camera control
+                if (typeof THREE.OrbitControls !== 'undefined') {
+                    this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                    this.controls.enableDamping = true;
+                    this.controls.dampingFactor = 0.05;
+                    this.controls.screenSpacePanning = false;
+                    this.controls.minDistance = 10;
+                    this.controls.maxDistance = 100;
+                    this.controls.maxPolarAngle = Math.PI / 2;
+                    this.controls.autoRotate = false;
+                    this.controls.autoRotateSpeed = 1.0;
+                } else {
+                    console.warn('OrbitControls not available, using fallback controls');
+                    // Fallback to manual controls
+                    let mouseDown = false;
+                    let mouseX = 0;
+                    let mouseY = 0;
 
-                this.renderer.domElement.addEventListener('mousedown', (event) => {
-                    if (event.button === 0) {
-                        mouseDown = true;
+                    this.renderer.domElement.addEventListener('mousedown', (event) => {
+                        if (event.button === 0) {
+                            mouseDown = true;
+                            mouseX = event.clientX;
+                            mouseY = event.clientY;
+                        }
+                    });
+
+                    this.renderer.domElement.addEventListener('mouseup', () => {
+                        mouseDown = false;
+                    });
+
+                    this.renderer.domElement.addEventListener('mousemove', (event) => {
+                        if (!mouseDown) {
+                            // Update mouse position for raycasting
+                            const rect = this.renderer.domElement.getBoundingClientRect();
+                            this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                            this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                            return;
+                        }
+
+                        const deltaX = event.clientX - mouseX;
+                        const deltaY = event.clientY - mouseY;
+
+                        // Rotate camera around center
+                        const spherical = new THREE.Spherical();
+                        spherical.setFromVector3(this.camera.position);
+                        spherical.theta -= deltaX * 0.01;
+                        spherical.phi += deltaY * 0.01;
+                        spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+
+                        this.camera.position.setFromSpherical(spherical);
+                        this.camera.lookAt(0, 0, 0);
+
                         mouseX = event.clientX;
                         mouseY = event.clientY;
-                    }
-                });
+                    });
 
-                this.renderer.domElement.addEventListener('mouseup', () => {
-                    mouseDown = false;
-                });
-
-                this.renderer.domElement.addEventListener('mousemove', (event) => {
-                    if (!mouseDown) {
-                        // Update mouse position for raycasting
-                        const rect = this.renderer.domElement.getBoundingClientRect();
-                        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-                        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-                        return;
-                    }
-
-                    const deltaX = event.clientX - mouseX;
-                    const deltaY = event.clientY - mouseY;
-
-                    // Rotate camera around center
-                    const spherical = new THREE.Spherical();
-                    spherical.setFromVector3(this.camera.position);
-                    spherical.theta -= deltaX * 0.01;
-                    spherical.phi += deltaY * 0.01;
-                    spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-
-                    this.camera.position.setFromSpherical(spherical);
-                    this.camera.lookAt(0, 0, 0);
-
-                    mouseX = event.clientX;
-                    mouseY = event.clientY;
-                });
-
-                // Zoom controls
-                this.renderer.domElement.addEventListener('wheel', (event) => {
-                    event.preventDefault();
-                    const scale = event.deltaY > 0 ? 1.1 : 0.9;
-                    this.camera.position.multiplyScalar(scale);
-                    this.camera.position.clampLength(10, 100);
-                });
+                    // Zoom controls
+                    this.renderer.domElement.addEventListener('wheel', (event) => {
+                        event.preventDefault();
+                        const scale = event.deltaY > 0 ? 1.1 : 0.9;
+                        this.camera.position.multiplyScalar(scale);
+                        this.camera.position.clampLength(10, 100);
+                    });
+                }
 
                 // Click handler
                 this.renderer.domElement.addEventListener('click', (event) => {
@@ -1872,8 +1896,13 @@
             animate() {
                 requestAnimationFrame(() => this.animate());
 
-                // Auto-rotate if enabled
-                if (this.autoRotate && !this.mouseDown) {
+                // Update controls if using OrbitControls
+                if (this.controls && this.controls.update) {
+                    this.controls.update();
+                }
+
+                // Auto-rotate if enabled (and not using OrbitControls autoRotate)
+                if (this.autoRotate && !this.controls) {
                     const time = Date.now() * 0.001;
                     const radius = this.camera.position.length();
                     this.camera.position.x = Math.cos(time * 0.1) * radius;
@@ -2253,8 +2282,20 @@
         function toggleAutoLayout() {
             if (currentView === '2d' && visualization2D) {
                 visualization2D.autoLayout();
+            } else if (currentView === '3d' && visualization3D) {
+                // Toggle auto-rotation for 3D view
+                if (visualization3D.controls && visualization3D.controls.autoRotate !== undefined) {
+                    visualization3D.controls.autoRotate = !visualization3D.controls.autoRotate;
+                    const btn = event.target.closest('.control-btn');
+                    if (btn) {
+                        if (visualization3D.controls.autoRotate) {
+                            btn.classList.add('active');
+                        } else {
+                            btn.classList.remove('active');
+                        }
+                    }
+                }
             }
-            // TODO: Implement 3D auto layout
         }
 
         function exportView() {

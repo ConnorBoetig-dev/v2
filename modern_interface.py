@@ -273,6 +273,8 @@ class ModernInterface:
                     border_style="green"
                 )
                 console.print(success_panel)
+                # Store target for later use
+                self._last_target = target
                 return target
             else:
                 console.print("[red]❌ Invalid target format. Please check your input.[/red]")
@@ -328,6 +330,21 @@ class ModernInterface:
                 # Handle masscan option for discovery scans
                 use_masscan = False
                 if scan_type == "discovery":
+                    # Check if this is a large network
+                    # We'll use the target from the previous step
+                    target = getattr(self, '_last_target', '192.168.1.0/24')
+                    from core.scanner import NetworkScanner
+                    scanner = NetworkScanner()
+                    estimated_hosts = scanner._estimate_total_hosts(target)
+                    
+                    if estimated_hosts > 10000:
+                        # Automatically suggest masscan for large networks
+                        console.print(f"\n[yellow]⚡ Large network detected ({estimated_hosts:,} hosts)[/yellow]")
+                        console.print("[cyan]Masscan is recommended for faster scanning of large networks[/cyan]")
+                        default_choice = "2"
+                    else:
+                        default_choice = "1"
+                    
                     speed_panel = Panel(
                         "Choose scanning engine for discovery mode",
                         title="[bold white]Speed Configuration[/bold white]",
@@ -339,7 +356,7 @@ class ModernInterface:
                     console.print("1. [bold]Standard (nmap)[/bold] - Reliable and accurate")
                     console.print("2. [bold]Fast (masscan)[/bold] - High-speed scanning")
                     
-                    masscan_choice = Prompt.ask("\nUse fast scanning?", choices=["1", "2"], default="1")
+                    masscan_choice = Prompt.ask("\nUse fast scanning?", choices=["1", "2"], default=default_choice)
                     
                     if masscan_choice == "2":
                         console.print("[green]⚡ Using masscan for faster discovery[/green]")
@@ -399,18 +416,16 @@ class ModernInterface:
         console.print(scan_header)
         console.print()
         
-        # Handle sudo authentication first if needed
-        if config['needs_root']:
+        # Handle sudo authentication first if needed (for masscan or other root scans)
+        if config['needs_root'] or config.get('use_masscan', False):
             console.print("[yellow]⚡ This scan requires administrator privileges.[/yellow]")
-            console.print("[dim]Checking sudo access...[/dim]\n")
+            console.print("[dim]You may be prompted for your password.[/dim]\n")
             
             # Check if we already have sudo access
             import subprocess
             result = subprocess.run(["sudo", "-n", "true"], capture_output=True)
             
             if result.returncode != 0:
-                console.print("[yellow]🔐 Please enter your password for elevated privileges:[/yellow]")
-                
                 # Get password from user directly (no progress bar interference)
                 sudo_result = subprocess.run(["sudo", "-v"])
                 
@@ -428,52 +443,37 @@ class ModernInterface:
         scan_start_time = time.time()
         
         try:
-            # For scans requiring real-time output (like nmap with sudo), we need to handle differently
-            if config['needs_root'] and config['scan_type'] != 'arp':
-                console.print("[cyan]🔍 Starting network scan...[/cyan]")
-                console.print("[dim]This may take a few minutes depending on the target size.[/dim]\n")
-                
-                # Use the original scan method which handles real-time output
-                results = self.mapper.scanner.scan(
-                    target=config['target'],
-                    scan_type=config['scan_type'],
-                    use_masscan=config['use_masscan'],
-                    needs_root=config['needs_root'],
-                    snmp_config=config['snmp_config'] if config['snmp_enabled'] else None,
-                )
-                
-                console.print("\n[green]✅ Network scan completed![/green]")
-                
-            else:
-                # For non-sudo scans, we can use the progress bar
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[bold blue]Scanning..."),
-                    BarColumn(),
-                    TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-                    TimeElapsedColumn(),
-                    console=console
-                ) as progress:
-                    scan_task = progress.add_task("Network scan in progress...", total=100)
-                    
-                    # Execute the scan
-                    if config['scan_type'] == "arp":
-                        results = self.mapper.scanner._run_arp_scan(config['target'])
-                    else:
-                        results = self.mapper.scanner.scan(
-                            target=config['target'],
-                            scan_type=config['scan_type'],
-                            use_masscan=config['use_masscan'],
-                            needs_root=config['needs_root'],
-                            snmp_config=config['snmp_config'] if config['snmp_enabled'] else None,
-                        )
-                        
-                    progress.update(scan_task, advance=70, description="Processing results...")
+            # For all scans (including masscan), use the scanner method which handles output
+            console.print("[cyan]🔍 Starting network scan...[/cyan]")
+            console.print("[dim]This may take a few minutes depending on the target size.[/dim]\n")
+            
+            # Use the original scan method which handles real-time output
+            results = self.mapper.scanner.scan(
+                target=config['target'],
+                scan_type=config['scan_type'],
+                use_masscan=config.get('use_masscan', False),
+                needs_root=config['needs_root'],
+                snmp_config=config['snmp_config'] if config['snmp_enabled'] else None,
+            )
+            
+            console.print("\n[green]✅ Network scan completed![/green]")
             
             # Parse and classify
             console.print("[cyan]📊 Processing scan results...[/cyan]")
-            devices = self.mapper.parser.parse_results(results)
-            devices = self.mapper.classifier.classify_devices(devices)
+            
+            # Check if we have valid results
+            if not results:
+                console.print("[yellow]⚠ No devices found in scan[/yellow]")
+                devices = []
+            else:
+                devices = self.mapper.parser.parse_results(results)
+                devices = self.mapper.classifier.classify_devices(devices)
+                
+                # Fast parallel DNS resolution for discovery scans
+                if config['scan_type'] == 'discovery' and devices:
+                    from utils.dns_resolver import DNSResolver
+                    resolver = DNSResolver(max_workers=50, timeout=2.0)
+                    devices = resolver.resolve_devices(devices, console)
             
             # Add subnet tagging
             devices = self._add_subnet_tags(devices)
@@ -481,8 +481,50 @@ class ModernInterface:
             # Handle passive analysis if enabled
             if config['passive_enabled']:
                 console.print("[cyan]📡 Running traffic analysis...[/cyan]")
-                # Passive analysis would go here
-                time.sleep(2)  # Simulation
+                try:
+                    # Start passive capture
+                    self.mapper.traffic_analyzer.start_capture(duration=config['passive_duration'])
+                    
+                    # Show progress
+                    with console.status(
+                        f"[cyan]Analyzing network traffic for {config['passive_duration']} seconds...[/cyan]"
+                    ) as status:
+                        start_time = time.time()
+                        while (
+                            self.mapper.traffic_analyzer.running
+                            and (time.time() - start_time) < config['passive_duration'] + 5
+                        ):
+                            elapsed = int(time.time() - start_time)
+                            discovered = self.mapper.traffic_analyzer.stats["devices_discovered"]
+                            flows = self.mapper.traffic_analyzer.stats["flows_tracked"]
+                            status.update(
+                                f"[cyan]Passive analysis: {elapsed}s elapsed, {discovered} devices, {flows} flows[/cyan]"
+                            )
+                            time.sleep(1)
+                    
+                    # Stop capture
+                    self.mapper.traffic_analyzer.stop_capture()
+                    
+                    # Export passive results
+                    devices_file, flows_file = self.mapper.traffic_analyzer.export_results(timestamp)
+                    
+                    # Merge with active scan results
+                    devices = self.mapper.traffic_analyzer.merge_with_active_scan(devices)
+                    
+                    # Store results for report generation
+                    self.mapper.passive_analysis_results = {
+                        "devices_file": devices_file,
+                        "flows_file": flows_file,
+                        "flow_matrix": self.mapper.traffic_analyzer.get_flow_matrix(),
+                        "service_usage": self.mapper.traffic_analyzer.get_service_usage(),
+                        "duration": config['passive_duration'],
+                    }
+                    
+                    console.print(f"[green]✓ Traffic analysis complete: {len(self.mapper.traffic_analyzer.flows)} flows captured[/green]")
+                    
+                except Exception as e:
+                    console.print(f"[yellow]⚠ Traffic analysis failed: {e}[/yellow]")
+                    self.mapper.passive_analysis_results = None
                 
             # Calculate scan duration
             scan_duration = time.time() - scan_start_time
@@ -502,12 +544,22 @@ class ModernInterface:
             console.print("\n[red]❌ Scan interrupted by user[/red]")
             input("\nPress Enter to continue...")
         except Exception as e:
+            import traceback
             console.print(f"\n[red]❌ Scan failed: {e}[/red]")
+            console.print(f"[dim]Error type: {type(e).__name__}[/dim]")
+            if console._log_render:  # Only show traceback in debug mode
+                console.print("[dim]Traceback:[/dim]")
+                traceback.print_exc()
             input("\nPress Enter to continue...")
                 
     def _show_scan_results(self, devices, timestamp):
         """Show scan results with modern styling"""
         console.clear()
+        
+        # Ensure devices is a list
+        if not isinstance(devices, list):
+            console.print(f"[red]Error: Expected list of devices, got {type(devices)}[/red]")
+            devices = []
         
         # Results header
         results_panel = Panel(
@@ -534,6 +586,11 @@ class ModernInterface:
             device_table.add_column("Ports", style="magenta", width=12)
             
             for device in devices[:10]:  # Show first 10 devices
+                # Skip if device is not a dictionary
+                if not isinstance(device, dict):
+                    console.print(f"[yellow]Warning: Skipping invalid device entry (type: {type(device)})[/yellow]")
+                    continue
+                    
                 ports = ", ".join(map(str, device.get('open_ports', [])[:3]))  # First 3 ports
                 if len(device.get('open_ports', [])) > 3:
                     ports += "..."
@@ -753,13 +810,10 @@ class ModernInterface:
                 'target': config['target']
             }
             
-        # Save enhanced scan data
+        # Save scan data in the expected format (array of devices)
         scan_file = self.output_path / "scans" / f"scan_{timestamp}.json"
         with open(scan_file, 'w') as f:
-            json.dump({
-                'devices': devices,
-                'scan_metadata': scan_stats
-            }, f, indent=2)
+            json.dump(devices, f, indent=2)
             
         # Save scan summary for reports
         summary_file = self.output_path / "scans" / f"summary_{timestamp}.json"

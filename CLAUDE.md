@@ -69,6 +69,119 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 - Critical infrastructure flagging
 - Custom tags and notes
 
+## Scan Types and Use Cases
+
+### 1. Discovery Scan
+- **Purpose**: Quick network reconnaissance to find active hosts
+- **Duration**: ~30 seconds
+- **Requires sudo**: No (unless using masscan option)
+- **Techniques**:
+  - Standard mode: Multiple ICMP types, TCP SYN to common ports, UDP probes
+  - Masscan mode: Ultra-fast SYN scanning with ICMP
+  - Local subnet: Combines ARP + ICMP for maximum coverage
+- **Use cases**:
+  - Initial network discovery
+  - Quick inventory updates
+  - Finding new devices on the network
+  - Pre-scan for larger assessments
+- **Command options**:
+  - Can use masscan for 10x faster scanning of large networks
+  - Automatically detects local vs remote subnets
+
+### 2. Inventory Scan
+- **Purpose**: Detailed device identification with services and OS detection
+- **Duration**: ~5 minutes (varies by network size)
+- **Requires sudo**: Yes
+- **Techniques**:
+  - Service version detection (-sV)
+  - OS fingerprinting (-O)
+  - Top 1000 ports scanned
+  - Script scanning for enhanced detection
+- **Use cases**:
+  - Asset management and documentation
+  - Security baseline creation
+  - Compliance auditing
+  - Network documentation
+  - Change management preparation
+
+### 3. Deep Scan
+- **Purpose**: Comprehensive security assessment
+- **Duration**: ~15 minutes (can be much longer)
+- **Requires sudo**: Yes
+- **Techniques**:
+  - Top 5000 ports scanned
+  - Aggressive service detection
+  - NSE script scanning
+  - Vulnerability detection scripts
+  - Full TCP connect scan options
+- **Use cases**:
+  - Security assessments
+  - Vulnerability discovery
+  - Pre-penetration testing
+  - Detailed service enumeration
+  - Finding hidden services
+
+### 4. ARP Scan
+- **Purpose**: Layer 2 discovery for local networks only
+- **Duration**: ~10 seconds
+- **Requires sudo**: Yes
+- **Techniques**:
+  - ARP requests to all hosts
+  - MAC address resolution
+  - Vendor identification from OUI
+  - Finds devices with firewalls blocking ICMP/TCP
+- **Use cases**:
+  - Local subnet discovery
+  - Finding hidden/firewalled devices
+  - MAC address inventory
+  - Virtual machine detection
+  - IoT device discovery
+
+### Additional Scan Features
+
+#### SNMP Enrichment
+- Enabled during any scan type
+- Gathers detailed device information:
+  - System description and uptime
+  - Interface details
+  - Running processes
+  - Installed software
+- Supports SNMPv1, v2c, and v3
+
+#### Passive Traffic Analysis
+- Optional add-on to any scan
+- Captures network traffic for 30-120 seconds
+- Discovers:
+  - Stealth devices not responding to probes
+  - Real-time communication patterns
+  - Service usage statistics
+  - Traffic flows between devices
+- Generates separate traffic flow report
+
+#### Vulnerability Scanning
+- Automatically enabled by default
+- Uses multiple sources:
+  - OSV (Google) API - primary
+  - CIRCL CVE database - fallback
+  - Local vulnerability patterns
+- No API keys required
+- Provides CVSS scores and risk levels
+
+### Scan Selection Guide
+
+| Network Size | First Scan | Regular Updates | Security Check |
+|-------------|------------|-----------------|----------------|
+| < 50 hosts | Discovery | Discovery | Deep |
+| 50-500 hosts | Discovery + Masscan | Discovery | Inventory → Deep |
+| 500-5000 hosts | Discovery + Masscan | Discovery + Masscan | Inventory (targeted) |
+| > 5000 hosts | Discovery + Masscan (staged) | ARP (local) + Discovery | Targeted Deep |
+
+### Performance Tips
+1. **Large Networks**: Use masscan for discovery, then targeted nmap for details
+2. **Local Networks**: Always include ARP scan for complete coverage
+3. **Busy Networks**: Use inventory scan during off-hours
+4. **Security Scans**: Stage deep scans by subnet to avoid overwhelming the network
+
 ## Common Commands
 
 ### Testing and Linting

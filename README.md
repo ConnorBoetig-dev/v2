@@ -11,11 +11,43 @@ A comprehensive Python-based network discovery and security assessment tool that
 - **🔍 Multi-Scanner Support**: Intelligent use of nmap, masscan, and arp-scan
 - **🎯 Smart Device Classification**: Identifies 16+ device types using ML-like signatures
 - **🔐 Vulnerability Assessment**: Real-time CVE correlation using free APIs (OSV, CIRCL)
-- **📊 Interactive Visualizations**: Network topology maps with D3.js
+- **📊 Interactive Visualizations**: 2D/3D network maps and traffic flow animations
 - **📈 Change Tracking**: Monitors network changes between scans with advanced comparison tools
 - **🔌 SNMP Integration**: Device enrichment with SNMP v1/v2c/v3 support
 - **📑 Advanced Reporting**: HTML, PDF, Excel, CSV, and JSON exports
 - **🎨 Professional UI**: Rich CLI with progress tracking and intuitive menus
+- **🌊 Passive Analysis**: Discover stealth devices and map traffic flows in real-time
+
+## Scan Types
+
+### 🚀 Discovery Scan (Default)
+- **Duration**: ~30 seconds
+- **Purpose**: Quick network reconnaissance
+- **Best for**: Initial discovery, finding new devices
+- **Options**: Standard (nmap) or High-Speed (masscan)
+
+### 📋 Inventory Scan
+- **Duration**: ~5 minutes
+- **Purpose**: Detailed device profiling with services and OS detection
+- **Best for**: Asset management, documentation, compliance
+- **Requires**: sudo/admin privileges
+
+### 🔒 Deep Scan
+- **Duration**: ~15 minutes
+- **Purpose**: Comprehensive security assessment
+- **Best for**: Security audits, vulnerability discovery
+- **Features**: Scans top 5000 ports with NSE scripts
+
+### 🔗 ARP Scan
+- **Duration**: ~10 seconds
+- **Purpose**: Layer 2 discovery for local networks
+- **Best for**: Finding hidden devices, IoT discovery
+- **Note**: Local networks only
+
+### Additional Features
+- **SNMP Enrichment**: Automatic device information gathering
+- **Vulnerability Scanning**: CVE correlation with CVSS scores
+- **Passive Analysis**: Real-time traffic capture and flow mapping
 
 ## Quick Start
 
@@ -34,29 +66,95 @@ python3 mapper.py
 
 ## Installation
 
-### Requirements
-- Python 3.8+
-- nmap
-- arp-scan (optional, for Layer 2 discovery)
-- masscan (optional, for high-speed scanning)
+### System Requirements
+- Python 3.8 or higher
+- Operating System: Linux, macOS, or Windows (with WSL)
+- Network access and appropriate permissions for scanning
 
-### Ubuntu/Debian
+### Required System Packages
 ```bash
+# Core scanner (required)
+sudo apt install nmap
+
+# Optional but recommended
+sudo apt install arp-scan    # For Layer 2 discovery
+sudo apt install masscan     # For high-speed scanning
+```
+
+### Python Dependencies
+```bash
+# Install all dependencies (includes testing and development tools)
+pip3 install -r requirements.txt
+
+# For production only (minimal dependencies)
+pip3 install typer rich python-nmap requests jinja2 pyyaml reportlab openpyxl pandas pysnmp flask
+```
+
+### Platform-Specific Installation
+
+#### Ubuntu/Debian
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv nmap arp-scan masscan
+
+# Create virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate
+
+# Install Python dependencies
+pip install -r requirements.txt
+```
+
+#### macOS
+```bash
+# Install Homebrew if not already installed
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install system packages
+brew install python nmap arp-scan
+
+# Masscan on macOS (build from source)
+git clone https://github.com/robertdavidgraham/masscan
+cd masscan
+make
+sudo make install
+
+# Install Python dependencies
+pip3 install -r requirements.txt
+```
+
+#### Windows (WSL2)
+```bash
+# In WSL2 Ubuntu terminal
 sudo apt update
 sudo apt install python3 python3-pip nmap arp-scan
 pip3 install -r requirements.txt
 ```
 
-### macOS
+### Docker Installation
 ```bash
-brew install python nmap arp-scan
-pip3 install -r requirements.txt
+# Build the container
+docker build -t networkmapper .
+
+# Run with host network access
+docker run -it --network host --privileged networkmapper
+
+# Or with volume for persistent data
+docker run -it --network host --privileged -v $(pwd)/output:/app/output networkmapper
 ```
 
-### Docker
+### Verify Installation
 ```bash
-docker build -t networkmapper .
-docker run -it --network host networkmapper
+# Check Python version
+python3 --version  # Should be 3.8+
+
+# Check scanners
+which nmap         # Should show path
+which arp-scan     # Optional
+which masscan      # Optional
+
+# Test the application
+python3 mapper.py --help
 ```
 
 ## Usage
