@@ -211,11 +211,6 @@
 
         .node {
             cursor: pointer;
-            transition: transform 0.3s;
-        }
-
-        .node:hover {
-            transform: scale(1.1);
         }
 
         .node-label {
@@ -411,13 +406,45 @@
 
         <div class="visualization-container">
             <h2>Live Traffic Flow Visualization</h2>
-            {% if total_flows == 0 %}
+            {% if not real_traffic_captured %}
+            <div style="background: #3e3e42; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <p style="color: #ffd93d; margin: 0;">
+                    {% if scapy_available %}
+                    <strong>⚠️ Traffic Capture Failed</strong><br>
+                    No packets were captured during the analysis period.<br>
+                    This could be due to:
+                    {% else %}
+                    <strong>⚠️ Scapy Not Installed</strong><br>
+                    This visualization requires Scapy for packet capture.<br>
+                    To capture real network traffic:
+                    {% endif %}
+                </p>
+                {% if scapy_available %}
+                <ul style="margin: 0.5rem 0 0 2rem; color: #cccccc;">
+                    <li>Permission issues (ensure sudo access is working)</li>
+                    <li>Incorrect network interface selected</li>
+                    <li>No network traffic during capture period</li>
+                    <li>Firewall blocking packet capture</li>
+                </ul>
+                {% else %}
+                <ol style="margin: 0.5rem 0 0 2rem; color: #cccccc;">
+                    <li>Install Scapy: <code>pip install scapy</code> or run <code>./install_scapy.sh</code></li>
+                    <li>Re-run the scan with passive analysis enabled</li>
+                    <li>Ensure you have sudo/root privileges</li>
+                </ol>
+                {% endif %}
+            </div>
+            {% elif total_flows == 0 %}
             <div style="background: #3e3e42; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
                 <p style="color: #ffd93d; margin: 0;">
                     <strong>No traffic flows detected.</strong> 
-                    This visualization only shows actual observed network traffic. 
-                    If passive analysis was not enabled or no traffic was captured, no connections will be displayed.
+                    This can happen if:
                 </p>
+                <ul style="margin: 0.5rem 0 0 2rem; color: #cccccc;">
+                    <li>No network traffic occurred during the capture period</li>
+                    <li>The capture interface was incorrect</li>
+                    <li>Firewall rules blocked packet capture</li>
+                </ul>
             </div>
             {% endif %}
             <div class="controls">
@@ -578,8 +605,20 @@
                 .attr("stroke", "#fff")
                 .attr("stroke-width", 2)
                 .call(drag(simulation))
-                .on("mouseover", showTooltip)
-                .on("mouseout", hideTooltip)
+                .on("mouseover", function(event, d) {
+                    // Visual feedback without transform
+                    d3.select(this)
+                        .attr("stroke-width", 4)
+                        .attr("stroke", "#ffd93d");
+                    showTooltip(event, d);
+                })
+                .on("mouseout", function(event, d) {
+                    // Reset visual feedback
+                    d3.select(this)
+                        .attr("stroke-width", 2)
+                        .attr("stroke", "#fff");
+                    hideTooltip();
+                })
                 .on("click", handleNodeClick);
             
             // Create labels

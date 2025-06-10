@@ -36,7 +36,15 @@ class NetworkScanner:
     def __init__(self):
         self.scan_profiles = {
             "discovery": {
-                "nmap": ["-sn", "-PE", "-PP", "-PM", "-PS80,443,22,445", "-PA80,443,22,445", "-PU53,161,123"],
+                "nmap": [
+                    "-sn",
+                    "-PE",
+                    "-PP",
+                    "-PM",
+                    "-PS80,443,22,445",
+                    "-PA80,443,22,445",
+                    "-PU53,161,123",
+                ],
                 "masscan": ["-p80,443,22,445,3389,8080,21,23,25,53,135,139,161"],
                 "description": "Multi-technique host discovery",
             },
@@ -48,6 +56,27 @@ class NetworkScanner:
                 # Added -PR for ARP discovery to ensure all hosts are found
                 "nmap": ["-PR", "-sS", "-sV", "-O", "--top-ports", "5000", "--script", "default"],
                 "description": "Deep scan with top 5000 ports + ARP discovery",
+            },
+            "fast": {
+                # Optimized for large networks - uses masscan for discovery and limited enrichment
+                "masscan": ["-p80,443,22,445,3389,8080,8443,3306,5432,27017"],
+                "nmap": [
+                    "-sS",
+                    "-sV",
+                    "-O",
+                    "--osscan-guess",
+                    "--version-intensity",
+                    "0",
+                    "--top-ports",
+                    "100",
+                    "-T5",
+                ],
+                "description": "Fast scan for large networks (65k+ hosts)",
+            },
+            "os_detect": {
+                # Dedicated OS detection scan
+                "nmap": ["-O", "--osscan-guess", "--osscan-limit", "-T4", "-n"],
+                "description": "OS detection only (for enriching existing results)",
             },
         }
         self.console = Console()
@@ -86,6 +115,20 @@ class NetworkScanner:
         snmp_config: Dict = None,
     ) -> List[Dict]:
         """Execute network scan with progress feedback"""
+        # Fast scan for large networks
+        if scan_type == "fast":
+            self.console.print("[cyan]⚡ Fast scan mode for large networks[/cyan]")
+            # Always use masscan for discovery in fast mode
+            devices = self._run_masscan_fast(target)
+            if devices:
+                # Light enrichment with nmap on discovered hosts only
+                self.console.print(f"[cyan]📊 Enriching {len(devices)} discovered hosts...[/cyan]")
+                self.console.print(
+                    "[cyan]🔍 This includes: OS detection, hostname resolution, and service detection[/cyan]"
+                )
+                devices = self._enrich_fast_scan(devices)
+            return devices
+
         # For discovery scans, use hybrid approach for better coverage
         if scan_type == "discovery":
             if use_masscan:
@@ -94,19 +137,23 @@ class NetworkScanner:
             else:
                 # Check if target is local subnet for ARP scan optimization
                 if self._is_local_subnet(target):
-                    self.console.print("[cyan]🔍 Local subnet detected - using ARP + ICMP discovery[/cyan]")
+                    self.console.print(
+                        "[cyan]🔍 Local subnet detected - using ARP + ICMP discovery[/cyan]"
+                    )
                     # Run both ARP and regular discovery for maximum coverage
                     arp_devices = []
                     if self._check_scanner_available("arp-scan"):
                         try:
                             arp_devices = self._run_arp_scan(target)
-                            self.console.print(f"[green]✓ ARP scan found {len(arp_devices)} devices[/green]")
+                            self.console.print(
+                                f"[green]✓ ARP scan found {len(arp_devices)} devices[/green]"
+                            )
                         except Exception as e:
                             self.console.print(f"[yellow]⚠ ARP scan failed: {e}[/yellow]")
-                    
+
                     # Also run nmap for devices that don't respond to ARP
                     nmap_devices = self._run_nmap(target, scan_type, needs_root)
-                    
+
                     # Merge results, avoiding duplicates
                     devices = self._merge_scan_results(arp_devices, nmap_devices)
                 else:
@@ -575,20 +622,24 @@ class NetworkScanner:
 
         show_details = self.config["scanners"].get("progress_details", False)
         refresh_rate = self.config["scanners"].get("progress_refresh_rate", 4)
-        
+
         # Calculate number of hosts in target for optimization
         total_hosts = self._estimate_total_hosts(target)
         large_network_threshold = self.config["scanners"].get("large_network_threshold", 10000)
-        
+
         # Use appropriate scan rate based on network size
         if total_hosts > 50000:
             # Very large network - use moderate rate to avoid initialization issues
             scan_rate = 30000
-            self.console.print(f"[cyan]⚡ Very large network detected ({total_hosts:,} hosts)[/cyan]")
+            self.console.print(
+                f"[cyan]⚡ Very large network detected ({total_hosts:,} hosts)[/cyan]"
+            )
             self.console.print(f"[cyan]📊 Using moderate scan rate for stability[/cyan]")
         elif total_hosts > large_network_threshold:
             scan_rate = self.config["scanners"].get("masscan_rate_large", 40000)
-            self.console.print(f"[cyan]⚡ Large network detected ({total_hosts:,} hosts) - using optimized settings[/cyan]")
+            self.console.print(
+                f"[cyan]⚡ Large network detected ({total_hosts:,} hosts) - using optimized settings[/cyan]"
+            )
         else:
             scan_rate = self.config["scanners"].get("masscan_rate", 25000)
 
@@ -620,7 +671,7 @@ class NetworkScanner:
                 # Standard port list for smaller networks
                 port_list = "80,443,22,445,135,139,8080,3389,21,23,25,53,161"
                 wait_time = "3"
-                
+
             cmd = [
                 "sudo",
                 "-n",
@@ -633,7 +684,7 @@ class NetworkScanner:
                 wait_time,  # Wait time for responses
                 "--open-only",  # Only report open ports
             ]
-            
+
             # Add interface selection for large networks
             if total_hosts > large_network_threshold:
                 # Try to auto-detect the best interface
@@ -641,15 +692,15 @@ class NetworkScanner:
                 if interface:
                     cmd.extend(["-e", interface])
                     self.console.print(f"[cyan]📡 Using interface: {interface}[/cyan]")
-                    
+
                 # Also try to get source IP for faster initialization
                 src_ip = self._get_source_ip_for_interface(interface)
                 if src_ip:
                     cmd.extend(["--adapter-ip", src_ip])
                     self.console.print(f"[cyan]📍 Source IP: {src_ip}[/cyan]")
-                    
+
             cmd.append(target)
-            
+
             # Show command for debugging large scans
             if total_hosts > 50000:
                 self.console.print(f"[dim]Ports being scanned: {port_list}[/dim]")
@@ -686,7 +737,7 @@ class NetworkScanner:
                     universal_newlines=True,
                     bufsize=1,
                 )
-                
+
                 # Check for early errors (including sudo issues)
                 time.sleep(0.5)
                 if proc.poll() is not None:
@@ -695,13 +746,16 @@ class NetworkScanner:
                         # Progress bar interfered with password prompt
                         progress.stop()
                         self.console.print("\n[red]❌ Sudo authentication failed.[/red]")
-                        self.console.print("[yellow]The password prompt was missed. Please run the scan again.[/yellow]")
+                        self.console.print(
+                            "[yellow]The password prompt was missed. Please run the scan again.[/yellow]"
+                        )
                         raise RuntimeError("Sudo authentication failed - please retry")
                     elif stderr_output:
                         raise RuntimeError(f"Masscan failed to start: {stderr_output}")
 
                 # Monitor stderr in a separate thread
                 stderr_lines = []
+
                 def monitor_stderr():
                     try:
                         for line in proc.stderr:
@@ -714,22 +768,26 @@ class NetworkScanner:
 
                 stderr_thread = threading.Thread(target=monitor_stderr, daemon=True)
                 stderr_thread.start()
-                
+
                 # Track initialization
                 initialized = False
                 init_timeout = 15  # 15 seconds max for initialization
-                
+
                 for line in proc.stdout:
                     line = line.strip()
                     current_time = time.time()
-                    
+
                     # Check for initialization timeout
                     if not initialized and (current_time - start_time) > init_timeout:
-                        progress.update(task, status="Initialization taking longer than expected...")
+                        progress.update(
+                            task, status="Initialization taking longer than expected..."
+                        )
                         if (current_time - start_time) > 30:
                             # Kill the process if it takes too long
                             proc.terminate()
-                            raise RuntimeError("Masscan initialization timeout - try reducing scan rate or target size")
+                            raise RuntimeError(
+                                "Masscan initialization timeout - try reducing scan rate or target size"
+                            )
 
                     if show_details and line:
                         self.console.print(f"[dim]{line}[/dim]")
@@ -738,7 +796,7 @@ class NetworkScanner:
                     if not initialized and line:
                         initialized = True
                         progress.update(task, status="Scan started...")
-                        
+
                     if "rate:" in line.lower():
                         # Extract scan rate
                         match = re.search(r"rate:\s*([\d.]+)", line, re.IGNORECASE)
@@ -771,7 +829,7 @@ class NetworkScanner:
                     elif "waiting" in line.lower() and "seconds" in line.lower():
                         # Waiting phase
                         progress.update(task, status="Waiting for final packets...")
-                        
+
                     # Also check for standard masscan output format
                     elif "Scanning" in line and "/" in line:
                         # Format: "Scanning 4 hosts [1 port/host]"
@@ -779,7 +837,7 @@ class NetworkScanner:
                         if match:
                             hosts_count = match.group(1)
                             progress.update(task, status=f"Scanning {hosts_count} hosts...")
-                    
+
                     # Check for completion
                     elif "scanned" in line.lower() and "seconds" in line.lower():
                         # Format: "scanned 65536 hosts in X seconds"
@@ -802,16 +860,14 @@ class NetworkScanner:
                         raise RuntimeError(f"Masscan failed with return code {proc.returncode}")
 
                 # Set to 100% when done (temporary status)
-                progress.update(
-                    task, completed=100, status=f"Scan complete, parsing results..."
-                )
+                progress.update(task, completed=100, status=f"Scan complete, parsing results...")
 
             # Parse JSON output
             devices = self._parse_masscan_output(temp_file)
-            
+
             # Update with actual device count
             self.console.print(f"\n[green]✓ Masscan discovered {len(devices)} devices[/green]")
-            
+
             # Debug: Check if temp file has content
             if os.path.exists(temp_file):
                 file_size = os.path.getsize(temp_file)
@@ -822,26 +878,36 @@ class NetworkScanner:
                     if len(devices) == 0 and file_size > 0:
                         debug_dir = Path("output") / "debug"
                         debug_dir.mkdir(parents=True, exist_ok=True)
-                        debug_file = debug_dir / f"masscan_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                        
+                        debug_file = (
+                            debug_dir
+                            / f"masscan_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                        )
+
                         try:
                             import shutil
+
                             shutil.copy2(temp_file, debug_file)
-                            self.console.print(f"[yellow]⚠ No devices parsed, debug output saved to: {debug_file}[/yellow]")
-                            
+                            self.console.print(
+                                f"[yellow]⚠ No devices parsed, debug output saved to: {debug_file}[/yellow]"
+                            )
+
                             # Also show first few lines of the file for immediate debugging
-                            with open(temp_file, 'r') as f:
+                            with open(temp_file, "r") as f:
                                 lines = f.readlines()[:10]
                                 if lines:
-                                    self.console.print("[yellow]First few lines of masscan output:[/yellow]")
+                                    self.console.print(
+                                        "[yellow]First few lines of masscan output:[/yellow]"
+                                    )
                                     for i, line in enumerate(lines):
-                                        self.console.print(f"[dim]{i+1}: {line.strip()[:120]}[/dim]")
+                                        self.console.print(
+                                            f"[dim]{i+1}: {line.strip()[:120]}[/dim]"
+                                        )
                         except Exception as e:
                             logger.warning(f"Could not save debug file: {e}")
-                    
+
                     if show_details:
                         self.console.print(f"[dim]Output file size: {file_size} bytes[/dim]")
-            
+
             # If masscan found no hosts, suggest falling back to nmap
             if len(devices) == 0:
                 self.console.print("\n[yellow]⚠ Masscan found no hosts on the network[/yellow]")
@@ -849,16 +915,22 @@ class NetworkScanner:
                 self.console.print("[dim]  • No hosts have the scanned ports open[/dim]")
                 self.console.print("[dim]  • Firewall is blocking the scan[/dim]")
                 self.console.print("[dim]  • Network uses non-standard ports[/dim]")
-                self.console.print("\n[cyan]💡 Tip: Try using standard nmap discovery instead (more thorough but slower)[/cyan]")
+                self.console.print(
+                    "\n[cyan]💡 Tip: Try using standard nmap discovery instead (more thorough but slower)[/cyan]"
+                )
             else:
                 # Log successful parsing
-                self.console.print(f"\n[green]✓ Successfully parsed {len(devices)} devices from masscan[/green]")
+                self.console.print(
+                    f"\n[green]✓ Successfully parsed {len(devices)} devices from masscan[/green]"
+                )
                 if show_details:
                     for i, device in enumerate(devices[:5]):  # Show first 5
-                        self.console.print(f"[dim]  {i+1}. {device['ip']} - Ports: {device.get('open_ports', [])}[/dim]")
+                        self.console.print(
+                            f"[dim]  {i+1}. {device['ip']} - Ports: {device.get('open_ports', [])}[/dim]"
+                        )
                     if len(devices) > 5:
                         self.console.print(f"[dim]  ... and {len(devices) - 5} more[/dim]")
-                    
+
             return devices
 
         finally:
@@ -1156,7 +1228,7 @@ class NetworkScanner:
                 # Masscan outputs one JSON object per line, each representing a finding
                 for line_num, line in enumerate(data.strip().split("\n"), 1):
                     line = line.strip()
-                    
+
                     # Skip empty lines and array brackets
                     if not line or line in ["{}", "{ }", "[", "]", "[\n", "\n]", ","]:
                         continue
@@ -1168,12 +1240,14 @@ class NetworkScanner:
 
                         # Parse the JSON object
                         entry = json.loads(line)
-                        
+
                         # Ensure entry is a dictionary before accessing keys
                         if not isinstance(entry, dict):
-                            logger.debug(f"Line {line_num}: entry is not a dict, skipping: {type(entry)}")
+                            logger.debug(
+                                f"Line {line_num}: entry is not a dict, skipping: {type(entry)}"
+                            )
                             continue
-                        
+
                         # Masscan format: each line has ip, timestamp, and ports array
                         if "ip" in entry:
                             ip = entry["ip"]
@@ -1197,17 +1271,19 @@ class NetworkScanner:
                                     # Ensure port_info is a dict
                                     if not isinstance(port_info, dict):
                                         continue
-                                        
+
                                     port = port_info.get("port", 0)
                                     proto = port_info.get("proto", "tcp")
-                                    status = port_info.get("status", "open")  # Default to "open" if not specified
-                                    
+                                    status = port_info.get(
+                                        "status", "open"
+                                    )  # Default to "open" if not specified
+
                                     # Accept the port if status is "open" or not specified (masscan default)
                                     if port and (status == "open" or status == ""):
                                         if port not in devices[ip]["open_ports"]:
                                             devices[ip]["open_ports"].append(port)
                                             devices[ip]["services"].append(f"{proto}:{port}")
-                                            
+
                         # Also check for the "rec" field (some masscan versions)
                         elif "rec" in entry and isinstance(entry["rec"], dict):
                             rec = entry["rec"]
@@ -1243,11 +1319,11 @@ class NetworkScanner:
 
             # Log summary
             logger.info(f"Parsed {len(devices)} devices from masscan output")
-            
+
             # If we got no devices but had data, try alternate parsing
             if len(devices) == 0 and data.strip():
                 logger.warning("No devices parsed with standard format, trying alternate parsing")
-                
+
                 # Try parsing as single JSON array
                 try:
                     json_data = json.loads(data)
@@ -1285,6 +1361,7 @@ class NetworkScanner:
         except Exception as e:
             logger.error(f"Failed to parse masscan output: {e}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
 
         return list(devices.values())
@@ -1420,7 +1497,7 @@ class NetworkScanner:
         """Check if target is a local subnet that can benefit from ARP scanning"""
         import ipaddress
         import socket
-        
+
         try:
             # Parse the target network
             if "/" in target:
@@ -1428,43 +1505,43 @@ class NetworkScanner:
             else:
                 # Single IP
                 return True
-            
+
             # Get local interfaces
             hostname = socket.gethostname()
             local_ips = socket.gethostbyname_ex(hostname)[2]
-            
+
             # Also check common local network ranges
             local_ranges = [
                 ipaddress.IPv4Network("10.0.0.0/8"),
                 ipaddress.IPv4Network("172.16.0.0/12"),
                 ipaddress.IPv4Network("192.168.0.0/16"),
             ]
-            
+
             # Check if target overlaps with local networks
             for local_range in local_ranges:
                 if network.overlaps(local_range):
                     return True
-                    
+
             # Check if any local IP is in the target network
             for ip in local_ips:
                 if ipaddress.IPv4Address(ip) in network:
                     return True
-                    
+
         except Exception as e:
             logger.debug(f"Error checking if subnet is local: {e}")
-            
+
         return False
-        
+
     def _merge_scan_results(self, arp_devices: List[Dict], nmap_devices: List[Dict]) -> List[Dict]:
         """Merge results from multiple scanners, avoiding duplicates"""
         merged = {}
-        
+
         # First add all ARP devices (more reliable for local)
         for device in arp_devices:
             ip = device.get("ip")
             if ip:
                 merged[ip] = device
-                
+
         # Then add/update with nmap results
         for device in nmap_devices:
             ip = device.get("ip")
@@ -1481,29 +1558,29 @@ class NetworkScanner:
                     existing_services = set(existing.get("services", []))
                     new_services = set(device.get("services", []))
                     device["services"] = list(existing_services | new_services)
-                    
+
                     existing_ports = set(existing.get("open_ports", []))
                     new_ports = set(device.get("open_ports", []))
                     device["open_ports"] = sorted(list(existing_ports | new_ports))
-                    
+
                 merged[ip] = device
-                
+
         return list(merged.values())
-        
+
     def _get_best_interface_for_target(self, target: str) -> Optional[str]:
         """Determine the best network interface for scanning a target"""
         try:
             import ipaddress
             import subprocess
-            
+
             # Get routing table to find best interface
             result = subprocess.run(
-                ["ip", "route", "get", target.split('/')[0]], 
-                capture_output=True, 
+                ["ip", "route", "get", target.split("/")[0]],
+                capture_output=True,
                 text=True,
-                timeout=2
+                timeout=2,
             )
-            
+
             if result.returncode == 0 and result.stdout:
                 # Parse output like: "10.0.0.1 via 192.168.1.1 dev eth0 src 192.168.1.100"
                 parts = result.stdout.split()
@@ -1511,36 +1588,357 @@ class NetworkScanner:
                     dev_index = parts.index("dev")
                     if dev_index + 1 < len(parts):
                         return parts[dev_index + 1]
-                        
+
         except Exception as e:
             logger.debug(f"Could not determine best interface: {e}")
-            
+
         return None
-        
+
     def _get_source_ip_for_interface(self, interface: str) -> Optional[str]:
         """Get the source IP address for a given interface"""
         if not interface:
             return None
-            
+
         try:
             import subprocess
-            
+
             # Use ip addr show to get interface IPs
             result = subprocess.run(
-                ["ip", "addr", "show", interface],
-                capture_output=True,
-                text=True,
-                timeout=2
+                ["ip", "addr", "show", interface], capture_output=True, text=True, timeout=2
             )
-            
+
             if result.returncode == 0 and result.stdout:
                 # Parse output for IPv4 address
                 import re
-                match = re.search(r'inet\s+(\d+\.\d+\.\d+\.\d+)/\d+', result.stdout)
+
+                match = re.search(r"inet\s+(\d+\.\d+\.\d+\.\d+)/\d+", result.stdout)
                 if match:
                     return match.group(1)
-                    
+
         except Exception as e:
             logger.debug(f"Could not get source IP for interface {interface}: {e}")
-            
+
         return None
+
+    def _run_masscan_fast(self, target: str) -> List[Dict]:
+        """Run masscan optimized for very large networks
+
+        Args:
+            target: Network target (can be multiple /16s)
+
+        Returns:
+            List of discovered devices
+        """
+        # Check availability
+        if not self._check_scanner_available("masscan"):
+            self.console.print(
+                "[yellow]⚠ Masscan not available, falling back to standard discovery[/yellow]"
+            )
+            return self._run_masscan(target)
+
+        # Calculate total hosts
+        total_hosts = self._estimate_total_hosts(target)
+
+        # For very large networks, use aggressive settings
+        if total_hosts > 50000:
+            scan_rate = 100000  # 100k pps for large networks
+            ports = "80,443,22,445,3389,135,139,8080"  # Common ports that are usually open
+            wait_time = "2"  # Give more time for responses
+        else:
+            scan_rate = 50000
+            ports = "80,443,22,445,3389,8080,135,139,21,23,25,53,161"
+            wait_time = "3"
+
+        self.console.print(f"[cyan]🚀 Scanning {total_hosts:,} hosts at {scan_rate:,} pps[/cyan]")
+        self.console.print(f"[cyan]📍 Target ports: {ports}[/cyan]")
+
+        # Ensure sudo
+        if not self._ensure_sudo_access():
+            raise RuntimeError("Fast scan requires sudo access")
+
+        temp_file = self._create_temp_file("masscan_fast", ".json")
+
+        try:
+            cmd = [
+                "sudo",
+                "-n",
+                "masscan",
+                f"-p{ports}",
+                f"--rate={scan_rate}",
+                "-oJ",
+                temp_file,
+                "--wait",
+                wait_time,
+                "--open-only",
+                "--randomize-hosts",  # Better for large ranges
+            ]
+
+            # Add interface if detected
+            interface = self._get_best_interface_for_target(target)
+            if interface:
+                cmd.extend(["-e", interface])
+
+            cmd.append(target)
+
+            # Create progress bar
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold cyan]Ultra-fast scan[/bold cyan]"),
+                BarColumn(complete_style="cyan", finished_style="cyan"),
+                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                TimeElapsedColumn(),
+                TextColumn("• {task.fields[status]}"),
+                console=self.console,
+                refresh_per_second=2,
+                transient=False,
+            ) as progress:
+                task = progress.add_task(
+                    f"Scanning {target}", total=100, status="Initializing masscan..."
+                )
+
+                start_time = time.time()
+                devices_found = 0
+                last_percent = 0
+
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    universal_newlines=True,
+                    bufsize=1,
+                )
+
+                # Quick error check
+                time.sleep(0.5)
+                if proc.poll() is not None:
+                    stderr = proc.stderr.read()
+                    if "sudo:" in stderr:
+                        raise RuntimeError("Sudo authentication failed")
+                    raise RuntimeError(f"Masscan failed: {stderr}")
+
+                # Process output
+                for line in proc.stdout:
+                    line = line.strip()
+
+                    # Parse progress
+                    if "found=" in line:
+                        match = re.search(r"found=(\d+)", line)
+                        if match:
+                            devices_found = int(match.group(1))
+
+                    percent_match = re.search(r"(\d+\.\d+)%", line)
+                    if percent_match:
+                        percent = float(percent_match.group(1))
+                        if percent > last_percent:
+                            last_percent = percent
+                            elapsed = time.time() - start_time
+                            rate = devices_found / elapsed if elapsed > 0 else 0
+                            progress.update(
+                                task,
+                                completed=percent,
+                                status=f"Found {devices_found} hosts ({rate:.0f}/sec)",
+                            )
+
+                proc.wait()
+
+                if proc.returncode != 0:
+                    stderr = proc.stderr.read()
+                    raise RuntimeError(f"Masscan failed: {stderr}")
+
+                progress.update(
+                    task, completed=100, status=f"Complete: {devices_found} hosts found"
+                )
+
+            # Parse results
+            devices = self._parse_masscan_output(temp_file)
+            self.console.print(
+                f"[green]✓ Fast scan complete: {len(devices)} active hosts found[/green]"
+            )
+
+            return devices
+
+        finally:
+            self._cleanup_temp_file(temp_file, needs_sudo=True)
+
+    def _enrich_fast_scan(self, devices: List[Dict]) -> List[Dict]:
+        """Enrich devices from fast scan with minimal service detection
+
+        Args:
+            devices: List of devices from masscan
+
+        Returns:
+            Enriched device list
+        """
+        if not devices:
+            return devices
+
+        # Create target list of just discovered IPs
+        ip_list = [d["ip"] for d in devices]
+
+        # For large sets, process in chunks
+        chunk_size = 25  # Smaller chunks for better timeout handling
+        enriched_devices = []
+
+        total_chunks = (len(ip_list) + chunk_size - 1) // chunk_size
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold green]Enrichment[/bold green]"),
+            BarColumn(complete_style="green", finished_style="green"),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("• {task.fields[status]}"),
+            console=self.console,
+            transient=False,
+        ) as progress:
+            task = progress.add_task(
+                "Enriching devices",
+                total=len(devices),
+                status="Starting enrichment with DNS resolution...",
+            )
+
+            for i in range(0, len(ip_list), chunk_size):
+                chunk = ip_list[i : i + chunk_size]
+                chunk_num = i // chunk_size + 1
+
+                progress.update(
+                    task, completed=i, status=f"Processing chunk {chunk_num}/{total_chunks}"
+                )
+
+                # Create target string for this chunk
+                target = " ".join(chunk)
+
+                try:
+                    # Run light nmap scan on chunk
+                    temp_file = self._create_temp_file("nmap_enrich", ".xml")
+
+                    cmd = [
+                        "sudo",
+                        "-n",
+                        "nmap",
+                        "-sS",  # SYN scan
+                        "-sV",  # Version detection
+                        "-O",  # OS detection
+                        "--osscan-guess",  # Aggressive OS guessing
+                        "--version-intensity",
+                        "0",  # Fastest version detection
+                        "-T5",  # Aggressive timing
+                        # DNS resolution enabled for hostname discovery
+                        "--top-ports",
+                        "20",  # Only check top 20 ports for speed
+                        "-oX",
+                        temp_file,
+                        "--max-rtt-timeout",
+                        "100ms",
+                        "--max-retries",
+                        "1",
+                    ] + chunk
+
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=120,  # 120 second timeout per chunk for OS detection
+                    )
+
+                    if result.returncode == 0 and os.path.exists(temp_file):
+                        # Parse enrichment data
+                        enriched = self._parse_nmap_xml(temp_file)
+
+                        # Merge with original masscan data
+                        enriched_map = {e["ip"]: e for e in enriched}
+
+                        for device in devices[i : i + len(chunk)]:
+                            if device["ip"] in enriched_map:
+                                # Merge data
+                                e = enriched_map[device["ip"]]
+                                device.update(
+                                    {
+                                        "hostname": e.get("hostname", ""),
+                                        "os": e.get("os", ""),
+                                        "os_accuracy": e.get("os_accuracy", 0),
+                                        "services": e.get("services", []),
+                                        "vendor": e.get("vendor", device.get("vendor", "")),
+                                    }
+                                )
+                                # Debug: Log if OS was found
+                                if e.get("os"):
+                                    logger.info(f"OS detected for {device['ip']}: {e.get('os')}")
+                                    self.console.print(
+                                        f"[green]✓ OS detected for {device['ip']}: {e.get('os', 'Unknown')}[/green]"
+                                    )
+                                # Log if hostname was found
+                                if e.get("hostname"):
+                                    logger.info(
+                                        f"Hostname resolved for {device['ip']}: {e.get('hostname')}"
+                                    )
+                                    self.console.print(
+                                        f"[green]✓ Hostname found for {device['ip']}: {e.get('hostname')}[/green]"
+                                    )
+                            enriched_devices.append(device)
+                    else:
+                        # If enrichment fails, keep original data
+                        enriched_devices.extend(devices[i : i + len(chunk)])
+
+                    self._cleanup_temp_file(temp_file, needs_sudo=True)
+
+                except subprocess.TimeoutExpired:
+                    self.console.print(
+                        f"[yellow]⚠ Enrichment timeout for chunk {chunk_num} - trying without OS detection[/yellow]"
+                    )
+                    # Try again without OS detection
+                    try:
+                        cmd_no_os = [
+                            "sudo",
+                            "-n",
+                            "nmap",
+                            "-sS",  # SYN scan
+                            "-sV",  # Version detection
+                            "--version-intensity",
+                            "0",  # Fastest version detection
+                            "-T5",  # Aggressive timing
+                            # DNS resolution enabled for hostname discovery
+                            "--top-ports",
+                            "10",  # Only top 10 ports
+                            "-oX",
+                            temp_file,
+                            "--max-rtt-timeout",
+                            "50ms",
+                            "--max-retries",
+                            "0",
+                        ] + chunk
+
+                        result = subprocess.run(
+                            cmd_no_os,
+                            capture_output=True,
+                            text=True,
+                            timeout=30,  # Much shorter timeout
+                        )
+
+                        if result.returncode == 0 and os.path.exists(temp_file):
+                            enriched = self._parse_nmap_xml(temp_file)
+                            enriched_map = {e["ip"]: e for e in enriched}
+
+                            for device in devices[i : i + len(chunk)]:
+                                if device["ip"] in enriched_map:
+                                    e = enriched_map[device["ip"]]
+                                    device.update(
+                                        {
+                                            "hostname": e.get("hostname", ""),
+                                            "services": e.get("services", []),
+                                            "vendor": e.get("vendor", device.get("vendor", "")),
+                                        }
+                                    )
+                                enriched_devices.append(device)
+                        else:
+                            enriched_devices.extend(devices[i : i + len(chunk)])
+
+                        self._cleanup_temp_file(temp_file, needs_sudo=True)
+                    except:
+                        enriched_devices.extend(devices[i : i + len(chunk)])
+                except Exception as e:
+                    logger.warning(f"Enrichment error for chunk {chunk_num}: {e}")
+                    enriched_devices.extend(devices[i : i + len(chunk)])
+
+            progress.update(task, completed=len(devices), status="Enrichment complete")
+
+        return enriched_devices

@@ -4,13 +4,14 @@
 1. [Quick Start](#quick-start)
 2. [Basic Scanning](#basic-scanning)
 3. [Advanced Scanning](#advanced-scanning)
-4. [SNMP Configuration](#snmp-configuration)
-5. [Vulnerability Assessment](#vulnerability-assessment)
-6. [Report Generation](#report-generation)
-7. [Data Export](#data-export)
-8. [Change Tracking](#change-tracking)
-9. [Device Annotation](#device-annotation)
-10. [Automation Examples](#automation-examples)
+4. [Fast Scan for Large Networks](#fast-scan-for-large-networks)
+5. [SNMP Configuration](#snmp-configuration)
+6. [Vulnerability Assessment](#vulnerability-assessment)
+7. [Report Generation](#report-generation)
+8. [Data Export](#data-export)
+9. [Change Tracking](#change-tracking)
+10. [Device Annotation](#device-annotation)
+11. [Automation Examples](#automation-examples)
 
 ## Quick Start
 
@@ -115,6 +116,74 @@ router.local
 When prompted for scan type, select "Discovery Scan" and then:
 - Choose "Yes" for "Use masscan for faster discovery"
 - Note: Requires masscan to be installed
+
+## Fast Scan for Large Networks
+
+### Overview
+The Fast Scan mode is designed for scanning very large networks (65,000+ hosts) efficiently.
+
+### Example: Scanning Multiple /16 Networks
+```bash
+# Start NetworkMapper
+python3 mapper.py
+
+# Select option 1 (Run Network Scan)
+# Enter target: 10.0.0.0/16 10.1.0.0/16 10.2.0.0/16
+# Select option 5 (Fast Scan)
+# Disable SNMP for speed (or configure if needed)
+# Disable vulnerability scanning
+# Disable passive analysis
+```
+
+### What Fast Scan Does:
+1. **Discovery Phase** (30-60 seconds)
+   - Uses masscan at 100,000 packets/second
+   - Scans minimal ports: 80,443,22,445,3389,8080
+   - Finds all active hosts across 65,000+ IPs
+   - Automatic interface detection
+
+2. **Enrichment Phase** (1-3 minutes)
+   - Groups discovered hosts into chunks of 50
+   - Runs ultra-light nmap scan on each chunk
+   - Gathers basic service info and hostnames
+   - No deep inspection for maximum speed
+
+3. **Results**
+   - CSV with all discovered hosts
+   - Basic device classification
+   - Service information for key ports
+   - Ready for further targeted analysis
+
+### Example Output:
+```
+⚡ Fast scan mode for large networks
+🚀 Scanning 196,608 hosts at 100,000 pps
+📍 Target ports: 80,443,22,445
+📡 Using interface: eth0
+✓ Fast scan complete: 2,847 active hosts found
+
+📊 Enriching 2,847 discovered hosts...
+Processing chunk 1/57
+Processing chunk 2/57
+...
+✓ Enrichment complete
+
+Total time: 3 minutes 42 seconds
+```
+
+### Use Cases:
+- Enterprise network inventory
+- ISP customer network mapping
+- Data center asset discovery
+- Pre-migration network assessment
+- Compliance auditing
+
+### Tips for Fast Scanning:
+1. Run during off-peak hours to avoid network congestion
+2. Consider breaking very large ranges into multiple scans
+3. Use the CSV export for further analysis
+4. Follow up with targeted deep scans on critical subnets
+5. Monitor network impact - 100k pps can be noticeable
 
 ## SNMP Configuration
 

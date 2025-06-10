@@ -11,7 +11,10 @@ This module provides passive network monitoring capabilities to:
 import ipaddress
 import json
 import logging
+import os
 import subprocess
+import sys
+import tempfile
 import threading
 import time
 from collections import Counter, defaultdict
@@ -151,6 +154,7 @@ class PassiveTrafficAnalyzer:
         self.arp_cache: Dict[str, str] = {}  # IP -> MAC mapping
         self.dns_cache: Dict[str, Set[str]] = defaultdict(set)  # IP -> hostnames
         self.service_patterns: Dict[int, str] = self._init_service_patterns()
+        self.discovered_devices: Set[str] = set()  # All discovered device IPs
 
         # Processing queue
         self.packet_queue = Queue(maxsize=10000)
@@ -251,6 +255,11 @@ class PassiveTrafficAnalyzer:
         """
         if not SCAPY_AVAILABLE:
             logger.error("Scapy is required for passive traffic analysis")
+            logger.error("Install with: pip install scapy OR run ./install_scapy.sh")
+            # Set some minimal stats so reports don't break
+            self.stats["packets_captured"] = 0
+            self.stats["flows_tracked"] = 0
+            self.stats["devices_discovered"] = 0
             return
 
         if self.running:
@@ -285,39 +294,144 @@ class PassiveTrafficAnalyzer:
         logger.info(f"Stopped passive traffic capture. Stats: {self.stats}")
 
     def _capture_packets(self, duration: int, packet_count: int) -> None:
-        """Capture packets using scapy"""
+        """Capture packets using scapy with sudo wrapper"""
+        import tempfile
+        import subprocess
+        import os
+        
+        temp_file = None
         try:
-
-            def packet_handler(pkt):
-                if not self.running:
-                    return
-
-                self.stats["packets_captured"] += 1
-
-                # Add to queue if not full
-                if not self.packet_queue.full():
-                    self.packet_queue.put(pkt)
+            # Create temporary file for capture results
+            temp_fd, temp_file = tempfile.mkstemp(suffix='.json', prefix='traffic_capture_')
+            os.close(temp_fd)
+            
+            # Make the temp file writable by the sudo process
+            os.chmod(temp_file, 0o666)
+            
+            # Path to sudo wrapper script
+            script_path = Path(__file__).parent / "traffic_capture_sudo.py"
+            
+            # Run capture with sudo
+            cmd = [
+                "sudo", "-n",
+                sys.executable,
+                str(script_path),
+                self.interface,
+                str(duration if duration > 0 else 60),  # Default 60s if not specified
+                temp_file
+            ]
+            
+            logger.info(f"Starting packet capture with sudo on {self.interface}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                error_msg = result.stderr or result.stdout
+                if "password" in error_msg.lower():
+                    logger.error("Sudo authentication required for packet capture")
                 else:
-                    logger.debug("Packet queue full, dropping packet")
-
-            # Build filter to reduce noise
-            bpf_filter = "not port 22"  # Exclude SSH to avoid capturing our own session
-
-            # Start sniffing
-            sniff(
-                iface=self.interface,
-                prn=packet_handler,
-                filter=bpf_filter,
-                count=packet_count if packet_count > 0 else 0,
-                timeout=duration if duration > 0 else None,
-                store=False,
-            )
-
+                    logger.error(f"Capture failed: {error_msg}")
+                return
+            
+            # Check if there's any stdout output (which might contain "False" prints)
+            if result.stdout and result.stdout.strip():
+                # Try to parse as JSON (expected format)
+                try:
+                    output_data = json.loads(result.stdout.strip())
+                    if "error" in output_data:
+                        logger.error(f"Capture error: {output_data['error']}")
+                        return
+                except json.JSONDecodeError:
+                    # If it's not JSON, log it but continue
+                    logger.debug(f"Non-JSON output from capture: {result.stdout}")
+                
+            # Parse capture results
+            if os.path.exists(temp_file):
+                with open(temp_file, 'r') as f:
+                    capture_data = json.load(f)
+                    
+                packets = capture_data.get("packets", [])
+                self.stats["packets_captured"] = len(packets)
+                
+                # Process packets
+                for pkt_data in packets:
+                    if not self.running:
+                        break
+                    self._process_packet_data(pkt_data)
+                    
+                logger.info(f"Processed {len(packets)} packets from capture")
+                    
         except Exception as e:
             logger.error(f"Capture error: {e}")
         finally:
             self.running = False
+            # Clean up temp file
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.unlink(temp_file)
+                except:
+                    pass
 
+    def _process_packet_data(self, pkt_data: Dict) -> None:
+        """Process a single packet data dictionary"""
+        try:
+            # Extract flow key
+            src_ip = pkt_data.get("src_ip", "")
+            dst_ip = pkt_data.get("dst_ip", "")
+            src_port = pkt_data.get("src_port", 0)
+            dst_port = pkt_data.get("dst_port", 0)
+            protocol = pkt_data.get("proto_name", "")
+            
+            if not src_ip or not dst_ip:
+                # Handle ARP packets
+                if pkt_data.get("arp_src_ip"):
+                    src_ip = pkt_data["arp_src_ip"]
+                    src_mac = pkt_data.get("arp_src_mac", "")
+                    if src_ip and src_mac:
+                        self.arp_cache[src_ip] = src_mac
+                        self.discovered_devices.add(src_ip)
+                return
+                
+            # Create flow key
+            flow_key = (src_ip, dst_ip, src_port, dst_port, protocol)
+            
+            # Update or create flow
+            if flow_key in self.flows:
+                flow = self.flows[flow_key]
+                flow.packets += 1
+                flow.bytes += pkt_data.get("size", 0)
+                flow.last_seen = datetime.now()
+            else:
+                flow = TrafficFlow(
+                    src_ip=src_ip,
+                    dst_ip=dst_ip,
+                    src_port=src_port,
+                    dst_port=dst_port,
+                    protocol=protocol,
+                    packets=1,
+                    bytes=pkt_data.get("size", 0)
+                )
+                
+                # Detect service
+                if dst_port in self.service_patterns:
+                    flow.service = self.service_patterns[dst_port]
+                elif src_port in self.service_patterns:
+                    flow.service = self.service_patterns[src_port]
+                    
+                self.flows[flow_key] = flow
+                self.stats["flows_tracked"] = len(self.flows)
+                
+            # Track devices
+            self.discovered_devices.add(src_ip)
+            self.discovered_devices.add(dst_ip)
+            
+            # Update stats
+            self.stats["packets_processed"] += 1
+            self.stats["flows_tracked"] = len(self.flows)
+            self.stats["devices_discovered"] = len(self.discovered_devices)
+            
+        except Exception as e:
+            logger.debug(f"Error processing packet: {e}")
+    
     def _process_packets(self) -> None:
         """Process captured packets"""
         while self.running or not self.packet_queue.empty():

@@ -36,8 +36,8 @@ pytz>=2020.1
 # SNMP
 pysnmp==6.2.6
 
-# Passive Traffic Analysis (optional)
-# scapy==2.5.0  # Uncomment if passive analysis needed
+# Passive Traffic Analysis
+scapy==2.5.0  # Required for traffic flow analysis
 
 # ==================== Testing Framework ====================
 # Core testing

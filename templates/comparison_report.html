@@ -377,6 +377,17 @@
                 </div>
             </div>
         </header>
+        
+        {% if new_devices|length > 0 or missing_devices|length > 0 or changed_devices|length > 0 %}
+        <div style="background: #2d2d30; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #ce9178;">
+            <h3 style="margin: 0 0 0.5rem 0; color: #ce9178;">⚡ Quick Summary</h3>
+            <p style="margin: 0; color: #cccccc;">
+                {% if new_devices|length > 0 %}{{ new_devices|length }} new device{% if new_devices|length > 1 %}s{% endif %} appeared on the network. {% endif %}
+                {% if missing_devices|length > 0 %}{{ missing_devices|length }} device{% if missing_devices|length > 1 %}s{% endif %} went offline. {% endif %}
+                {% if changed_devices|length > 0 %}{{ changed_devices|length }} device{% if changed_devices|length > 1 %}s{% endif %} had configuration changes. {% endif %}
+            </p>
+        </div>
+        {% endif %}
 
         <div class="change-summary">
             <div class="change-card new">

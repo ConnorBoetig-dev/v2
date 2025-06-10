@@ -82,8 +82,8 @@ class NetworkMapper:
             choices = {
                 "1": "🔍 Run Network Scan",
                 "2": "📊 View Recent Scans",
-                "3": "🔄 Check Changes",
-                "4": "🔀 Compare Scans",
+                "3": "🔄 Compare to Last Scan (Auto-opens Report)",
+                "4": "🔀 Compare Any Two Scans",
                 "5": "✏️  Annotate Devices",
                 "6": "📈 Generate Reports",
                 "7": "🗺️  View Network Map",
@@ -241,6 +241,23 @@ class NetworkMapper:
             self.save_changes(changes, timestamp)
             # Store changes for report generation
             self.last_changes = changes
+
+            # Display change summary immediately
+            if changes.get("summary", {}).get("total_changes", 0) > 0:
+                console.print("\n[bold yellow]🔄 Network Changes Detected![/bold yellow]")
+                change_table = Table(show_header=False, box=None, padding=(0, 2))
+                change_table.add_column("Type", style="cyan")
+                change_table.add_column("Count", style="yellow")
+
+                if changes.get("new_devices"):
+                    change_table.add_row("New devices:", f"+{len(changes['new_devices'])}")
+                if changes.get("missing_devices"):
+                    change_table.add_row("Missing devices:", f"-{len(changes['missing_devices'])}")
+                if changes.get("changed_devices"):
+                    change_table.add_row("Modified devices:", f"~{len(changes['changed_devices'])}")
+
+                console.print(change_table)
+                console.print("[dim]A detailed comparison report will be generated...[/dim]")
         else:
             self.last_changes = None
 
@@ -279,7 +296,7 @@ class NetworkMapper:
         network_map = self.output_path / "reports" / f"network_map_{timestamp}.html"
         detailed_report = self.output_path / "reports" / f"report_{timestamp}.html"
         traffic_flow = self.output_path / "reports" / f"traffic_flow_{timestamp}.html"
-        
+
         if network_map.exists():
             report_table.add_row("Network Map (2D/3D):", str(network_map))
         if detailed_report.exists():
@@ -290,12 +307,16 @@ class NetworkMapper:
             report_table.add_row("Comparison:", str(comparison_file))
 
         console.print(report_table)
-        
+
         # Show tips for viewing
         if not traffic_flow.exists() and not passive_enabled:
-            console.print("\n[dim]💡 Tip: Enable passive traffic analysis to generate the traffic flow report[/dim]")
-        
-        console.print("\n[dim]💡 Tip: In the Network Map, use the 2D/3D toggle buttons to switch views[/dim]")
+            console.print(
+                "\n[dim]💡 Tip: Enable passive traffic analysis to generate the traffic flow report[/dim]"
+            )
+
+        console.print(
+            "\n[dim]💡 Tip: In the Network Map, use the 2D/3D toggle buttons to switch views[/dim]"
+        )
 
         input("\nPress Enter to continue...")
 
@@ -456,7 +477,7 @@ class NetworkMapper:
                 device["dependent_count"] = 0
             if "uptime_days" not in device:
                 device["uptime_days"] = 0
-        
+
         # Load scan metadata if available
         metadata_file = self.output_path / "scans" / f"summary_{timestamp}.json"
         scan_metadata = {}
@@ -466,7 +487,7 @@ class NetworkMapper:
                     scan_metadata = json.load(f)
             except:
                 pass
-        
+
         # Prepare report data with enhanced metadata
         report_data = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -515,6 +536,11 @@ class NetworkMapper:
             flow_data = self.passive_analysis_results.get("flow_matrix", {})
             service_usage = self.passive_analysis_results.get("service_usage", {})
 
+            # Check if we have real traffic data
+            real_traffic_captured = False
+            if hasattr(self.traffic_analyzer, "stats"):
+                real_traffic_captured = self.traffic_analyzer.stats.get("packets_captured", 0) > 0
+
             # Calculate statistics
             stealth_devices = len([d for d in devices if d.get("stealth_device", False)])
             total_flows = sum(len(flows) for flows in flow_data.values())
@@ -562,6 +588,9 @@ class NetworkMapper:
                     else:
                         max_service_count = max(max_service_count, ips)
 
+            # Check if scapy is available
+            from utils.traffic_analyzer import SCAPY_AVAILABLE
+
             traffic_report_data = {
                 **report_data,
                 "devices": devices,  # Add full devices data for risk analysis
@@ -572,8 +601,12 @@ class NetworkMapper:
                 "service_usage": service_usage,
                 "max_service_count": max_service_count,
                 "top_talkers": top_talkers,
+                "real_traffic_captured": real_traffic_captured,
+                "scapy_available": SCAPY_AVAILABLE,
                 "stats": {
-                    "packets_captured": getattr(self.traffic_analyzer, 'stats', {}).get("packets_captured", 0),
+                    "packets_captured": getattr(self.traffic_analyzer, "stats", {}).get(
+                        "packets_captured", 0
+                    ),
                     "duration": self.passive_analysis_results.get("duration", 0),
                 },
             }
@@ -598,6 +631,7 @@ class NetworkMapper:
         webbrowser.open(original_url)
 
         # Open traffic flow report if generated
+        traffic_url = None
         if self.passive_analysis_results and len(generated_files) > 2:
             traffic_report_file = generated_files[2][1]  # Get the traffic report file
             traffic_url = f"file://{traffic_report_file.absolute()}"
@@ -610,23 +644,45 @@ class NetworkMapper:
         console.print(f"[yellow]Network Visualization:[/yellow] [underline]{viz_url}[/underline]")
         console.print(f"[yellow]Detailed Report:[/yellow] [underline]{original_url}[/underline]")
 
-        if self.passive_analysis_results:
+        if self.passive_analysis_results and traffic_url:
             console.print(
                 f"[yellow]Traffic Flow Analysis:[/yellow] [underline]{traffic_url}[/underline]"
             )
 
         console.print("\n")
 
-        # Also generate comparison report if we have changes
+        # Generate comparison report if we have previous scans and changes
         comparison_file = None
         scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
-        if len(scan_files) >= 2:
-            # Get changes for comparison
-            with open(scan_files[0]) as f:
-                current = json.load(f)
-            changes = self.tracker.detect_changes(current)
-            if changes:
-                comparison_file = self.generate_comparison_report(devices, changes, timestamp)
+        if len(scan_files) >= 2 and self.last_changes:
+            # Always generate comparison report if we have changes
+            if self.last_changes.get("summary", {}).get("total_changes", 0) > 0:
+                console.print(
+                    "\n[bold yellow]🔄 Network changes detected! Generating comparison report...[/bold yellow]"
+                )
+                comparison_file = self.generate_comparison_report(
+                    devices, self.last_changes, timestamp
+                )
+
+                if comparison_file and comparison_file.exists():
+                    comparison_url = f"file://{comparison_file.absolute()}"
+                    time.sleep(0.5)
+                    webbrowser.open(comparison_url)
+                    console.print(
+                        f"\n[bold green]✓ Comparison Report Generated and Opened![/bold green]"
+                    )
+                    console.print(
+                        f"[yellow]📊 Comparison Report:[/yellow] [underline]{comparison_url}[/underline]"
+                    )
+                    console.print(
+                        f"[cyan]Summary: {len(self.last_changes.get('new_devices', []))} new, "
+                        f"{len(self.last_changes.get('missing_devices', []))} missing, "
+                        f"{len(self.last_changes.get('changed_devices', []))} changed devices[/cyan]"
+                    )
+                else:
+                    console.print("[red]⚠ Failed to generate comparison report[/red]")
+            else:
+                console.print("\n[green]✓ No changes detected since last scan[/green]")
 
         return viz_report_file, comparison_file
 
@@ -732,26 +788,54 @@ class NetworkMapper:
         input("\nPress Enter to continue...")
 
     def check_changes(self):
-        """Check for network changes - basic version for backward compatibility"""
-        # Get most recent scan
+        """Check for network changes and generate comparison report"""
+        import webbrowser
+
+        # Get most recent scans
         scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
-        if not scan_files:
-            console.print("[yellow]No scans found[/yellow]")
-            input("\nPress Enter to continue...")
-            return
-
-        with open(scan_files[0]) as f:
-            current_devices = json.load(f)
-
-        changes = self.tracker.detect_changes(current_devices)
-
-        if not changes:
+        if len(scan_files) < 2:
             console.print("[yellow]Need at least 2 scans to detect changes[/yellow]")
             input("\nPress Enter to continue...")
             return
 
-        # Display changes
+        # Load current scan
+        with open(scan_files[0]) as f:
+            current_devices = json.load(f)
+
+        # Detect changes
+        changes = self.tracker.detect_changes(current_devices)
+
+        if not changes:
+            console.print("[yellow]No previous scan found for comparison[/yellow]")
+            input("\nPress Enter to continue...")
+            return
+
+        # Display changes summary
         self._display_changes_summary(changes)
+
+        # Generate comparison report if there are changes
+        if changes.get("summary", {}).get("total_changes", 0) > 0:
+            console.print("\n[yellow]Generating comparison report...[/yellow]")
+
+            # Get timestamp from most recent scan
+            timestamp = scan_files[0].stem.replace("scan_", "")
+
+            # Generate the comparison report
+            comparison_file = self.generate_comparison_report(current_devices, changes, timestamp)
+
+            if comparison_file and comparison_file.exists():
+                # Open in browser
+                comparison_url = f"file://{comparison_file.absolute()}"
+                webbrowser.open(comparison_url)
+                console.print(f"\n[bold green]✓ Comparison report opened in browser![/bold green]")
+                console.print(
+                    f"[yellow]Report location:[/yellow] [underline]{comparison_url}[/underline]"
+                )
+            else:
+                console.print("[red]Failed to generate comparison report[/red]")
+        else:
+            console.print("\n[green]No changes detected between scans[/green]")
+
         input("\nPress Enter to continue...")
 
     def compare_scans_interactive(self):
@@ -1499,6 +1583,13 @@ class NetworkMapper:
             ),
             ("deep", "Deep Scan", "Comprehensive analysis with scripts", "15 minutes", True),
             ("arp", "ARP Scan", "Layer 2 discovery for local networks", "10 seconds", True),
+            (
+                "fast",
+                "Fast Scan",
+                "Ultra-fast scan for large networks (65k+ hosts)",
+                "2-5 minutes",
+                True,
+            ),
         ]
 
         for i, (_, name, desc, time, needs_root) in enumerate(scan_options, 1):
@@ -1508,7 +1599,9 @@ class NetworkMapper:
 
         while True:
             try:
-                choice = Prompt.ask("\nSelect scan type", choices=["1", "2", "3", "4"], default="1")
+                choice = Prompt.ask(
+                    "\nSelect scan type", choices=["1", "2", "3", "4", "5"], default="1"
+                )
                 choice_idx = int(choice) - 1
                 scan_type, scan_name, _, _, needs_root = scan_options[choice_idx]
 
@@ -1521,11 +1614,19 @@ class NetworkMapper:
                         console.print("[green]→ Using masscan for faster scanning[/green]")
                     else:
                         console.print("[dim]→ Using standard nmap discovery[/dim]")
+                elif scan_type == "fast":
+                    # Fast scan always uses masscan
+                    use_masscan = True
+                    console.print("\n[cyan]⚡ Fast scan automatically uses masscan for speed[/cyan]")
+                    console.print(
+                        "[cyan]📊 Will discover hosts first, then perform light enrichment[/cyan]"
+                    )
+                    console.print("[cyan]💡 Perfect for /16 networks and larger[/cyan]")
 
                 return scan_type, scan_name, needs_root, use_masscan
 
             except (ValueError, IndexError):
-                console.print("[red]Please select a valid option (1-4)[/red]")
+                console.print("[red]Please select a valid option (1-5)[/red]")
 
     def _handle_vulnerability_setup(self) -> bool:
         """Handle vulnerability scanning setup"""

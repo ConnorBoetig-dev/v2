@@ -18,7 +18,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from mapper import NetworkMapper
 
-def generate_simulated_traffic_flow(devices):
+def generate_simulated_traffic_flow_DISABLED(devices):
     """Generate realistic traffic flow data for visualization"""
     flow_matrix = {}
     

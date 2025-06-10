@@ -182,6 +182,49 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 3. **Busy Networks**: Use inventory scan during off-hours
 4. **Security Scans**: Stage deep scans by subnet to avoid overwhelming the network
 
+## Scan Types
+
+### 1. Discovery Scan
+- **Purpose**: Quick host discovery to find active devices
+- **Duration**: ~30 seconds for /24 network
+- **Method**: Multiple ICMP/TCP/UDP probes
+- **Use case**: Initial network reconnaissance
+
+### 2. Inventory Scan
+- **Purpose**: Service detection and OS fingerprinting
+- **Duration**: ~5 minutes for /24 network
+- **Method**: SYN scan of top 1000 ports with version detection
+- **Use case**: Asset inventory and service mapping
+- **Requires**: sudo/root
+
+### 3. Deep Scan
+- **Purpose**: Comprehensive analysis with NSE scripts
+- **Duration**: ~15 minutes for /24 network
+- **Method**: Top 5000 ports + ARP + scripts + OS detection
+- **Use case**: Security assessments, detailed analysis
+- **Requires**: sudo/root
+
+### 4. ARP Scan
+- **Purpose**: Layer 2 discovery for local networks
+- **Duration**: ~10 seconds
+- **Method**: ARP requests to find all devices on local segment
+- **Use case**: Finding devices that block ICMP
+- **Requires**: sudo/root
+
+### 5. Fast Scan (NEW)
+- **Purpose**: Ultra-fast scanning for large networks (65k+ hosts)
+- **Duration**: 2-5 minutes for /16 network
+- **Method**: Masscan at 100k pps + light nmap enrichment
+- **Features**:
+  - Optimized for 6+ /16 subnets (65,000+ IPs)
+  - Minimal port set for speed (80,443,22,445,3389,8080)
+  - Chunked enrichment (50 IPs at a time)
+  - No vulnerability scanning for speed
+  - Automatic interface detection
+  - Randomized host order to avoid rate limiting
+- **Use case**: Large enterprise networks, ISP ranges, data center inventories
+- **Requires**: sudo/root
+
 ## Common Commands
 
 ### Testing and Linting
@@ -375,6 +418,24 @@ These enhancements would transform NetworkMapper from a scanning tool into a com
 ## Recent Updates (2025)
 
 ### Latest Changes (January 2025)
+
+8. **Fast Scan Mode for Large Networks** ✅
+   - New scan type optimized for 65,000+ hosts
+   - Uses masscan at 100k packets/second
+   - Minimal port set (80,443,22,445,3389,8080)
+   - Chunked enrichment - processes discovered hosts in groups of 50
+   - Automatic interface detection for optimal routing
+   - No vulnerability scanning to maximize speed
+   - Perfect for enterprise /16 networks and ISP ranges
+   - Completes 65k host scan in 2-5 minutes
+
+9. **Fixed Traffic Flow Visualization Jitter** ✅
+   - Removed CSS transform scale on hover that conflicted with D3.js simulation
+   - Replaced with stroke-based visual feedback for smoother interaction
+   - Nodes now highlight with golden stroke on hover without position jitter
+   - Maintains smooth drag behavior while providing clear hover feedback
+
+### Latest Changes (Previous)
 1. **Reduced Demo Network Size** ✅
    - Scaled down from ~220 to ~55 devices for better visualization
    - Consolidated from 10 subnets to 3 focused subnets

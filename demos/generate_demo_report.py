@@ -4,9 +4,13 @@ Generate reports directly from demo data with traffic flows
 """
 
 import json
+import sys
 import webbrowser
 from pathlib import Path
 from datetime import datetime
+
+# Add parent directory to path
+sys.path.append(str(Path(__file__).parent.parent))
 from mapper import NetworkMapper
 
 # Initialize mapper

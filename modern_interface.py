@@ -294,6 +294,7 @@ class ModernInterface:
             ("inventory", "Inventory Scan", "Service detection and OS fingerprinting", "5 minutes", True),
             ("deep", "Deep Scan", "Comprehensive analysis with scripts", "15 minutes", True),
             ("arp", "ARP Scan", "Layer 2 discovery for local networks", "10 seconds", True),
+            ("fast", "Fast Scan", "Ultra-fast scan for large networks (65k+ hosts)", "2-5 minutes", True),
         ]
         
         # Create scan option cards
@@ -323,13 +324,19 @@ class ModernInterface:
         
         while True:
             try:
-                choice = Prompt.ask("\n[bold green]❯[/bold green] Select scan type", choices=["1", "2", "3", "4"], default="1")
+                choice = Prompt.ask("\n[bold green]❯[/bold green] Select scan type", choices=["1", "2", "3", "4", "5"], default="1")
                 choice_idx = int(choice) - 1
                 scan_type, scan_name, _, _, needs_root = scan_options[choice_idx]
                 
                 # Handle masscan option for discovery scans
                 use_masscan = False
-                if scan_type == "discovery":
+                if scan_type == "fast":
+                    # Fast scan always uses masscan
+                    use_masscan = True
+                    console.print("\n[cyan]⚡ Fast scan mode selected[/cyan]")
+                    console.print("[cyan]📊 Will use masscan for discovery + light enrichment[/cyan]")
+                    console.print("[cyan]💡 Perfect for scanning large /16 networks and bigger[/cyan]")
+                elif scan_type == "discovery":
                     # Check if this is a large network
                     # We'll use the target from the previous step
                     target = getattr(self, '_last_target', '192.168.1.0/24')
