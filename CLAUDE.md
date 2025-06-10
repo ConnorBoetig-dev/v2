@@ -12,16 +12,21 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 - **core/parser.py**: Normalizes scan results from different scanners into unified format
 - **core/tracker.py**: Detects changes between scans (new/missing devices, service changes)
 - **core/annotator.py**: Manages persistent device annotations and tags
-- **utils/visualization.py**: Generates network topology data for 2D/3D visualizations
+- **utils/visualization.py**: Generates network topology data for visualizations
 - **utils/mac_lookup.py**: MAC vendor lookup with local OUI database and API fallback
 - **utils/network_utils.py**: IP address manipulation and network calculations
+- **utils/vulnerability_scanner.py**: Multi-API vulnerability correlation (OSV, CIRCL, local patterns)
+- **utils/snmp_config.py**: Interactive SNMP configuration with persistence
+- **utils/export_manager.py**: Advanced export functionality (PDF, Excel, JSON, CSV)
 
 ### Key Technologies
 - **Scanning**: nmap (primary), masscan (speed), arp-scan (layer 2)
 - **CLI**: Typer, Rich (tables, progress bars, formatting)
-- **Visualization**: D3.js (2D force-directed graphs), Three.js (3D layered view)
+- **Visualization**: Interactive network map using D3.js and Three.js
 - **Data Storage**: JSON files (no database required)
 - **Web Framework**: Flask (for serving reports)
+- **Vulnerability APIs**: OSV (Google), CIRCL CVE Search (keyless, free APIs)
+- **Export Formats**: PDF, Excel, CSV, JSON with full vulnerability data
 
 ## Key Features
 
@@ -40,10 +45,21 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 - Tracks service/port changes
 - Maintains scan history for comparison
 
-### 4. Visualization
-- 2D network map with force-directed layout
-- 3D layered view with device hierarchy
-- Auto-generated network topology with intelligent link creation
+### 4. Visualization ✅ ENHANCED
+- **2D Network Map**: 
+  - Modern dark theme UI with intuitive controls
+  - Force-directed layout with hierarchical positioning
+  - Real-time device search and filtering
+  - Interactive tooltips and device detail panels
+  - Change tracking visualization (new/modified/removed devices)
+  - Export to PNG functionality
+- **3D Network Map**:
+  - Layered 3D view with spatial organization by device type
+  - Smooth camera controls and optional auto-rotation
+  - Glowing effects for critical devices
+  - Curved connection lines with type-based styling
+- **Auto-opening Reports**: Both detailed report and visualization open after scans
+- **Improved Initial View**: Fixed camera positioning for immediate visibility
 
 ### 5. Asset Management
 - Persistent device annotations
@@ -226,3 +242,144 @@ self.scan_profiles['profile_name'] = {
 3. **Low Priority**: VR support, mobile app, advanced ML features
 
 These enhancements would transform NetworkMapper from a scanning tool into a comprehensive network intelligence platform.
+
+## Recent Updates (2025)
+
+### Completed Enhancements
+1. **Comprehensive Test Suite** ✅
+   - 100+ unit tests covering all core modules
+   - Integration tests for full workflow validation
+   - Makefile with 40+ test automation targets
+   - Fixed logger initialization issues
+
+2. **Modern Network Visualization** ✅
+   - Complete redesign of 2D/3D network maps
+   - Professional dark theme UI
+   - Interactive device filtering and search
+   - Change tracking indicators
+   - Auto-opening after scan completion
+   - Fixed camera positioning issues
+
+3. **Advanced Export Capabilities** ✅
+   - PDF reports with executive summaries and charts
+   - Excel workbooks with multiple formatted sheets
+   - JSON/CSV exports for data integration
+   - Rich formatting and device type categorization
+   - Automated generation integrated with scan workflow
+
+4. **SNMP Integration** ✅
+   - Device enrichment with SNMP data collection
+   - System information retrieval (hostname, uptime, description)
+   - Device-specific metrics (interfaces, memory, processes)
+   - Smart candidate filtering and error handling
+   - Interactive setup at the start of every scan
+   - Support for SNMP v1, v2c, and v3 with full credential management
+   - Configuration persistence with secure storage
+   - CLI argument override support (--disable-snmp, --snmp-community, --snmp-version)
+   - Input validation and user-friendly error handling
+   - Progress tracking during enrichment operations
+
+5. **Enhanced Scan Wizard UX** ✅
+   - Completely redesigned scan setup flow with clear, intuitive prompts
+   - Smart input validation with helpful error messages and examples
+   - Structured option selection (numbered lists vs confusing bracket notation)
+   - Contextual help and descriptions for all scan types
+   - Target validation with support for IPs, CIDR, ranges, and hostnames
+   - Graceful fallback handling for invalid input
+   - Consistent visual formatting and progress indicators
+
+6. **Multi-API Vulnerability Correlation** ✅
+   - **Primary API**: OSV (Google Open Source Vulnerabilities) - keyless, comprehensive
+   - **Fallback API**: CIRCL CVE Search - community-maintained, no authentication
+   - **Local Patterns**: Enhanced security assessment for common vulnerabilities
+   - Automatic CVE matching for discovered services and versions
+   - CVSS scoring and severity classification (Critical/High/Medium/Low)
+   - Intelligent cascading: tries APIs in order, falls back gracefully
+   - Caching system to minimize API requests and improve performance
+   - Vulnerability summary reporting with top risks highlighted
+   - Full integration with CSV and HTML reports
+
+7. **Enhanced Report Structure** ✅
+   - **Removed**: Broken 2D/3D map tabs that displayed poorly in smaller report view
+   - **Added**: Security Report tab with comprehensive vulnerability analysis
+   - **Added**: Services tab with network service distribution and details
+   - **Improved**: Vulnerability columns in device tables and CSV exports
+   - **New**: Risk assessment cards with visual indicators
+   - **Better**: Service organization by type and port information
+
+### Current System Capabilities
+The NetworkMapper v2 now provides a complete network security assessment platform with:
+
+- **Multi-scanner network discovery** with intelligent fallback
+- **Advanced device classification** using port, service, and OS fingerprints
+- **Real-time vulnerability assessment** using multiple free APIs
+- **Interactive SNMP enrichment** with full v1/v2c/v3 support
+- **Comprehensive reporting** in multiple formats (HTML, PDF, Excel, CSV, JSON)
+- **Change tracking** between scans with detailed comparison reports
+- **Professional visualizations** with the main network map
+- **Security-focused reporting** with vulnerability details and risk assessment
+- **Service analysis** showing network service distribution
+- **Export automation** with vulnerability data included in all formats
+
+### Usage Examples
+
+```bash
+# Basic scan with all features
+python3 mapper.py
+
+# Scan with SNMP disabled
+python3 mapper.py --disable-snmp
+
+# Scan with specific SNMP settings
+python3 mapper.py --snmp-community private --snmp-version v2c
+
+# Generate test data
+python3 generate_test_data.py
+
+# Run linting
+./lint.sh
+```
+
+### API Documentation
+
+#### Vulnerability APIs (No Keys Required)
+
+1. **OSV (Open Source Vulnerabilities)**
+   - Endpoint: `https://api.osv.dev/v1/query`
+   - Method: POST
+   - Coverage: Major package ecosystems, CVEs
+   - Used as primary source
+
+2. **CIRCL CVE Search**
+   - Endpoint: `https://cve.circl.lu/api/search/{keyword}`
+   - Method: GET
+   - Coverage: Full CVE dataset mirror
+   - Used as fallback when OSV has no results
+
+3. **Local Patterns**
+   - Built-in vulnerability patterns for common services
+   - Used when APIs are unavailable or return no results
+   - Covers: telnet, ftp, http, snmp, ssh, rlogin, finger, netbios
+
+### Testing
+
+The project includes comprehensive testing capabilities:
+
+```bash
+# Generate test network data
+python3 generate_test_data.py
+
+# Generate minimal test network
+python3 generate_minimal_network_test.py
+
+# Run all linting checks
+./lint.sh
+```
+
+### Important Notes
+
+- The system is designed to work completely offline with local patterns
+- All vulnerability APIs are free and require no authentication
+- SNMP configuration is securely stored and can be reused between scans
+- Reports automatically open in the browser after generation
+- The main network visualization map provides the best interactive experience

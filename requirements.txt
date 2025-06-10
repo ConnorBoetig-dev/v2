@@ -5,6 +5,14 @@ python-nmap==0.7.1
 requests==2.31.0
 jinja2==3.1.3
 pyyaml==6.0.1
+
+# Export dependencies
+reportlab==4.0.4
+openpyxl==3.1.2
+pandas==2.0.3
+
+# SNMP dependencies
+pysnmp==6.2.6
 # Development dependencies
 black==23.12.1
 flake8==7.0.0

@@ -5,8 +5,10 @@ NetworkMapper 2.0 - Network Discovery and Mapping Tool
 
 import csv
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, Tuple
 
 import typer
 from rich.console import Console
@@ -20,9 +22,13 @@ from core.parser import ScanParser
 from core.scanner import NetworkScanner
 from core.tracker import ChangeTracker
 from utils.visualization import MapGenerator
+from utils.export_manager import ExportManager
+from utils.snmp_config import SNMPConfig
+from utils.vulnerability_scanner import VulnerabilityScanner
 
 app = typer.Typer()
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 class NetworkMapper:
@@ -36,6 +42,10 @@ class NetworkMapper:
         self.tracker = ChangeTracker()
         self.annotator = DeviceAnnotator()
         self.map_gen = MapGenerator()
+        self.export_mgr = ExportManager(self.output_path)
+        self.snmp_config = SNMPConfig(self.output_path / "config")
+        self.vuln_scanner = VulnerabilityScanner(self.output_path / "cache")
+        self.cli_overrides = {}
         self.last_changes = None
 
     def ensure_directories(self):
@@ -44,6 +54,8 @@ class NetworkMapper:
             self.output_path / "scans",
             self.output_path / "reports",
             self.output_path / "changes",
+            self.output_path / "config",
+            self.output_path / "cache",
         ]
         for d in dirs:
             d.mkdir(parents=True, exist_ok=True)
@@ -95,32 +107,20 @@ class NetworkMapper:
                     break
 
     def run_scan_wizard(self):
-        """Interactive scan wizard"""
-        console.print("\n[bold]Network Scan Wizard[/bold]")
+        """Interactive scan wizard with improved UX"""
+        console.print("\n[bold cyan]Network Scan Wizard[/bold cyan]")
 
-        # Get target
-        target = Prompt.ask("Enter target network (example: 192.168.1.0/24)")
+        # Get target with validation
+        target = self._get_scan_target()
 
-        # Select scan type
-        scan_types = {
-            "1": ("discovery", "Discovery Scan", "~30 seconds", False),
-            "2": ("inventory", "Inventory Scan", "~5 minutes", True),
-            "3": ("deep", "Deep Scan", "~15 minutes", True),
-            "4": ("arp", "ARP Scan (Layer 2)", "~10 seconds", True),
-        }
+        # Select scan type with clear descriptions
+        scan_type, scan_name, needs_root, use_masscan = self._select_scan_type()
 
-        console.print("\n[bold]Scan Types:[/bold]")
-        for key, (_, name, time, root) in scan_types.items():
-            root_txt = " [red](requires sudo)[/red]" if root else ""
-            console.print(f"  {key}. {name} ({time}){root_txt}")
-
-        scan_choice = Prompt.ask("Select scan type", choices=list(scan_types.keys()))
-        scan_type, scan_name, _, needs_root = scan_types[scan_choice]
-
-        # Use masscan for discovery?
-        use_masscan = False
-        if scan_type == "discovery":
-            use_masscan = Confirm.ask("Use masscan for faster discovery?", default=False)
+        # Interactive SNMP setup (unless disabled via CLI)
+        snmp_enabled, snmp_config = self._handle_snmp_setup()
+        
+        # Interactive vulnerability scanning setup
+        vuln_enabled = self._handle_vulnerability_setup()
 
         # Run scan
         console.print(f"\n[yellow]Starting {scan_name} on {target}...[/yellow]\n")
@@ -132,12 +132,29 @@ class NetworkMapper:
             results = self.scanner._run_arp_scan(target)
         else:
             results = self.scanner.scan(
-                target=target, scan_type=scan_type, use_masscan=use_masscan, needs_root=needs_root
+                target=target, 
+                scan_type=scan_type, 
+                use_masscan=use_masscan, 
+                needs_root=needs_root,
+                snmp_config=snmp_config if snmp_enabled else None
             )
 
         # Parse and classify
         devices = self.parser.parse_results(results)
         devices = self.classifier.classify_devices(devices)
+        
+        # Vulnerability scanning if enabled
+        if vuln_enabled:
+            console.print("\n[cyan]Scanning for vulnerabilities...[/cyan]")
+            try:
+                devices = self.vuln_scanner.scan_devices(devices)
+                
+                # Generate vulnerability report
+                vuln_report = self.vuln_scanner.generate_vulnerability_report(devices)
+                self._display_vulnerability_summary(vuln_report)
+            except Exception as e:
+                console.print(f"[yellow]Warning: Vulnerability scanning failed: {e}[/yellow]")
+                logger.error(f"Vulnerability scanning error: {e}")
 
         # Save results
         scan_file = self.output_path / "scans" / f"scan_{timestamp}.json"
@@ -211,6 +228,10 @@ class NetworkMapper:
                 "os",
                 "services",
                 "open_ports",
+                "vulnerability_count",
+                "critical_vulns",
+                "high_vulns",
+                "vulnerability_summary",
                 "critical",
                 "notes",
                 "last_seen",
@@ -219,6 +240,18 @@ class NetworkMapper:
             writer.writeheader()
 
             for device in devices:
+                # Create vulnerability summary
+                vulns = device.get('vulnerabilities', [])
+                vuln_summary = ""
+                if vulns:
+                    high_severity = [v for v in vulns if v.get('severity') in ['CRITICAL', 'HIGH']]
+                    if high_severity:
+                        vuln_summary = f"{len(high_severity)} high-risk issues: " + "; ".join([v.get('cve_id', 'Unknown') for v in high_severity[:3]])
+                    else:
+                        vuln_summary = f"{len(vulns)} issues detected"
+                else:
+                    vuln_summary = "No vulnerabilities detected"
+                
                 row = {
                     "ip": device.get("ip"),
                     "hostname": device.get("hostname", ""),
@@ -228,6 +261,10 @@ class NetworkMapper:
                     "os": device.get("os", ""),
                     "services": ";".join(device.get("services", [])),
                     "open_ports": ";".join(map(str, device.get("open_ports", []))),
+                    "vulnerability_count": device.get("vulnerability_count", 0),
+                    "critical_vulns": device.get("critical_vulns", 0),
+                    "high_vulns": device.get("high_vulns", 0),
+                    "vulnerability_summary": vuln_summary,
                     "critical": device.get("critical", False),
                     "notes": device.get("notes", ""),
                     "last_seen": device.get("last_seen", datetime.now().isoformat()),
@@ -575,14 +612,213 @@ class NetworkMapper:
             console.print("[yellow]No network maps found. Run a scan first to generate a visualization.[/yellow]")
         input("\nPress Enter to continue...")
 
+    def _handle_snmp_setup(self) -> Tuple[bool, Dict]:
+        """Handle SNMP setup with CLI override support
+        
+        Returns:
+            Tuple of (enabled, config_dict)
+        """
+        # Check for CLI override to disable SNMP
+        if self.cli_overrides.get('disable_snmp'):
+            console.print("\n[dim]SNMP enrichment disabled via CLI argument[/dim]")
+            return False, {}
+            
+        # Check for CLI override with specific settings
+        if self.cli_overrides.get('snmp_community') or self.cli_overrides.get('snmp_version'):
+            config = {}
+            
+            version = self.cli_overrides.get('snmp_version', 'v2c')
+            if version not in ['v1', 'v2c', 'v3']:
+                console.print(f"[red]Invalid SNMP version '{version}'. Using v2c.[/red]")
+                version = 'v2c'
+                
+            config['version'] = version
+            
+            if version in ['v1', 'v2c']:
+                community = self.cli_overrides.get('snmp_community', 'public')
+                config['community'] = community
+                console.print(f"\n[green]✓ SNMP enrichment enabled via CLI: {version} with community '{community}'[/green]")
+            else:
+                console.print(f"\n[yellow]SNMPv3 specified via CLI but credentials missing. Using interactive setup.[/yellow]")
+                return self.snmp_config.interactive_setup()
+                
+            config['timeout'] = 2
+            config['retries'] = 1
+            return True, config
+            
+        # Use interactive setup
+        return self.snmp_config.interactive_setup()
+
+    def _get_scan_target(self) -> str:
+        """Get and validate scan target with helpful examples"""
+        console.print("\n[bold]Scan Target[/bold]")
+        console.print("Enter the network or host you want to scan:")
+        console.print("[dim]• Single host: 192.168.1.10[/dim]")
+        console.print("[dim]• Network range: 192.168.1.0/24[/dim]")
+        console.print("[dim]• IP range: 192.168.1.1-50[/dim]")
+        console.print("[dim]• Hostname: example.com[/dim]")
+        
+        while True:
+            target = Prompt.ask("\nTarget").strip()
+            
+            if not target:
+                console.print("[red]Target cannot be empty[/red]")
+                continue
+                
+            # Basic validation
+            if self._validate_target(target):
+                return target
+            else:
+                console.print("[red]Invalid target format. Please check your input.[/red]")
+                
+    def _validate_target(self, target: str) -> bool:
+        """Basic validation for scan targets"""
+        import re
+        
+        if not target or target.isspace():
+            return False
+            
+        # IP address patterns with proper range validation
+        def is_valid_ip_octet(octet):
+            try:
+                num = int(octet)
+                return 0 <= num <= 255
+            except ValueError:
+                return False
+        
+        # Single IP address
+        ip_match = re.match(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$', target)
+        if ip_match:
+            return all(is_valid_ip_octet(octet) for octet in ip_match.groups())
+            
+        # CIDR notation
+        cidr_match = re.match(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})$', target)
+        if cidr_match:
+            octets = cidr_match.groups()[:4]
+            prefix = int(cidr_match.group(5))
+            return all(is_valid_ip_octet(octet) for octet in octets) and 0 <= prefix <= 32
+            
+        # IP range
+        range_match = re.match(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})-(\d{1,3})$', target)
+        if range_match:
+            octets = range_match.groups()[:4]
+            end_range = int(range_match.group(5))
+            return (all(is_valid_ip_octet(octet) for octet in octets) and 
+                    0 <= end_range <= 255 and 
+                    end_range >= int(octets[3]))
+        
+        # Hostname pattern (basic but more restrictive)
+        hostname_pattern = r'^[a-zA-Z0-9][a-zA-Z0-9\.-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$'
+        if re.match(hostname_pattern, target):
+            # Additional hostname validation
+            if len(target) > 253:  # Max hostname length
+                return False
+            if '..' in target:  # No consecutive dots
+                return False
+            if target.startswith('.') or target.endswith('.'):  # No leading/trailing dots
+                return False
+            return True
+            
+        return False
+        
+    def _select_scan_type(self) -> Tuple[str, str, bool, bool]:
+        """Select scan type with improved UX"""
+        console.print("\n[bold]Scan Type[/bold]")
+        
+        scan_options = [
+            ("discovery", "Discovery Scan", "Quick host discovery", "30 seconds", False),
+            ("inventory", "Inventory Scan", "Service detection and OS fingerprinting", "5 minutes", True),
+            ("deep", "Deep Scan", "Comprehensive analysis with scripts", "15 minutes", True),
+            ("arp", "ARP Scan", "Layer 2 discovery for local networks", "10 seconds", True),
+        ]
+        
+        for i, (_, name, desc, time, needs_root) in enumerate(scan_options, 1):
+            sudo_text = " (requires sudo)" if needs_root else ""
+            console.print(f"{i}. [bold]{name}[/bold] – {desc}")
+            console.print(f"   [dim]Duration: ~{time}{sudo_text}[/dim]")
+            
+        while True:
+            try:
+                choice = Prompt.ask("\nSelect scan type", choices=["1", "2", "3", "4"], default="1")
+                choice_idx = int(choice) - 1
+                scan_type, scan_name, _, _, needs_root = scan_options[choice_idx]
+                
+                # Handle masscan option for discovery scans
+                use_masscan = False
+                if scan_type == "discovery":
+                    console.print("\n[bold]Speed Option[/bold]")
+                    use_masscan = Confirm.ask("Use masscan for faster discovery", default=False)
+                    if use_masscan:
+                        console.print("[green]→ Using masscan for faster scanning[/green]")
+                    else:
+                        console.print("[dim]→ Using standard nmap discovery[/dim]")
+                
+                return scan_type, scan_name, needs_root, use_masscan
+                
+            except (ValueError, IndexError):
+                console.print("[red]Please select a valid option (1-4)[/red]")
+                
+    def _handle_vulnerability_setup(self) -> bool:
+        """Handle vulnerability scanning setup"""
+        console.print("\n[bold]Vulnerability Analysis[/bold]")
+        console.print("Check discovered services against multiple CVE databases")
+        console.print("[dim]Uses OSV (Google) and CIRCL APIs - no registration required[/dim]")
+        
+        enabled = Confirm.ask("Enable vulnerability scanning", default=True)
+        
+        if enabled:
+            console.print("[green]→ Vulnerability scanning enabled (OSV + CIRCL + Local patterns)[/green]")
+        else:
+            console.print("[dim]→ Vulnerability scanning disabled[/dim]")
+            
+        return enabled
+
+    def _display_vulnerability_summary(self, vuln_report: Dict):
+        """Display vulnerability scan summary"""
+        if vuln_report['total_vulnerabilities'] == 0:
+            console.print("[green]✓ No vulnerabilities found[/green]")
+            return
+            
+        console.print(f"\n[bold red]Vulnerability Summary[/bold red]")
+        
+        # Create summary table
+        summary_table = Table(show_header=False, box=None, padding=(0, 2))
+        summary_table.add_column("Metric", style="cyan")
+        summary_table.add_column("Count", style="yellow")
+        
+        summary_table.add_row("Total vulnerabilities", str(vuln_report['total_vulnerabilities']))
+        summary_table.add_row("Vulnerable devices", f"{vuln_report['vulnerable_devices']}/{vuln_report['total_devices']}")
+        summary_table.add_row("Critical severity", str(vuln_report['critical_vulnerabilities']))
+        summary_table.add_row("High severity", str(vuln_report['high_vulnerabilities']))
+        
+        console.print(summary_table)
+        
+        # Show top vulnerabilities
+        top_vulns = vuln_report['top_vulnerabilities'][:3]  # Show top 3
+        if top_vulns:
+            console.print("\n[bold]Top Vulnerabilities:[/bold]")
+            for vuln in top_vulns:
+                severity_color = {
+                    'CRITICAL': 'red',
+                    'HIGH': 'orange1',
+                    'MEDIUM': 'yellow',
+                    'LOW': 'blue'
+                }.get(vuln.get('severity'), 'white')
+                
+                console.print(f"• [{severity_color}]{vuln.get('cve_id')}[/{severity_color}] "
+                            f"(CVSS: {vuln.get('cvss_score', 0):.1f}) - {vuln.get('device_ip')}")
+
     def export_data(self):
         """Export data menu"""
         console.print("\n[bold]Export Options:[/bold]")
-        console.print("  1. Export all devices (CSV)")
-        console.print("  2. Export critical devices only")
-        console.print("  3. Export by device type")
+        console.print("  1. Export to PDF Report")
+        console.print("  2. Export to Excel (with formatting)")
+        console.print("  3. Export to Enhanced JSON")
+        console.print("  4. Export to CSV (all devices)")
+        console.print("  5. Export critical devices only")
+        console.print("  6. Export by device type")
 
-        choice = Prompt.ask("Select export option", choices=["1", "2", "3"])
+        choice = Prompt.ask("Select export option", choices=["1", "2", "3", "4", "5", "6"])
 
         # Get most recent scan
         scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
@@ -596,22 +832,70 @@ class NetworkMapper:
 
         devices = self.annotator.apply_annotations(devices)
 
+        # Get recent changes if available
+        changes = None
+        if len(scan_files) >= 2:
+            changes = self.tracker.detect_changes(devices)
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        if choice == "1":
-            export_file = self.output_path / f"export_all_{timestamp}.csv"
-            self.save_csv(devices, export_file)
-        elif choice == "2":
-            critical = [d for d in devices if d.get("critical", False)]
-            export_file = self.output_path / f"export_critical_{timestamp}.csv"
-            self.save_csv(critical, export_file)
-        elif choice == "3":
-            device_type = Prompt.ask("Enter device type (router/switch/server/etc)")
-            filtered = [d for d in devices if d.get("type") == device_type]
-            export_file = self.output_path / f"export_{device_type}_{timestamp}.csv"
-            self.save_csv(filtered, export_file)
+        try:
+            if choice == "1":
+                # Export to PDF
+                console.print("[yellow]Generating PDF report...[/yellow]")
+                export_file = self.export_mgr.export_to_pdf(devices, changes)
+                console.print(f"[green]✓ PDF report exported to: {export_file}[/green]")
+                
+            elif choice == "2":
+                # Export to Excel
+                console.print("[yellow]Generating Excel workbook...[/yellow]")
+                export_file = self.export_mgr.export_to_excel(devices, changes)
+                console.print(f"[green]✓ Excel workbook exported to: {export_file}[/green]")
+                
+            elif choice == "3":
+                # Export to Enhanced JSON
+                console.print("[yellow]Generating enhanced JSON export...[/yellow]")
+                export_file = self.export_mgr.export_to_json(devices, changes)
+                console.print(f"[green]✓ JSON export saved to: {export_file}[/green]")
+                
+            elif choice == "4":
+                # Export to CSV (enhanced)
+                console.print("[yellow]Generating CSV export...[/yellow]")
+                export_file = self.export_mgr.export_to_csv_enhanced(devices)
+                console.print(f"[green]✓ CSV exported to: {export_file}[/green]")
+                
+            elif choice == "5":
+                # Export critical devices only
+                critical = [d for d in devices if d.get("critical", False)]
+                if critical:
+                    export_file = self.output_path / "exports" / f"critical_devices_{timestamp}.csv"
+                    self.output_path.joinpath("exports").mkdir(exist_ok=True)
+                    self.save_csv(critical, export_file)
+                    console.print(f"[green]✓ Critical devices exported to: {export_file}[/green]")
+                else:
+                    console.print("[yellow]No critical devices found.[/yellow]")
+                    
+            elif choice == "6":
+                # Export by device type
+                device_type = Prompt.ask("Enter device type (router/switch/server/etc)")
+                filtered = [d for d in devices if d.get("type") == device_type]
+                if filtered:
+                    export_file = self.output_path / "exports" / f"{device_type}_devices_{timestamp}.csv"
+                    self.output_path.joinpath("exports").mkdir(exist_ok=True)
+                    self.save_csv(filtered, export_file)
+                    console.print(f"[green]✓ {device_type} devices exported to: {export_file}[/green]")
+                else:
+                    console.print(f"[yellow]No {device_type} devices found.[/yellow]")
 
-        console.print(f"[green]✓ Exported to: {export_file}[/green]")
+            # Ask if user wants to open the export
+            if 'export_file' in locals() and Confirm.ask("\nOpen exported file?"):
+                import webbrowser
+                file_url = f"file://{export_file.absolute()}"
+                webbrowser.open(file_url)
+                
+        except Exception as e:
+            console.print(f"[red]Export failed: {e}[/red]")
+            
         input("\nPress Enter to continue...")
 
 
@@ -619,9 +903,20 @@ mapper = NetworkMapper()
 
 
 @app.command()
-def main():
+def main(
+    disable_snmp: bool = typer.Option(False, "--disable-snmp", help="Disable SNMP enrichment"),
+    snmp_community: str = typer.Option(None, "--snmp-community", help="SNMP community string"),
+    snmp_version: str = typer.Option(None, "--snmp-version", help="SNMP version (v1, v2c, v3)"),
+):
     """NetworkMapper 2.0 - Network Discovery & Mapping Tool"""
     try:
+        # Set CLI overrides
+        mapper.cli_overrides = {
+            'disable_snmp': disable_snmp,
+            'snmp_community': snmp_community,
+            'snmp_version': snmp_version
+        }
+        
         mapper.interactive_menu()
     except KeyboardInterrupt:
         console.print("\n[red]Interrupted by user[/red]")

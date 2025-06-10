@@ -742,6 +742,194 @@
             background: rgba(255, 255, 255, 0.95);
         }
 
+        /* Vulnerability display styles */
+        .vulnerabilities {
+            font-size: 0.9rem;
+        }
+
+        .vuln-count {
+            background: #f39c12;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .vuln-none {
+            color: #27ae60;
+            font-weight: 500;
+        }
+
+        .risk-level {
+            text-align: center;
+        }
+
+        .risk-critical {
+            background: #e74c3c;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .risk-high {
+            background: #f39c12;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .risk-medium {
+            background: #f1c40f;
+            color: #2c3e50;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .risk-low {
+            background: #27ae60;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        /* Security Report styles */
+        .security-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .stat-card.critical {
+            border-color: #e74c3c;
+        }
+
+        .stat-card.high {
+            border-color: #f39c12;
+        }
+
+        .stat-card.medium {
+            border-color: #f1c40f;
+        }
+
+        .stat-card.low {
+            border-color: #27ae60;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+
+        .stat-card.critical .stat-number {
+            color: #e74c3c;
+        }
+
+        .stat-card.high .stat-number {
+            color: #f39c12;
+        }
+
+        .stat-card.medium .stat-number {
+            color: #f1c40f;
+        }
+
+        .stat-card.low .stat-number {
+            color: #27ae60;
+        }
+
+        .stat-label {
+            color: #858585;
+            font-size: 0.9rem;
+        }
+
+        .cve-list {
+            font-size: 0.9rem;
+        }
+
+        .cve-item {
+            margin: 2px 0;
+        }
+
+        .cve-id {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-weight: bold;
+        }
+
+        .cve-score {
+            color: #858585;
+            font-size: 0.8rem;
+        }
+
+        .no-vulnerabilities {
+            text-align: center;
+            padding: 3rem;
+            background: #252526;
+            border: 1px solid #27ae60;
+            border-radius: 8px;
+        }
+
+        /* Services tab styles */
+        .service-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .service-card {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .service-name {
+            font-weight: bold;
+            color: #569cd6;
+            margin-bottom: 0.5rem;
+        }
+
+        .service-count {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #4ec9b0;
+        }
+
+        .service-label {
+            color: #858585;
+            font-size: 0.8rem;
+        }
+
+        .service-item {
+            margin: 2px 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+        }
+
+        .ports {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+        }
+
         @media (max-width: 768px) {
             .summary-grid {
                 grid-template-columns: 1fr;
@@ -931,15 +1119,16 @@
             </div>
 
             <div class="summary-card">
-                <h3>Subnets</h3>
-                <div class="number">{{ subnet_summary|length }}</div>
+                <h3>Vulnerable Devices</h3>
+                {% set vulnerable_count = devices|selectattr('vulnerability_count', 'greaterthan', 0)|list|length %}
+                <div class="number" style="color: {% if vulnerable_count > 0 %}#f39c12{% else %}#27ae60{% endif %}">{{ vulnerable_count }}</div>
             </div>
         </div>
 
         <div class="tabs">
             <button class="tab active" onclick="showTab('devices')">Devices</button>
-            <button class="tab" onclick="showTab('network-map')">2D Map</button>
-            <button class="tab" onclick="showTab('3d-view')">3D Map</button>
+            <button class="tab" onclick="showTab('vulnerabilities')">Security Report</button>
+            <button class="tab" onclick="showTab('services')">Services</button>
             <button class="tab" onclick="showTab('subnets')">Subnets</button>
         </div>
 
@@ -954,6 +1143,8 @@
                         <th>Vendor</th>
                         <th>OS</th>
                         <th>Services</th>
+                        <th>Vulnerabilities</th>
+                        <th>Risk Level</th>
                         <th>Notes</th>
                     </tr>
                 </thead>
@@ -973,6 +1164,31 @@
                             -
                             {% endif %}
                         </td>
+                        <td class="vulnerabilities">
+                            {% set vuln_count = device.get('vulnerability_count', 0) %}
+                            {% if vuln_count > 0 %}
+                            <span class="vuln-count">{{ vuln_count }}</span>
+                            {% if device.get('vulnerabilities') %}
+                            <br><small>{{ device.vulnerabilities[:2]|map(attribute='cve_id')|join(', ') }}
+                            {% if device.vulnerabilities|length > 2 %}...{% endif %}</small>
+                            {% endif %}
+                            {% else %}
+                            <span class="vuln-none">None</span>
+                            {% endif %}
+                        </td>
+                        <td class="risk-level">
+                            {% set critical_vulns = device.get('critical_vulns', 0) %}
+                            {% set high_vulns = device.get('high_vulns', 0) %}
+                            {% if critical_vulns > 0 %}
+                            <span class="risk-critical">CRITICAL</span>
+                            {% elif high_vulns > 0 %}
+                            <span class="risk-high">HIGH</span>
+                            {% elif vuln_count > 0 %}
+                            <span class="risk-medium">MEDIUM</span>
+                            {% else %}
+                            <span class="risk-low">LOW</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if device.critical %}<span class="critical">CRITICAL</span>{% endif %}
                             {{ device.notes or '' }}
@@ -983,81 +1199,162 @@
             </table>
         </div>
 
-        <div id="network-map-tab" class="tab-content hidden">
-            <h2>Network Topology (Select a node for info display)</h2>
-            <div class="map-controls">
-                <div class="map-control-group">
-                    <button class="control-btn" onclick="resetZoom2D()">Reset View</button>
-                    <button class="control-btn" onclick="download2DMap()">Download PNG</button>
+        <div id="vulnerabilities-tab" class="tab-content hidden">
+            <h2>Security Report</h2>
+            
+            {% set vulnerable_devices = devices|selectattr('vulnerability_count', 'greaterthan', 0)|list %}
+            {% set critical_devices = devices|selectattr('critical_vulns', 'greaterthan', 0)|list %}
+            {% set high_devices = devices|selectattr('high_vulns', 'greaterthan', 0)|list %}
+            
+            <div class="security-summary">
+                <div class="security-stats">
+                    <div class="stat-card critical">
+                        <h3>Critical Risk</h3>
+                        <div class="stat-number">{{ critical_devices|length }}</div>
+                        <div class="stat-label">Devices</div>
+                    </div>
+                    <div class="stat-card high">
+                        <h3>High Risk</h3>
+                        <div class="stat-number">{{ high_devices|length }}</div>
+                        <div class="stat-label">Devices</div>
+                    </div>
+                    <div class="stat-card medium">
+                        <h3>Total Vulnerable</h3>
+                        <div class="stat-number">{{ vulnerable_devices|length }}</div>
+                        <div class="stat-label">Devices</div>
+                    </div>
+                    <div class="stat-card low">
+                        <h3>Secure</h3>
+                        <div class="stat-number">{{ devices|length - vulnerable_devices|length }}</div>
+                        <div class="stat-label">Devices</div>
+                    </div>
                 </div>
-                <div class="map-control-group">
-                    <label>
-                        <input type="checkbox" id="show-labels" checked onchange="toggleLabels2D()"> Show Labels
-                    </label>
+                
+                {% if vulnerable_devices %}
+                <h3>Vulnerable Devices</h3>
+                <table class="device-table">
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>Hostname</th>
+                            <th>Type</th>
+                            <th>Risk Level</th>
+                            <th>Vulnerabilities</th>
+                            <th>Top CVEs</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for device in vulnerable_devices|sort(attribute='critical_vulns', reverse=true) %}
+                        <tr>
+                            <td>{{ device.ip }}</td>
+                            <td>{{ device.hostname or '-' }}</td>
+                            <td><span class="device-type type-{{ device.type }}">{{ device.type }}</span></td>
+                            <td class="risk-level">
+                                {% if device.get('critical_vulns', 0) > 0 %}
+                                <span class="risk-critical">CRITICAL</span>
+                                {% elif device.get('high_vulns', 0) > 0 %}
+                                <span class="risk-high">HIGH</span>
+                                {% else %}
+                                <span class="risk-medium">MEDIUM</span>
+                                {% endif %}
+                            </td>
+                            <td class="vulnerabilities">
+                                <span class="vuln-count">{{ device.get('vulnerability_count', 0) }}</span>
+                                {% if device.get('critical_vulns', 0) > 0 %}
+                                <br><small style="color: #e74c3c;">{{ device.get('critical_vulns') }} critical</small>
+                                {% endif %}
+                                {% if device.get('high_vulns', 0) > 0 %}
+                                <br><small style="color: #f39c12;">{{ device.get('high_vulns') }} high</small>
+                                {% endif %}
+                            </td>
+                            <td class="cve-list">
+                                {% if device.get('vulnerabilities') %}
+                                {% for vuln in device.vulnerabilities[:3] %}
+                                <div class="cve-item">
+                                    <span class="cve-id">{{ vuln.get('cve_id') }}</span>
+                                    <span class="cve-score">({{ vuln.get('cvss_score', 0)|round(1) }})</span>
+                                </div>
+                                {% endfor %}
+                                {% if device.vulnerabilities|length > 3 %}
+                                <small>+{{ device.vulnerabilities|length - 3 }} more</small>
+                                {% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="no-vulnerabilities">
+                    <h3 style="color: #27ae60;">✓ No Vulnerabilities Detected</h3>
+                    <p>All scanned devices appear to be secure based on current vulnerability databases.</p>
                 </div>
-                <div class="map-control-group">
-                    <label>Layout:</label>
-                    <select id="layout-select" onchange="changeLayout2D()">
-                        <option value="force">Force Directed</option>
-                        <option value="circular">Circular</option>
-                        <option value="grid">Grid</option>
-                    </select>
-                </div>
-            </div>
-            <div class="visualization">
-                <div class="visualization-controls">
-                    <button class="control-btn" onclick="zoomIn2D()">🔍+</button>
-                    <button class="control-btn" onclick="zoomOut2D()">🔍−</button>
-                    <button class="control-btn" onclick="toggleFullscreen2D()">⛶</button>
-                </div>
-                <svg id="network-2d"></svg>
-                <div class="node-tooltip" id="tooltip-2d" style="display: none;"></div>
-                <div class="loading-overlay" id="loading-2d" style="display: none;">
-                    <div class="loading-spinner"></div>
-                    Loading network visualization...
-                </div>
+                {% endif %}
             </div>
         </div>
 
-        <div id="3d-view-tab" class="tab-content hidden">
-            <h2>3D Network View</h2>
-            <div class="map-controls">
-                <div class="map-control-group">
-                    <button class="control-btn" onclick="reset3DView()">Reset View</button>
-                    <button class="control-btn" onclick="download3DMap()">Download Screenshot</button>
+        <div id="services-tab" class="tab-content hidden">
+            <h2>Network Services Analysis</h2>
+            
+            {% set all_services = [] %}
+            {% for device in devices %}
+                {% for service in device.get('services', []) %}
+                    {% if all_services.append(service) %}{% endif %}
+                {% endfor %}
+            {% endfor %}
+            
+            {% set service_summary = {} %}
+            {% for service in all_services %}
+                {% set service_name = service.split(':')[0] %}
+                {% if service_summary.update({service_name: service_summary.get(service_name, 0) + 1}) %}{% endif %}
+            {% endfor %}
+            
+            <div class="services-summary">
+                <h3>Service Distribution</h3>
+                <div class="service-grid">
+                    {% for service, count in service_summary.items() %}
+                    <div class="service-card">
+                        <div class="service-name">{{ service.upper() }}</div>
+                        <div class="service-count">{{ count }}</div>
+                        <div class="service-label">instances</div>
+                    </div>
+                    {% endfor %}
                 </div>
-                <div class="map-control-group">
-                    <label>
-                        <input type="checkbox" id="auto-rotate" onchange="toggle3DRotation()"> Auto Rotate
-                    </label>
-                </div>
-                <div class="map-control-group">
-                    <label>
-                        <input type="checkbox" id="show-connections" checked onchange="toggle3DConnections()"> Show
-                        Connections
-                    </label>
-                </div>
-                <div class="map-control-group">
-                    <label>
-                        <input type="checkbox" id="show-3d-labels" checked onchange="toggle3DLabels()"> Show Labels
-                    </label>
-                </div>
-            </div>
-            <div class="visualization">
-                <div class="visualization-controls">
-                    <button class="control-btn" onclick="zoom3DIn()">🔍+</button>
-                    <button class="control-btn" onclick="zoom3DOut()">🔍−</button>
-                    <button class="control-btn" onclick="toggle3DFullscreen()">⛶</button>
-                </div>
-                <div class="device-info-panel" id="device-info-3d">
-                    <h4>Device Information</h4>
-                    <div class="info-content">Click a device to view details</div>
-                </div>
-                <div id="network-3d"></div>
-                <div class="loading-overlay" id="loading-3d" style="display: none;">
-                    <div class="loading-spinner"></div>
-                    Loading 3D visualization...
-                </div>
+                
+                <h3>Detailed Service List</h3>
+                <table class="device-table">
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>Hostname</th>
+                            <th>Type</th>
+                            <th>Open Ports</th>
+                            <th>Services</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for device in devices|selectattr('services') %}
+                        <tr>
+                            <td>{{ device.ip }}</td>
+                            <td>{{ device.hostname or '-' }}</td>
+                            <td><span class="device-type type-{{ device.type }}">{{ device.type }}</span></td>
+                            <td class="ports">
+                                {% if device.open_ports %}
+                                {{ device.open_ports[:5]|join(', ') }}
+                                {% if device.open_ports|length > 5 %}...{% endif %}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td class="services">
+                                {% for service in device.services %}
+                                <div class="service-item">{{ service }}</div>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -1120,22 +1417,10 @@
 
             document.getElementById(tabName + '-tab').classList.remove('hidden');
             event.target.classList.add('active');
-
-            if (tabName === 'network-map' && !window.d3Initialized) {
-                setTimeout(() => {
-                    initializeD3Network();
-                    window.d3Initialized = true;
-                }, 100);
-            } else if (tabName === '3d-view' && !window.threeInitialized) {
-                setTimeout(() => {
-                    initialize3DNetwork();
-                    window.threeInitialized = true;
-                }, 100);
-            }
         }
 
         function downloadCSV() {
-            let csv = 'IP,Hostname,MAC,Vendor,Type,OS,Services,Open Ports,Critical,Notes\n';
+            let csv = 'IP,Hostname,MAC,Vendor,Type,OS,Services,Open Ports,Vulnerability Count,Critical Vulns,High Vulns,Critical,Notes\n';
 
             devicesData.forEach(device => {
                 const row = [
@@ -1147,6 +1432,9 @@
                     device.os || '',
                     (device.services || []).join(';'),
                     (device.open_ports || []).join(';'),
+                    device.vulnerability_count || 0,
+                    device.critical_vulns || 0,
+                    device.high_vulns || 0,
                     device.critical ? 'Yes' : 'No',
                     device.notes || ''
                 ];

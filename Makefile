@@ -24,21 +24,37 @@ all: lint test
 # Help target
 help:
 	@echo "NetworkMapper v2 - Available targets:"
+	@echo ""
+	@echo "Run Commands:"
+	@echo "  make run          - Run NetworkMapper interactive CLI"
+	@echo "  make scan         - Run a quick test scan (localhost)"
+	@echo "  make demo         - Generate demo data and open report"
+	@echo ""
+	@echo "Installation:"
 	@echo "  make install      - Install production dependencies"
 	@echo "  make dev-install  - Install development dependencies"
+	@echo ""
+	@echo "Testing:"
 	@echo "  make test         - Run all tests (unit + integration)"
 	@echo "  make unit         - Run unit tests only"
 	@echo "  make integration  - Run integration tests only"
-	@echo "  make lint         - Run code linting"
-	@echo "  make coverage     - Run tests with coverage report"
-	@echo "  make clean        - Clean temporary files and caches"
-	@echo "  make test-scanner - Test scanner module only"
-	@echo "  make test-parser  - Test parser module only"
-	@echo "  make test-classifier - Test classifier module only"
-	@echo "  make test-tracker - Test tracker module only"
-	@echo "  make test-annotator - Test annotator module only"
 	@echo "  make quick        - Run quick smoke tests"
-	@echo "  make verbose      - Run tests with verbose output"
+	@echo "  make coverage     - Run tests with coverage report"
+	@echo ""
+	@echo "Module Tests:"
+	@echo "  make test-scanner      - Test scanner module"
+	@echo "  make test-parser       - Test parser module"
+	@echo "  make test-classifier   - Test classifier module"
+	@echo "  make test-tracker      - Test tracker module"
+	@echo "  make test-annotator    - Test annotator module"
+	@echo "  make test-vulnerability - Test vulnerability scanner"
+	@echo "  make test-snmp         - Test SNMP modules"
+	@echo "  make test-export       - Test export manager"
+	@echo ""
+	@echo "Code Quality:"
+	@echo "  make lint         - Run code linting"
+	@echo "  make format       - Auto-format code"
+	@echo "  make clean        - Clean temporary files and caches"
 
 # Install dependencies
 install:
@@ -83,6 +99,33 @@ test-annotator:
 	@echo "Testing annotator module..."
 	$(PYTHON) -m pytest $(UNIT_TEST_DIR)/test_annotator.py -v
 
+# Test new modules
+test-vulnerability:
+	@echo "Testing vulnerability scanner..."
+	$(PYTHON) -m pytest $(TEST_DIR) -k "vulnerability" -v
+
+test-snmp:
+	@echo "Testing SNMP modules..."
+	$(PYTHON) -m pytest $(TEST_DIR) -k "snmp" -v
+
+test-export:
+	@echo "Testing export manager..."
+	$(PYTHON) -m pytest test_exports.py -v
+
+# Run commands
+run:
+	@echo "Starting NetworkMapper CLI..."
+	$(PYTHON) mapper.py
+
+scan:
+	@echo "Running quick localhost scan..."
+	@echo "127.0.0.1" | $(PYTHON) mapper.py --disable-snmp
+
+demo:
+	@echo "Generating demo network data..."
+	$(PYTHON) generate_test_data.py
+	@echo "Demo data generated. Run 'make run' to generate reports."
+
 # Quick smoke tests (fastest tests only)
 quick:
 	@echo "Running quick smoke tests..."
@@ -103,11 +146,11 @@ coverage:
 lint:
 	@echo "Running linting checks..."
 	@echo "1. Running flake8..."
-	-$(PYTHON) -m flake8 core utils mapper.py --max-line-length=100 --ignore=E203,W503
+	-$(PYTHON) -m flake8 core utils mapper.py generate_*.py --max-line-length=100 --ignore=E203,W503
 	@echo "2. Running mypy type checking..."
 	-$(PYTHON) -m mypy core utils mapper.py --ignore-missing-imports
 	@echo "3. Checking black formatting..."
-	-$(PYTHON) -m black --check core utils mapper.py tests
+	-$(PYTHON) -m black --check core utils mapper.py tests generate_*.py
 	@echo "4. Checking import sorting..."
 	-$(PYTHON) -m isort --check-only core utils mapper.py tests
 

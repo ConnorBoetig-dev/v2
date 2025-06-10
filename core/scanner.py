@@ -22,6 +22,14 @@ from rich.table import Table
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Import SNMP manager if available
+try:
+    from utils.snmp_manager import SNMPManager
+    SNMP_AVAILABLE = True
+except ImportError:
+    SNMP_AVAILABLE = False
+    logger.warning("SNMP support not available - install pysnmp to enable")
+
 
 class NetworkScanner:
     def __init__(self):
@@ -76,12 +84,19 @@ class NetworkScanner:
         scan_type: str = "discovery",
         use_masscan: bool = False,
         needs_root: bool = False,
+        snmp_config: Dict = None,
     ) -> List[Dict]:
         """Execute network scan with progress feedback"""
         if use_masscan and scan_type == "discovery":
-            return self._run_masscan(target)
+            devices = self._run_masscan(target)
         else:
-            return self._run_nmap(target, scan_type, needs_root)
+            devices = self._run_nmap(target, scan_type, needs_root)
+            
+        # Enrich with SNMP data if requested and available
+        if snmp_config and SNMP_AVAILABLE and devices:
+            devices = self._enrich_with_snmp(devices, snmp_config)
+            
+        return devices
 
     def _check_hang(self, current_time: float, progress_task, progress) -> bool:
         """Check if scan appears to be hung"""
@@ -996,3 +1011,94 @@ class NetworkScanner:
         ])
         
         return cmd
+    
+    def _enrich_with_snmp(self, devices: List[Dict], snmp_config: Dict) -> List[Dict]:
+        """Enrich devices with SNMP data
+        
+        Args:
+            devices: List of discovered devices
+            snmp_config: SNMP configuration dictionary
+            
+        Returns:
+            List of enriched devices
+        """
+        if not SNMP_AVAILABLE:
+            logger.warning("SNMP enrichment requested but pysnmp not available")
+            return devices
+            
+        # Filter devices that might respond to SNMP
+        snmp_candidates = [
+            device for device in devices 
+            if device.get('type') in ['router', 'switch', 'server', 'printer', 'nas', 'firewall']
+            or any(port in device.get('open_ports', []) for port in [161, 80, 443, 22])
+        ]
+        
+        if not snmp_candidates:
+            logger.info("No SNMP candidates found in scan results")
+            return devices
+            
+        version = snmp_config.get('version', 'v2c')
+        self.console.print(f"\n[cyan]Enriching {len(snmp_candidates)} devices with SNMP {version}...[/cyan]")
+        
+        # Create SNMP manager
+        snmp_manager = SNMPManager(config=snmp_config)
+        
+        # Progress tracking for SNMP enrichment
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold cyan]SNMP enrichment[/bold cyan]"),
+            BarColumn(complete_style="cyan", finished_style="cyan"),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("• {task.fields[status]}"),
+            console=self.console,
+            transient=False
+        ) as progress:
+            
+            task = progress.add_task(
+                "Enriching devices",
+                total=len(snmp_candidates),
+                status="Starting SNMP queries..."
+            )
+            
+            enriched_count = 0
+            failed_count = 0
+            
+            # Process devices with limited concurrency
+            try:
+                enriched_devices = snmp_manager.enrich_devices(snmp_candidates, max_workers=5)
+                
+                # Update progress and count successes
+                for i, (original, enriched) in enumerate(zip(snmp_candidates, enriched_devices)):
+                    if 'snmp_data' in enriched:
+                        enriched_count += 1
+                    else:
+                        failed_count += 1
+                        
+                    progress.update(
+                        task,
+                        completed=i + 1,
+                        status=f"Enriched: {enriched_count}, Failed: {failed_count}"
+                    )
+                
+                # Replace original devices with enriched versions
+                device_map = {device['ip']: device for device in enriched_devices}
+                for i, device in enumerate(devices):
+                    if device['ip'] in device_map:
+                        devices[i] = device_map[device['ip']]
+                        
+                progress.update(
+                    task,
+                    completed=len(snmp_candidates),
+                    status=f"Complete: {enriched_count} enriched, {failed_count} failed"
+                )
+                
+            except Exception as e:
+                logger.error(f"SNMP enrichment error: {e}")
+                progress.update(task, status=f"Error: {e}")
+                
+        if enriched_count > 0:
+            self.console.print(f"[green]✓ Successfully enriched {enriched_count} devices with SNMP data[/green]")
+        if failed_count > 0:
+            self.console.print(f"[yellow]⚠ Failed to enrich {failed_count} devices (SNMP not responding)[/yellow]")
+            
+        return devices
