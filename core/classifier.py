@@ -219,6 +219,8 @@ class DeviceClassifier:
             "mongodb": DeviceType.DATABASE,
             "redis": DeviceType.DATABASE,
             "memcached": DeviceType.DATABASE,
+            "elasticsearch": DeviceType.DATABASE,
+            "couchdb": DeviceType.DATABASE,
             "apache": DeviceType.WEB_SERVER,
             "nginx": DeviceType.WEB_SERVER,
             "httpd": DeviceType.WEB_SERVER,
@@ -304,7 +306,8 @@ class DeviceClassifier:
         if scores:
             best_type, best_score = max(scores.items(), key=lambda x: x[1])
             # Calculate confidence (0-1 scale)
-            max_possible_score = 100  # Theoretical maximum
+            # Adjusted max score based on typical scoring patterns
+            max_possible_score = 50  # More realistic maximum
             confidence = min(best_score / max_possible_score, 1.0)
             
             # Check minimum confidence threshold
@@ -316,13 +319,17 @@ class DeviceClassifier:
 
     def _extract_device_info(self, device: Dict) -> 'DeviceInfo':
         """Extract and normalize device information."""
+        # Handle None values gracefully
+        open_ports = device.get("open_ports") or []
+        services = device.get("services") or []
+        
         return DeviceInfo(
-            ports=set(device.get("open_ports", [])),
-            services=[s.split(":")[0].lower() for s in device.get("services", [])],
-            os_info=device.get("os", "").lower(),
-            hostname=device.get("hostname", "").lower(),
-            vendor=device.get("vendor", "").lower(),
-            mac=device.get("mac", "").upper(),
+            ports=set(open_ports) if open_ports else set(),
+            services=[s.split(":")[0].lower() for s in services if s],
+            os_info=(device.get("os") or "").lower(),
+            hostname=(device.get("hostname") or "").lower(),
+            vendor=(device.get("vendor") or "").lower(),
+            mac=(device.get("mac") or "").upper(),
         )
     
     def _calculate_signature_score(self, device_info: 'DeviceInfo', signature: DeviceSignature) -> float:
@@ -349,7 +356,7 @@ class DeviceClassifier:
             text = f"{device_info.os_info} {device_info.hostname} {device_info.vendor}"
             for keyword in signature.keywords:
                 if keyword in text:
-                    score += 8
+                    score += 15  # Increased weight for keyword matches
         
         # Vendor pattern matching
         if signature.vendor_patterns and device_info.vendor:

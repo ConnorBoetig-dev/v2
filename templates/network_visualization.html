@@ -1,0 +1,2318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Visualization - {{ scan_date }}</title>
+    <style>
+        /* Modern Dark Theme Design System */
+        :root {
+            /* Color Palette */
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #1a1f2e;
+            --bg-tertiary: #242938;
+            --bg-card: #2a3042;
+            --bg-hover: #323848;
+            
+            /* Text Colors */
+            --text-primary: #e4e6eb;
+            --text-secondary: #b8bcc8;
+            --text-muted: #8b92a8;
+            
+            /* Accent Colors */
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            
+            /* Device Type Colors */
+            --device-router: #f59e0b;
+            --device-switch: #3b82f6;
+            --device-server: #10b981;
+            --device-database: #8b5cf6;
+            --device-workstation: #06b6d4;
+            --device-printer: #ec4899;
+            --device-iot: #84cc16;
+            --device-firewall: #ef4444;
+            --device-unknown: #6b7280;
+            
+            /* Shadows and Effects */
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            
+            /* Transitions */
+            --transition-fast: 150ms ease;
+            --transition-base: 250ms ease;
+            --transition-slow: 350ms ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow: hidden;
+        }
+
+        /* Layout Structure */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            transition: transform var(--transition-base);
+            z-index: 100;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-280px);
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .sidebar-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* View Selector */
+        .view-selector {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .view-tabs {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .view-tab {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all var(--transition-fast);
+        }
+
+        .view-tab:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .view-tab.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        /* Device Filters */
+        .device-filters {
+            padding: 1rem;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .filter-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        .filter-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: background var(--transition-fast);
+        }
+
+        .filter-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .filter-checkbox {
+            width: 1.25rem;
+            height: 1.25rem;
+            margin-right: 0.75rem;
+            accent-color: var(--accent-blue);
+        }
+
+        .filter-icon {
+            width: 1rem;
+            height: 1rem;
+            margin-right: 0.5rem;
+            border-radius: 0.25rem;
+        }
+
+        .filter-label {
+            flex: 1;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+        }
+
+        .filter-count {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: var(--bg-tertiary);
+            padding: 0.125rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+
+        /* Network Statistics */
+        .network-stats {
+            padding: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .stat-card {
+            background: var(--bg-tertiary);
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--accent-blue);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Top Bar */
+        .topbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .menu-toggle {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            transition: background var(--transition-fast);
+        }
+
+        .menu-toggle:hover {
+            background: var(--bg-hover);
+        }
+
+        .search-container {
+            flex: 1;
+            max-width: 500px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 2.5rem;
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: border-color var(--transition-fast);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        /* Control Buttons */
+        .control-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-left: auto;
+        }
+
+        .control-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.375rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .control-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .control-btn.active {
+            background: var(--accent-blue);
+            color: white;
+            border-color: var(--accent-blue);
+        }
+
+        /* Visualization Container */
+        .visualization-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: var(--bg-primary);
+        }
+
+        #network-2d,
+        #network-3d {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Device Information Panel */
+        .device-panel {
+            position: absolute;
+            right: -400px;
+            top: 0;
+            width: 400px;
+            height: 100%;
+            background: var(--bg-secondary);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            transition: right var(--transition-base);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .device-panel.open {
+            right: 0;
+        }
+
+        .device-panel-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .device-panel-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .close-panel {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            transition: all var(--transition-fast);
+        }
+
+        .close-panel:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .device-panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .info-section {
+            margin-bottom: 2rem;
+        }
+
+        .info-section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            letter-spacing: 0.05em;
+        }
+
+        .info-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 0.5rem;
+        }
+
+        .info-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .info-value {
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            font-weight: 500;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+
+        /* Service List */
+        .service-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .service-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 0.5rem;
+            transition: background var(--transition-fast);
+        }
+
+        .service-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .service-port {
+            font-weight: 600;
+            color: var(--accent-blue);
+            margin-right: 0.75rem;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+
+        .service-name {
+            color: var(--text-primary);
+            flex: 1;
+        }
+
+        .service-status {
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 50%;
+            background: var(--accent-green);
+        }
+
+        /* Change Indicator */
+        .change-indicator {
+            position: absolute;
+            top: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            padding: 1rem 1.5rem;
+            display: none;
+            z-index: 100;
+            box-shadow: var(--shadow-xl);
+        }
+
+        .change-indicator.visible {
+            display: block;
+        }
+
+        .change-summary {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .change-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .change-icon {
+            width: 1.25rem;
+            height: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.25rem;
+        }
+
+        .change-icon.new {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+        }
+
+        .change-icon.removed {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+        }
+
+        .change-icon.modified {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-yellow);
+        }
+
+        .change-count {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .change-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Tooltip */
+        .network-tooltip {
+            position: absolute;
+            background: var(--bg-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+            box-shadow: var(--shadow-xl);
+            max-width: 300px;
+        }
+
+        .network-tooltip.visible {
+            opacity: 1;
+        }
+
+        .tooltip-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .tooltip-icon {
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 0.25rem;
+        }
+
+        .tooltip-title {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .tooltip-content {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            z-index: 50;
+        }
+
+        .legend-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        .legend-items {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .legend-color {
+            width: 1rem;
+            height: 1rem;
+            border-radius: 0.25rem;
+        }
+
+        .legend-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Loading State */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(10, 14, 26, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .loading-content {
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 3rem;
+            height: 3rem;
+            border: 3px solid rgba(59, 130, 246, 0.2);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .sidebar {
+                position: absolute;
+                height: 100%;
+                box-shadow: var(--shadow-xl);
+            }
+
+            .device-panel {
+                width: 100%;
+                right: -100%;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .search-container {
+                display: none;
+            }
+
+            .control-group {
+                margin-left: 0;
+            }
+
+            .control-btn span {
+                display: none;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn var(--transition-base) ease-out;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-hover);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* Focus Styles */
+        *:focus {
+            outline: 2px solid var(--accent-blue);
+            outline-offset: 2px;
+        }
+
+        button:focus,
+        input:focus {
+            outline-offset: 0;
+        }
+
+        /* Icon Styles */
+        .icon {
+            width: 1.25rem;
+            height: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .icon-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        .icon-lg {
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h1 class="sidebar-title">Network Map</h1>
+                <p class="sidebar-subtitle">{{ scan_date }}</p>
+            </div>
+
+            <!-- View Selector -->
+            <div class="view-selector">
+                <div class="view-tabs">
+                    <button class="view-tab active" onclick="switchView('2d')">2D View</button>
+                    <button class="view-tab" onclick="switchView('3d')">3D View</button>
+                </div>
+            </div>
+
+            <!-- Device Filters -->
+            <div class="device-filters">
+                <div class="filter-section">
+                    <h3 class="filter-title">Device Types</h3>
+                    <div id="device-type-filters"></div>
+                </div>
+
+                <div class="filter-section">
+                    <h3 class="filter-title">Special Filters</h3>
+                    <label class="filter-item">
+                        <input type="checkbox" class="filter-checkbox" id="filter-critical" checked>
+                        <span class="filter-label">Critical Devices</span>
+                    </label>
+                    <label class="filter-item">
+                        <input type="checkbox" class="filter-checkbox" id="filter-changes" checked>
+                        <span class="filter-label">Changed Devices</span>
+                    </label>
+                    <label class="filter-item">
+                        <input type="checkbox" class="filter-checkbox" id="filter-new" checked>
+                        <span class="filter-label">New Devices</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Network Statistics -->
+            <div class="network-stats">
+                <h3 class="filter-title">Network Overview</h3>
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ total_devices }}</div>
+                        <div class="stat-label">Total Devices</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">{{ critical_devices|length }}</div>
+                        <div class="stat-label">Critical</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">{{ subnet_summary|length }}</div>
+                        <div class="stat-label">Subnets</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="active-connections">0</div>
+                        <div class="stat-label">Connections</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="topbar">
+                <button class="menu-toggle" onclick="toggleSidebar()">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+
+                <div class="search-container">
+                    <svg class="icon search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" class="search-input" placeholder="Search devices by IP, hostname, or MAC..." id="device-search">
+                </div>
+
+                <div class="control-group">
+                    <button class="control-btn" onclick="resetView()">
+                        <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        <span>Reset View</span>
+                    </button>
+                    <button class="control-btn" onclick="toggleAutoLayout()">
+                        <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>
+                        </svg>
+                        <span>Auto Layout</span>
+                    </button>
+                    <button class="control-btn" onclick="exportView()">
+                        <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        <span>Export</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Visualization Container -->
+            <div class="visualization-container">
+                <!-- Change Indicator -->
+                <div class="change-indicator" id="change-indicator">
+                    <div class="change-summary">
+                        <div class="change-item">
+                            <div class="change-icon new">+</div>
+                            <span class="change-count" id="new-count">0</span>
+                            <span class="change-label">New</span>
+                        </div>
+                        <div class="change-item">
+                            <div class="change-icon removed">-</div>
+                            <span class="change-count" id="removed-count">0</span>
+                            <span class="change-label">Removed</span>
+                        </div>
+                        <div class="change-item">
+                            <div class="change-icon modified">~</div>
+                            <span class="change-count" id="modified-count">0</span>
+                            <span class="change-label">Modified</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2D Network View -->
+                <svg id="network-2d"></svg>
+
+                <!-- 3D Network View -->
+                <div id="network-3d" style="display: none;"></div>
+
+                <!-- Legend -->
+                <div class="legend">
+                    <h4 class="legend-title">Device Types</h4>
+                    <div class="legend-items" id="legend-items"></div>
+                </div>
+
+                <!-- Tooltip -->
+                <div class="network-tooltip" id="network-tooltip"></div>
+
+                <!-- Loading Overlay -->
+                <div class="loading-overlay" id="loading-overlay" style="display: none;">
+                    <div class="loading-content">
+                        <div class="loading-spinner"></div>
+                        <p class="loading-text">Loading network visualization...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Device Information Panel -->
+            <aside class="device-panel" id="device-panel">
+                <div class="device-panel-header">
+                    <h2 class="device-panel-title" id="device-panel-title">Device Details</h2>
+                    <button class="close-panel" onclick="closeDevicePanel()">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="device-panel-content" id="device-panel-content">
+                    <!-- Device information will be populated here -->
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Global Variables
+        const networkData = {
+            devices: {{ devices | tojson }},
+            d3Data: {{ d3_data | safe }},
+            threeData: {{ three_data | safe }},
+            changes: {{ changes | tojson if changes else '{}' | safe }},
+            scanTimestamp: '{{ scan_timestamp }}'
+        };
+
+        let currentView = '2d';
+        let visualization2D = null;
+        let visualization3D = null;
+        let selectedDevice = null;
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeFilters();
+            initializeSearch();
+            initializeVisualization();
+            loadChangeIndicator();
+            createLegend();
+        });
+
+        // Initialize device type filters
+        function initializeFilters() {
+            const filterContainer = document.getElementById('device-type-filters');
+            const deviceTypes = {};
+
+            // Count devices by type
+            networkData.devices.forEach(device => {
+                const type = device.type || 'unknown';
+                deviceTypes[type] = (deviceTypes[type] || 0) + 1;
+            });
+
+            // Create filter items
+            Object.entries(deviceTypes).forEach(([type, count]) => {
+                const filterItem = document.createElement('label');
+                filterItem.className = 'filter-item';
+                filterItem.innerHTML = `
+                    <input type="checkbox" class="filter-checkbox" data-device-type="${type}" checked>
+                    <span class="filter-icon" style="background: var(--device-${type})"></span>
+                    <span class="filter-label">${formatDeviceType(type)}</span>
+                    <span class="filter-count">${count}</span>
+                `;
+                filterContainer.appendChild(filterItem);
+            });
+
+            // Add filter event listeners
+            document.querySelectorAll('.filter-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', updateFilters);
+            });
+        }
+
+        // Initialize search functionality
+        function initializeSearch() {
+            const searchInput = document.getElementById('device-search');
+            let searchTimeout;
+
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    performSearch(e.target.value);
+                }, 300);
+            });
+        }
+
+        // Initialize visualization
+        function initializeVisualization() {
+            if (currentView === '2d') {
+                initialize2DVisualization();
+            } else {
+                initialize3DVisualization();
+            }
+        }
+
+        // Initialize 2D visualization
+        function initialize2DVisualization() {
+            if (visualization2D) return;
+
+            const container = document.getElementById('network-2d');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            // Show loading indicator
+            showLoading(true);
+
+            // Create D3.js visualization
+            visualization2D = new NetworkVisualization2D(container, networkData, {
+                width,
+                height,
+                onNodeClick: showDeviceDetails,
+                onNodeHover: showTooltip
+            });
+
+            visualization2D.render();
+            
+            // Hide loading after a delay
+            setTimeout(() => {
+                showLoading(false);
+            }, 2000);
+        }
+
+        // Initialize 3D visualization
+        function initialize3DVisualization() {
+            if (visualization3D) return;
+
+            const container = document.getElementById('network-3d');
+            
+            // Create Three.js visualization
+            visualization3D = new NetworkVisualization3D(container, networkData, {
+                onNodeClick: showDeviceDetails,
+                onNodeHover: showTooltip
+            });
+
+            visualization3D.render();
+        }
+
+        // 2D Network Visualization Class
+        class NetworkVisualization2D {
+            constructor(container, data, options) {
+                this.container = container;
+                this.data = data;
+                this.options = options;
+                this.nodes = [];
+                this.links = [];
+                this.simulation = null;
+                this.svg = null;
+                this.g = null;
+                this.zoom = null;
+                this.activeFilters = this.getActiveFilters();
+            }
+
+            render() {
+                this.setupSVG();
+                this.processData();
+                this.createForceSimulation();
+                this.createLinks();
+                this.createNodes();
+                this.updateConnectionCount();
+                // applyZoom is now called after simulation stabilizes
+            }
+
+            setupSVG() {
+                // Clear existing content
+                d3.select(this.container).selectAll("*").remove();
+
+                // Create SVG
+                this.svg = d3.select(this.container)
+                    .attr("width", this.options.width)
+                    .attr("height", this.options.height);
+
+                // Create container group
+                this.g = this.svg.append("g");
+
+                // Add zoom behavior
+                this.zoom = d3.zoom()
+                    .scaleExtent([0.1, 10])
+                    .on("zoom", (event) => {
+                        this.g.attr("transform", event.transform);
+                    });
+
+                this.svg.call(this.zoom);
+            }
+
+            processData() {
+                // Filter nodes based on active filters
+                const filteredNodes = this.data.d3Data.nodes.filter(node => {
+                    const device = this.data.devices.find(d => d.ip === node.id);
+                    if (!device) return true;
+
+                    // Check device type filter
+                    if (!this.activeFilters.deviceTypes[device.type]) return false;
+
+                    // Check special filters
+                    if (!this.activeFilters.critical && device.critical) return false;
+                    if (!this.activeFilters.changes && this.isChangedDevice(device)) return false;
+                    if (!this.activeFilters.new && this.isNewDevice(device)) return false;
+
+                    return true;
+                });
+
+                // Create node map for quick lookup
+                const nodeMap = new Map(filteredNodes.map(n => [n.id, n]));
+
+                // Filter links to only include those between visible nodes
+                const filteredLinks = this.data.d3Data.links.filter(link => {
+                    return nodeMap.has(link.source) && nodeMap.has(link.target);
+                });
+
+                this.nodes = filteredNodes.map(d => ({...d}));
+                this.links = filteredLinks.map(d => ({...d}));
+            }
+
+            createForceSimulation() {
+                // Create hierarchical force simulation
+                this.simulation = d3.forceSimulation(this.nodes)
+                    .force("link", d3.forceLink(this.links)
+                        .id(d => d.id)
+                        .distance(d => {
+                            // Vary link distance based on connection type
+                            const distances = {
+                                backbone: 200,
+                                uplink: 150,
+                                server_link: 120,
+                                access: 100,
+                                peripheral: 80,
+                                application: 100
+                            };
+                            return distances[d.type] || 100;
+                        })
+                        .strength(d => {
+                            // Stronger connections for infrastructure
+                            const strengths = {
+                                backbone: 1.0,
+                                uplink: 0.8,
+                                server_link: 0.6,
+                                access: 0.4,
+                                peripheral: 0.3,
+                                application: 0.5
+                            };
+                            return strengths[d.type] || 0.5;
+                        }))
+                    .force("charge", d3.forceManyBody()
+                        .strength(d => {
+                            // Stronger repulsion for infrastructure devices
+                            if (d.type === 'router') return -800;
+                            if (d.type === 'switch') return -600;
+                            if (d.type.includes('server')) return -400;
+                            return -300;
+                        }))
+                    .force("center", d3.forceCenter(this.options.width / 2, this.options.height / 2))
+                    .force("collision", d3.forceCollide()
+                        .radius(d => {
+                            // Larger collision radius for important devices
+                            if (d.critical) return 40;
+                            if (d.type === 'router' || d.type === 'switch') return 35;
+                            return 30;
+                        }))
+                    .force("x", d3.forceX(this.options.width / 2).strength(0.05))
+                    .force("y", d3.forceY(this.options.height / 2).strength(0.05));
+
+                // Run simulation
+                this.simulation.on("tick", () => this.ticked());
+                
+                // Auto-fit after simulation stabilizes
+                this.simulation.on("end", () => {
+                    this.applyZoom();
+                });
+                
+                // Also apply zoom after a delay for initial view
+                setTimeout(() => {
+                    this.applyZoom();
+                }, 1500);
+            }
+
+            createLinks() {
+                // Create link groups
+                this.linkGroup = this.g.append("g")
+                    .attr("class", "links");
+
+                // Create links
+                this.linkElements = this.linkGroup.selectAll("line")
+                    .data(this.links)
+                    .enter().append("line")
+                    .attr("stroke", d => this.getLinkColor(d.type))
+                    .attr("stroke-width", d => this.getLinkWidth(d.type))
+                    .attr("stroke-opacity", 0.6)
+                    .attr("stroke-dasharray", d => {
+                        if (d.type === 'peripheral') return "5,5";
+                        if (d.type === 'application') return "3,3";
+                        return null;
+                    });
+            }
+
+            createNodes() {
+                // Create node groups
+                this.nodeGroup = this.g.append("g")
+                    .attr("class", "nodes");
+
+                // Create node containers
+                const nodeContainers = this.nodeGroup.selectAll("g")
+                    .data(this.nodes)
+                    .enter().append("g")
+                    .attr("class", "node")
+                    .call(this.createDragBehavior());
+
+                // Add circles
+                nodeContainers.append("circle")
+                    .attr("r", d => this.getNodeRadius(d))
+                    .attr("fill", d => this.getNodeColor(d))
+                    .attr("stroke", d => {
+                        if (d.critical) return "var(--accent-red)";
+                        if (this.isNewDevice(d)) return "var(--accent-green)";
+                        if (this.isChangedDevice(d)) return "var(--accent-yellow)";
+                        return "rgba(255, 255, 255, 0.2)";
+                    })
+                    .attr("stroke-width", d => {
+                        if (d.critical || this.isNewDevice(d) || this.isChangedDevice(d)) return 3;
+                        return 2;
+                    })
+                    .style("cursor", "pointer");
+
+                // Add icons
+                nodeContainers.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dominant-baseline", "central")
+                    .attr("fill", "white")
+                    .attr("font-size", "14px")
+                    .attr("font-weight", "600")
+                    .text(d => this.getNodeIcon(d));
+
+                // Add labels
+                nodeContainers.append("text")
+                    .attr("x", 0)
+                    .attr("y", d => this.getNodeRadius(d) + 20)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "var(--text-secondary)")
+                    .attr("font-size", "12px")
+                    .text(d => d.name);
+
+                // Add event listeners
+                nodeContainers
+                    .on("click", (event, d) => this.options.onNodeClick(d))
+                    .on("mouseenter", (event, d) => this.options.onNodeHover(event, d, true))
+                    .on("mouseleave", (event, d) => this.options.onNodeHover(event, d, false));
+
+                this.nodeElements = nodeContainers;
+            }
+
+            createDragBehavior() {
+                return d3.drag()
+                    .on("start", (event, d) => {
+                        if (!event.active) this.simulation.alphaTarget(0.3).restart();
+                        d.fx = d.x;
+                        d.fy = d.y;
+                    })
+                    .on("drag", (event, d) => {
+                        d.fx = event.x;
+                        d.fy = event.y;
+                    })
+                    .on("end", (event, d) => {
+                        if (!event.active) this.simulation.alphaTarget(0);
+                        // Keep position fixed after drag
+                        // Uncomment next two lines to release position after drag
+                        // d.fx = null;
+                        // d.fy = null;
+                    });
+            }
+
+            ticked() {
+                // Update link positions
+                this.linkElements
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                // Update node positions
+                this.nodeElements
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            }
+
+            getNodeRadius(node) {
+                if (node.critical) return 20;
+                if (node.type === 'router' || node.type === 'switch') return 18;
+                if (node.type.includes('server')) return 16;
+                return 14;
+            }
+
+            getNodeColor(node) {
+                return `var(--device-${node.type || 'unknown'})`;
+            }
+
+            getNodeIcon(node) {
+                const icons = {
+                    router: '⚡',
+                    switch: '🔀',
+                    server: '🖥',
+                    database: '💾',
+                    workstation: '💻',
+                    printer: '🖨',
+                    iot: '📡',
+                    firewall: '🛡',
+                    unknown: '❓'
+                };
+                return icons[node.type] || icons.unknown;
+            }
+
+            getLinkColor(type) {
+                const colors = {
+                    backbone: 'var(--accent-red)',
+                    uplink: 'var(--accent-blue)',
+                    server_link: 'var(--accent-green)',
+                    access: 'var(--accent-purple)',
+                    peripheral: 'var(--accent-yellow)',
+                    application: 'var(--accent-cyan)',
+                    critical: 'var(--accent-red)'
+                };
+                return colors[type] || 'var(--text-muted)';
+            }
+
+            getLinkWidth(type) {
+                const widths = {
+                    backbone: 3,
+                    uplink: 2.5,
+                    server_link: 2,
+                    access: 1.5,
+                    peripheral: 1,
+                    application: 2,
+                    critical: 3
+                };
+                return widths[type] || 1.5;
+            }
+
+            applyZoom() {
+                // Auto-fit network to viewport with better initial positioning
+                const bounds = this.g.node().getBBox();
+                
+                // If bounds are invalid or too small, use default view
+                if (!bounds || bounds.width < 10 || bounds.height < 10) {
+                    // Center view with default zoom
+                    this.svg.call(
+                        this.zoom.transform,
+                        d3.zoomIdentity.translate(this.options.width / 2, this.options.height / 2).scale(0.8)
+                    );
+                    return;
+                }
+                
+                const fullWidth = this.options.width;
+                const fullHeight = this.options.height;
+                const width = bounds.width;
+                const height = bounds.height;
+                const midX = bounds.x + width / 2;
+                const midY = bounds.y + height / 2;
+
+                // Add padding (10% margin on all sides)
+                const padding = 0.8;
+                const scale = padding / Math.max(width / fullWidth, height / fullHeight);
+                
+                // Limit max zoom to prevent over-zooming on small networks
+                const finalScale = Math.min(scale, 1.5);
+                
+                const translate = [fullWidth / 2 - finalScale * midX, fullHeight / 2 - finalScale * midY];
+
+                this.svg.transition()
+                    .duration(750)
+                    .call(
+                        this.zoom.transform,
+                        d3.zoomIdentity.translate(translate[0], translate[1]).scale(finalScale)
+                    );
+            }
+
+            getActiveFilters() {
+                const filters = {
+                    deviceTypes: {},
+                    critical: true,
+                    changes: true,
+                    new: true
+                };
+
+                // Get device type filters
+                document.querySelectorAll('[data-device-type]').forEach(checkbox => {
+                    filters.deviceTypes[checkbox.dataset.deviceType] = checkbox.checked;
+                });
+
+                // Get special filters
+                filters.critical = document.getElementById('filter-critical').checked;
+                filters.changes = document.getElementById('filter-changes').checked;
+                filters.new = document.getElementById('filter-new').checked;
+
+                return filters;
+            }
+
+            isNewDevice(node) {
+                if (!this.data.changes || !this.data.changes.new_devices) return false;
+                const device = this.data.devices.find(d => d.ip === node.id);
+                return device && this.data.changes.new_devices.some(d => d.ip === device.ip);
+            }
+
+            isChangedDevice(node) {
+                if (!this.data.changes || !this.data.changes.changed_devices) return false;
+                const device = this.data.devices.find(d => d.ip === node.id);
+                return device && this.data.changes.changed_devices.some(d => d.ip === device.ip);
+            }
+
+            updateConnectionCount() {
+                document.getElementById('active-connections').textContent = this.links.length;
+            }
+
+            update() {
+                this.activeFilters = this.getActiveFilters();
+                this.render();
+            }
+
+            reset() {
+                this.simulation.alpha(1).restart();
+                this.applyZoom();
+            }
+
+            autoLayout() {
+                // Implement hierarchical layout
+                const layers = this.organizeLayers();
+                const centerX = this.options.width / 2;
+                const centerY = this.options.height / 2;
+                const layerHeight = this.options.height / (layers.length + 1);
+
+                layers.forEach((layer, i) => {
+                    const y = layerHeight * (i + 1);
+                    const angleStep = (2 * Math.PI) / layer.length;
+
+                    layer.forEach((node, j) => {
+                        const angle = angleStep * j;
+                        const radius = Math.min(this.options.width, this.options.height) / 3;
+                        node.fx = centerX + radius * Math.cos(angle) * (0.5 + i * 0.3);
+                        node.fy = y;
+                    });
+                });
+
+                this.simulation.alpha(0.5).restart();
+            }
+
+            organizeLayers() {
+                const layers = [[], [], [], []];
+
+                this.nodes.forEach(node => {
+                    if (node.type === 'router') layers[0].push(node);
+                    else if (node.type === 'switch') layers[1].push(node);
+                    else if (node.type.includes('server')) layers[2].push(node);
+                    else layers[3].push(node);
+                });
+
+                return layers.filter(layer => layer.length > 0);
+            }
+
+            highlightPath(sourceId, targetId) {
+                // Reset all elements
+                this.nodeElements.selectAll("circle").style("opacity", 0.3);
+                this.linkElements.style("opacity", 0.1);
+
+                // Find path between nodes
+                const path = this.findPath(sourceId, targetId);
+                if (!path) return;
+
+                // Highlight path nodes
+                this.nodeElements.selectAll("circle")
+                    .style("opacity", d => path.includes(d.id) ? 1 : 0.3);
+
+                // Highlight path links
+                this.linkElements
+                    .style("opacity", d => {
+                        const inPath = path.includes(d.source.id) && path.includes(d.target.id);
+                        return inPath ? 1 : 0.1;
+                    })
+                    .style("stroke-width", d => {
+                        const inPath = path.includes(d.source.id) && path.includes(d.target.id);
+                        return inPath ? this.getLinkWidth(d.type) * 1.5 : this.getLinkWidth(d.type);
+                    });
+            }
+
+            findPath(sourceId, targetId) {
+                // Simple BFS pathfinding
+                const queue = [[sourceId]];
+                const visited = new Set([sourceId]);
+
+                while (queue.length > 0) {
+                    const path = queue.shift();
+                    const current = path[path.length - 1];
+
+                    if (current === targetId) return path;
+
+                    const neighbors = this.getNeighbors(current);
+                    for (const neighbor of neighbors) {
+                        if (!visited.has(neighbor)) {
+                            visited.add(neighbor);
+                            queue.push([...path, neighbor]);
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            getNeighbors(nodeId) {
+                const neighbors = new Set();
+                this.links.forEach(link => {
+                    if (link.source.id === nodeId) neighbors.add(link.target.id);
+                    if (link.target.id === nodeId) neighbors.add(link.source.id);
+                });
+                return Array.from(neighbors);
+            }
+
+            clearHighlight() {
+                this.nodeElements.selectAll("circle").style("opacity", 1);
+                this.linkElements
+                    .style("opacity", 0.6)
+                    .style("stroke-width", d => this.getLinkWidth(d.type));
+            }
+
+            searchNodes(query) {
+                const lowerQuery = query.toLowerCase();
+                
+                this.nodeElements.selectAll("circle")
+                    .style("opacity", d => {
+                        const device = this.data.devices.find(dev => dev.ip === d.id);
+                        if (!device) return 0.3;
+
+                        const matches = 
+                            device.ip.toLowerCase().includes(lowerQuery) ||
+                            (device.hostname && device.hostname.toLowerCase().includes(lowerQuery)) ||
+                            (device.mac && device.mac.toLowerCase().includes(lowerQuery));
+
+                        return matches ? 1 : 0.3;
+                    })
+                    .style("stroke-width", d => {
+                        const device = this.data.devices.find(dev => dev.ip === d.id);
+                        if (!device) return 2;
+
+                        const matches = 
+                            device.ip.toLowerCase().includes(lowerQuery) ||
+                            (device.hostname && device.hostname.toLowerCase().includes(lowerQuery)) ||
+                            (device.mac && device.mac.toLowerCase().includes(lowerQuery));
+
+                        return matches ? 4 : 2;
+                    });
+
+                if (!query) {
+                    this.clearHighlight();
+                }
+            }
+
+            export() {
+                // Create a new canvas
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = this.options.width;
+                canvas.height = this.options.height;
+
+                // Set background
+                context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-primary');
+                context.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Convert SVG to image
+                const svgData = new XMLSerializer().serializeToString(this.svg.node());
+                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(svgBlob);
+
+                const img = new Image();
+                img.onload = () => {
+                    context.drawImage(img, 0, 0);
+                    URL.revokeObjectURL(url);
+
+                    // Download the image
+                    const link = document.createElement('a');
+                    link.download = `network_map_2d_${networkData.scanTimestamp}.png`;
+                    link.href = canvas.toDataURL();
+                    link.click();
+                };
+                img.src = url;
+            }
+        }
+
+        // 3D Network Visualization Class
+        class NetworkVisualization3D {
+            constructor(container, data, options) {
+                this.container = container;
+                this.data = data;
+                this.options = options;
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.controls = null;
+                this.nodes = [];
+                this.links = [];
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
+                this.activeFilters = this.getActiveFilters();
+            }
+
+            render() {
+                this.setupScene();
+                this.createNodes();
+                this.createLinks();
+                this.setupLighting();
+                this.setupControls();
+                this.animate();
+                this.updateConnectionCount();
+            }
+
+            setupScene() {
+                // Clear container
+                this.container.innerHTML = '';
+
+                // Create scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x0a0e1a);
+                this.scene.fog = new THREE.Fog(0x0a0e1a, 50, 200);
+
+                // Create camera
+                const aspect = this.container.clientWidth / this.container.clientHeight;
+                this.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
+                // Better initial position for viewing the network
+                this.camera.position.set(40, 30, 40);
+                this.camera.lookAt(0, 0, 0);
+
+                // Create renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.container.appendChild(this.renderer.domElement);
+
+                // Handle resize
+                window.addEventListener('resize', () => this.onWindowResize());
+            }
+
+            createNodes() {
+                // Filter and process nodes
+                const filteredData = this.filterDevices();
+                
+                // Create node meshes
+                filteredData.forEach((device, index) => {
+                    const position = this.data.threeData.positions[index] || { x: 0, y: 0, z: 0 };
+                    const color = this.getDeviceColor(device.type);
+                    const radius = this.getNodeRadius(device);
+
+                    // Create sphere geometry
+                    const geometry = new THREE.SphereGeometry(radius, 32, 32);
+                    const material = new THREE.MeshPhongMaterial({
+                        color: color,
+                        emissive: color,
+                        emissiveIntensity: 0.2,
+                        shininess: 100
+                    });
+
+                    const mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(position.x, position.y, position.z);
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    mesh.userData = { device };
+
+                    // Add glow for critical devices
+                    if (device.critical) {
+                        this.addGlow(mesh, 0xff0000);
+                    }
+
+                    this.scene.add(mesh);
+                    this.nodes.push(mesh);
+
+                    // Create label
+                    this.createLabel(device, position);
+                });
+            }
+
+            createLinks() {
+                // Filter connections based on visible nodes
+                const visibleIPs = new Set(this.nodes.map(n => n.userData.device.ip));
+                
+                this.data.threeData.connections.forEach(conn => {
+                    // Check if both nodes are visible
+                    const sourceVisible = this.nodes.some(n => 
+                        Math.abs(n.position.x - conn.start.x) < 0.1 &&
+                        Math.abs(n.position.y - conn.start.y) < 0.1 &&
+                        Math.abs(n.position.z - conn.start.z) < 0.1
+                    );
+                    const targetVisible = this.nodes.some(n => 
+                        Math.abs(n.position.x - conn.end.x) < 0.1 &&
+                        Math.abs(n.position.y - conn.end.y) < 0.1 &&
+                        Math.abs(n.position.z - conn.end.z) < 0.1
+                    );
+
+                    if (!sourceVisible || !targetVisible) return;
+
+                    // Create curved connection
+                    const curve = new THREE.QuadraticBezierCurve3(
+                        new THREE.Vector3(conn.start.x, conn.start.y, conn.start.z),
+                        new THREE.Vector3(
+                            (conn.start.x + conn.end.x) / 2,
+                            (conn.start.y + conn.end.y) / 2 + 5,
+                            (conn.start.z + conn.end.z) / 2
+                        ),
+                        new THREE.Vector3(conn.end.x, conn.end.y, conn.end.z)
+                    );
+
+                    const points = curve.getPoints(50);
+                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                    
+                    const material = new THREE.LineBasicMaterial({
+                        color: new THREE.Color(conn.color),
+                        opacity: conn.opacity || 0.6,
+                        transparent: true,
+                        linewidth: conn.thickness || 1
+                    });
+
+                    const line = new THREE.Line(geometry, material);
+                    this.scene.add(line);
+                    this.links.push(line);
+                });
+            }
+
+            createLabel(device, position) {
+                // Create sprite label
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 256;
+                canvas.height = 64;
+
+                // Draw label background
+                context.fillStyle = 'rgba(26, 31, 46, 0.9)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw text
+                context.font = '24px Arial';
+                context.fillStyle = '#e4e6eb';
+                context.textAlign = 'center';
+                context.fillText(device.hostname || device.ip, 128, 40);
+
+                // Create sprite
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.position.set(position.x, position.y + 2, position.z);
+                sprite.scale.set(4, 1, 1);
+
+                this.scene.add(sprite);
+            }
+
+            setupLighting() {
+                // Ambient light
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.8);
+                this.scene.add(ambientLight);
+
+                // Directional light
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+                directionalLight.position.set(20, 30, 20);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.camera.near = 0.1;
+                directionalLight.shadow.camera.far = 100;
+                directionalLight.shadow.camera.left = -50;
+                directionalLight.shadow.camera.right = 50;
+                directionalLight.shadow.camera.top = 50;
+                directionalLight.shadow.camera.bottom = -50;
+                this.scene.add(directionalLight);
+
+                // Point lights for ambiance
+                const pointLight1 = new THREE.PointLight(0x3b82f6, 0.5, 50);
+                pointLight1.position.set(20, 20, 20);
+                this.scene.add(pointLight1);
+
+                const pointLight2 = new THREE.PointLight(0xef4444, 0.3, 50);
+                pointLight2.position.set(-20, 20, -20);
+                this.scene.add(pointLight2);
+
+                // Add grid helper
+                const gridHelper = new THREE.GridHelper(100, 50, 0x2a3042, 0x1a1f2e);
+                gridHelper.position.y = -10;
+                this.scene.add(gridHelper);
+            }
+
+            setupControls() {
+                // Mouse controls
+                let mouseDown = false;
+                let mouseX = 0;
+                let mouseY = 0;
+
+                this.renderer.domElement.addEventListener('mousedown', (event) => {
+                    if (event.button === 0) {
+                        mouseDown = true;
+                        mouseX = event.clientX;
+                        mouseY = event.clientY;
+                    }
+                });
+
+                this.renderer.domElement.addEventListener('mouseup', () => {
+                    mouseDown = false;
+                });
+
+                this.renderer.domElement.addEventListener('mousemove', (event) => {
+                    if (!mouseDown) {
+                        // Update mouse position for raycasting
+                        const rect = this.renderer.domElement.getBoundingClientRect();
+                        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                        return;
+                    }
+
+                    const deltaX = event.clientX - mouseX;
+                    const deltaY = event.clientY - mouseY;
+
+                    // Rotate camera around center
+                    const spherical = new THREE.Spherical();
+                    spherical.setFromVector3(this.camera.position);
+                    spherical.theta -= deltaX * 0.01;
+                    spherical.phi += deltaY * 0.01;
+                    spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+
+                    this.camera.position.setFromSpherical(spherical);
+                    this.camera.lookAt(0, 0, 0);
+
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                });
+
+                // Zoom controls
+                this.renderer.domElement.addEventListener('wheel', (event) => {
+                    event.preventDefault();
+                    const scale = event.deltaY > 0 ? 1.1 : 0.9;
+                    this.camera.position.multiplyScalar(scale);
+                    this.camera.position.clampLength(10, 100);
+                });
+
+                // Click handler
+                this.renderer.domElement.addEventListener('click', (event) => {
+                    this.onMouseClick(event);
+                });
+
+                // Hover handler
+                this.renderer.domElement.addEventListener('mousemove', (event) => {
+                    this.onMouseMove(event);
+                });
+            }
+
+            onMouseClick(event) {
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                const intersects = this.raycaster.intersectObjects(this.nodes);
+
+                if (intersects.length > 0) {
+                    const device = intersects[0].object.userData.device;
+                    this.options.onNodeClick(device);
+                }
+            }
+
+            onMouseMove(event) {
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                const intersects = this.raycaster.intersectObjects(this.nodes);
+
+                // Reset all nodes
+                this.nodes.forEach(node => {
+                    node.scale.setScalar(1);
+                });
+
+                if (intersects.length > 0) {
+                    const node = intersects[0].object;
+                    node.scale.setScalar(1.2);
+                    this.options.onNodeHover(event, node.userData.device, true);
+                } else {
+                    this.options.onNodeHover(event, null, false);
+                }
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                // Auto-rotate if enabled
+                if (this.autoRotate && !this.mouseDown) {
+                    const time = Date.now() * 0.001;
+                    const radius = this.camera.position.length();
+                    this.camera.position.x = Math.cos(time * 0.1) * radius;
+                    this.camera.position.z = Math.sin(time * 0.1) * radius;
+                    this.camera.lookAt(0, 0, 0);
+                }
+
+                // Animate nodes slightly
+                this.nodes.forEach((node, index) => {
+                    const time = Date.now() * 0.001;
+                    node.position.y += Math.sin(time + index) * 0.001;
+                });
+
+                this.renderer.render(this.scene, this.camera);
+            }
+
+            onWindowResize() {
+                this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+            }
+
+            getActiveFilters() {
+                const filters = {
+                    deviceTypes: {},
+                    critical: true,
+                    changes: true,
+                    new: true
+                };
+
+                // Get device type filters
+                document.querySelectorAll('[data-device-type]').forEach(checkbox => {
+                    filters.deviceTypes[checkbox.dataset.deviceType] = checkbox.checked;
+                });
+
+                // Get special filters
+                filters.critical = document.getElementById('filter-critical').checked;
+                filters.changes = document.getElementById('filter-changes').checked;
+                filters.new = document.getElementById('filter-new').checked;
+
+                return filters;
+            }
+
+            filterDevices() {
+                return this.data.devices.filter(device => {
+                    // Check device type filter
+                    if (!this.activeFilters.deviceTypes[device.type]) return false;
+
+                    // Check special filters
+                    if (!this.activeFilters.critical && device.critical) return false;
+                    if (!this.activeFilters.changes && this.isChangedDevice(device)) return false;
+                    if (!this.activeFilters.new && this.isNewDevice(device)) return false;
+
+                    return true;
+                });
+            }
+
+            isNewDevice(device) {
+                if (!this.data.changes || !this.data.changes.new_devices) return false;
+                return this.data.changes.new_devices.some(d => d.ip === device.ip);
+            }
+
+            isChangedDevice(device) {
+                if (!this.data.changes || !this.data.changes.changed_devices) return false;
+                return this.data.changes.changed_devices.some(d => d.ip === device.ip);
+            }
+
+            getDeviceColor(type) {
+                const colors = {
+                    router: 0xf59e0b,
+                    switch: 0x3b82f6,
+                    server: 0x10b981,
+                    database: 0x8b5cf6,
+                    workstation: 0x06b6d4,
+                    printer: 0xec4899,
+                    iot: 0x84cc16,
+                    firewall: 0xef4444,
+                    unknown: 0x6b7280
+                };
+                return colors[type] || colors.unknown;
+            }
+
+            getNodeRadius(device) {
+                if (device.critical) return 1.2;
+                if (device.type === 'router' || device.type === 'switch') return 1.0;
+                if (device.type.includes('server')) return 0.8;
+                return 0.6;
+            }
+
+            addGlow(mesh, color) {
+                const glowGeometry = new THREE.SphereGeometry(mesh.geometry.parameters.radius * 1.5, 16, 16);
+                const glowMaterial = new THREE.MeshBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: 0.3,
+                    side: THREE.BackSide
+                });
+                const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+                mesh.add(glowMesh);
+            }
+
+            updateConnectionCount() {
+                document.getElementById('active-connections').textContent = this.links.length;
+            }
+
+            update() {
+                this.activeFilters = this.getActiveFilters();
+                // Clear scene
+                while (this.scene.children.length > 0) {
+                    this.scene.remove(this.scene.children[0]);
+                }
+                this.nodes = [];
+                this.links = [];
+                // Re-render
+                this.createNodes();
+                this.createLinks();
+                this.setupLighting();
+            }
+
+            reset() {
+                this.camera.position.set(40, 30, 40);
+                this.camera.lookAt(0, 0, 0);
+            }
+
+            export() {
+                // Render to canvas
+                this.renderer.render(this.scene, this.camera);
+                
+                // Download screenshot
+                const link = document.createElement('a');
+                link.download = `network_map_3d_${networkData.scanTimestamp}.png`;
+                link.href = this.renderer.domElement.toDataURL();
+                link.click();
+            }
+        }
+
+        // Helper Functions
+        function formatDeviceType(type) {
+            return type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ');
+        }
+
+        function switchView(view) {
+            currentView = view;
+
+            // Update UI
+            document.querySelectorAll('.view-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Show/hide visualizations
+            if (view === '2d') {
+                document.getElementById('network-2d').style.display = 'block';
+                document.getElementById('network-3d').style.display = 'none';
+                if (!visualization2D) initialize2DVisualization();
+            } else {
+                document.getElementById('network-2d').style.display = 'none';
+                document.getElementById('network-3d').style.display = 'block';
+                if (!visualization3D) initialize3DVisualization();
+            }
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        }
+
+        function updateFilters() {
+            if (currentView === '2d' && visualization2D) {
+                visualization2D.update();
+            } else if (currentView === '3d' && visualization3D) {
+                visualization3D.update();
+            }
+        }
+
+        function performSearch(query) {
+            if (currentView === '2d' && visualization2D) {
+                visualization2D.searchNodes(query);
+            }
+            // TODO: Implement 3D search
+        }
+
+        function showDeviceDetails(device) {
+            selectedDevice = device;
+            const panel = document.getElementById('device-panel');
+            const title = document.getElementById('device-panel-title');
+            const content = document.getElementById('device-panel-content');
+
+            // Find full device data
+            const fullDevice = networkData.devices.find(d => d.ip === device.id || d.ip === device.ip) || device;
+
+            title.textContent = fullDevice.hostname || fullDevice.ip;
+
+            // Build content
+            let html = '';
+
+            // Basic Information
+            html += `
+                <div class="info-section">
+                    <h3 class="info-section-title">Basic Information</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">IP Address</span>
+                            <span class="info-value">${fullDevice.ip}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Hostname</span>
+                            <span class="info-value">${fullDevice.hostname || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">MAC Address</span>
+                            <span class="info-value">${fullDevice.mac || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Vendor</span>
+                            <span class="info-value">${fullDevice.vendor || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Device Type</span>
+                            <span class="info-value">${formatDeviceType(fullDevice.type || 'unknown')}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Operating System</span>
+                            <span class="info-value">${fullDevice.os || 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Services
+            if (fullDevice.services && fullDevice.services.length > 0) {
+                html += `
+                    <div class="info-section">
+                        <h3 class="info-section-title">Services</h3>
+                        <div class="service-list">
+                `;
+                
+                fullDevice.services.forEach(service => {
+                    const [name, port] = service.split(':');
+                    html += `
+                        <div class="service-item">
+                            <span class="service-port">${port || '?'}</span>
+                            <span class="service-name">${name}</span>
+                            <span class="service-status"></span>
+                        </div>
+                    `;
+                });
+
+                html += '</div></div>';
+            }
+
+            // Open Ports
+            if (fullDevice.open_ports && fullDevice.open_ports.length > 0) {
+                html += `
+                    <div class="info-section">
+                        <h3 class="info-section-title">Open Ports</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Ports</span>
+                                <span class="info-value">${fullDevice.open_ports.join(', ')}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Status
+            html += `
+                <div class="info-section">
+                    <h3 class="info-section-title">Status</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Critical Device</span>
+                            <span class="info-value" style="color: ${fullDevice.critical ? 'var(--accent-red)' : 'var(--accent-green)'}">
+                                ${fullDevice.critical ? 'Yes' : 'No'}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Last Seen</span>
+                            <span class="info-value">${fullDevice.last_seen || 'Current Scan'}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Notes
+            if (fullDevice.notes) {
+                html += `
+                    <div class="info-section">
+                        <h3 class="info-section-title">Notes</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-value">${fullDevice.notes}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Changes
+            if (networkData.changes && networkData.changes.changed_devices) {
+                const changes = networkData.changes.changed_devices.find(d => d.ip === fullDevice.ip);
+                if (changes) {
+                    html += `
+                        <div class="info-section">
+                            <h3 class="info-section-title">Recent Changes</h3>
+                            <div class="info-grid">
+                    `;
+
+                    changes.changes.forEach(change => {
+                        html += `
+                            <div class="info-item">
+                                <span class="info-label">${change.field}</span>
+                                <span class="info-value" style="color: var(--accent-yellow)">${change.action || 'Modified'}</span>
+                            </div>
+                        `;
+                    });
+
+                    html += '</div></div>';
+                }
+            }
+
+            content.innerHTML = html;
+            panel.classList.add('open');
+        }
+
+        function closeDevicePanel() {
+            document.getElementById('device-panel').classList.remove('open');
+            selectedDevice = null;
+        }
+
+        function showTooltip(event, device, show) {
+            const tooltip = document.getElementById('network-tooltip');
+            
+            if (!show || !device) {
+                tooltip.classList.remove('visible');
+                return;
+            }
+
+            // Find full device data
+            const fullDevice = networkData.devices.find(d => d.ip === device.id || d.ip === device.ip) || device;
+
+            // Build tooltip content
+            let html = `
+                <div class="tooltip-header">
+                    <div class="tooltip-icon" style="background: var(--device-${fullDevice.type || 'unknown'})"></div>
+                    <div class="tooltip-title">${fullDevice.hostname || fullDevice.ip}</div>
+                </div>
+                <div class="tooltip-content">
+                    <div>Type: ${formatDeviceType(fullDevice.type || 'unknown')}</div>
+                    <div>IP: ${fullDevice.ip}</div>
+            `;
+
+            if (fullDevice.vendor) {
+                html += `<div>Vendor: ${fullDevice.vendor}</div>`;
+            }
+
+            if (fullDevice.critical) {
+                html += `<div style="color: var(--accent-red); font-weight: 600;">⚠ Critical Device</div>`;
+            }
+
+            html += '</div>';
+
+            tooltip.innerHTML = html;
+            tooltip.style.left = `${event.pageX + 10}px`;
+            tooltip.style.top = `${event.pageY + 10}px`;
+            tooltip.classList.add('visible');
+        }
+
+        function resetView() {
+            if (currentView === '2d' && visualization2D) {
+                visualization2D.reset();
+            } else if (currentView === '3d' && visualization3D) {
+                visualization3D.reset();
+            }
+        }
+
+        function toggleAutoLayout() {
+            if (currentView === '2d' && visualization2D) {
+                visualization2D.autoLayout();
+            }
+            // TODO: Implement 3D auto layout
+        }
+
+        function exportView() {
+            if (currentView === '2d' && visualization2D) {
+                visualization2D.export();
+            } else if (currentView === '3d' && visualization3D) {
+                visualization3D.export();
+            }
+        }
+
+        function loadChangeIndicator() {
+            if (!networkData.changes || 
+                (!networkData.changes.new_devices && 
+                 !networkData.changes.missing_devices && 
+                 !networkData.changes.changed_devices)) {
+                return;
+            }
+
+            const indicator = document.getElementById('change-indicator');
+            const newCount = networkData.changes.new_devices?.length || 0;
+            const removedCount = networkData.changes.missing_devices?.length || 0;
+            const modifiedCount = networkData.changes.changed_devices?.length || 0;
+
+            if (newCount > 0 || removedCount > 0 || modifiedCount > 0) {
+                document.getElementById('new-count').textContent = newCount;
+                document.getElementById('removed-count').textContent = removedCount;
+                document.getElementById('modified-count').textContent = modifiedCount;
+                indicator.classList.add('visible');
+            }
+        }
+
+        function createLegend() {
+            const legendItems = document.getElementById('legend-items');
+            const deviceTypes = new Set(networkData.devices.map(d => d.type || 'unknown'));
+
+            deviceTypes.forEach(type => {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+                item.innerHTML = `
+                    <div class="legend-color" style="background: var(--device-${type})"></div>
+                    <span class="legend-label">${formatDeviceType(type)}</span>
+                `;
+                legendItems.appendChild(item);
+            });
+        }
+
+        function showLoading(show) {
+            const loadingOverlay = document.getElementById('loading-overlay');
+            loadingOverlay.style.display = show ? 'flex' : 'none';
+        }
+
+        // Make functions available globally
+        window.switchView = switchView;
+        window.toggleSidebar = toggleSidebar;
+        window.closeDevicePanel = closeDevicePanel;
+        window.resetView = resetView;
+        window.toggleAutoLayout = toggleAutoLayout;
+        window.exportView = exportView;
+    </script>
+</body>
+</html>

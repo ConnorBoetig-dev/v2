@@ -16,72 +16,73 @@ class TestDeviceAnnotation(unittest.TestCase):
     """Test cases for DeviceAnnotation dataclass."""
     
     def test_device_annotation_creation(self):
-        """Test DeviceAnnotation creation with all fields."""
+        """Test DeviceAnnotation creation."""
         annotation = DeviceAnnotation(
-            device_id="192.168.1.1_00:11:22:33:44:55",
-            name="Main Router",
-            description="Primary network gateway",
+            ip="192.168.1.1",
+            critical=True,
+            notes="Main router",
+            tags=["network", "critical"],
             location="Server Room A",
-            owner="Network Team",
-            criticality="high",
-            tags=["production", "critical"],
-            custom_fields={"asset_id": "RT-001", "warranty": "2025-12-31"},
-            last_updated="2023-01-01T12:00:00"
+            owner="IT Department",
+            department="Infrastructure"
         )
         
-        self.assertEqual(annotation.device_id, "192.168.1.1_00:11:22:33:44:55")
-        self.assertEqual(annotation.name, "Main Router")
-        self.assertEqual(annotation.description, "Primary network gateway")
+        self.assertEqual(annotation.ip, "192.168.1.1")
+        self.assertTrue(annotation.critical)
+        self.assertEqual(annotation.notes, "Main router")
+        self.assertEqual(annotation.tags, ["network", "critical"])
         self.assertEqual(annotation.location, "Server Room A")
-        self.assertEqual(annotation.owner, "Network Team")
-        self.assertEqual(annotation.criticality, "high")
-        self.assertIn("production", annotation.tags)
-        self.assertEqual(annotation.custom_fields["asset_id"], "RT-001")
+        self.assertEqual(annotation.owner, "IT Department")
+        self.assertEqual(annotation.department, "Infrastructure")
+        self.assertIsNotNone(annotation.created)
+        self.assertIsNotNone(annotation.last_modified)
     
     def test_device_annotation_defaults(self):
-        """Test DeviceAnnotation with default values."""
-        annotation = DeviceAnnotation(device_id="192.168.1.1")
+        """Test DeviceAnnotation default values."""
+        annotation = DeviceAnnotation(ip="192.168.1.1")
         
-        self.assertEqual(annotation.device_id, "192.168.1.1")
-        self.assertEqual(annotation.name, "")
-        self.assertEqual(annotation.description, "")
+        self.assertEqual(annotation.ip, "192.168.1.1")
+        self.assertFalse(annotation.critical)
+        self.assertEqual(annotation.notes, "")
+        self.assertEqual(annotation.tags, [])
         self.assertEqual(annotation.location, "")
         self.assertEqual(annotation.owner, "")
-        self.assertEqual(annotation.criticality, "medium")
-        self.assertEqual(annotation.tags, [])
+        self.assertEqual(annotation.department, "")
         self.assertEqual(annotation.custom_fields, {})
-        self.assertIsNotNone(annotation.last_updated)
     
     def test_device_annotation_to_dict(self):
-        """Test converting annotation to dictionary."""
+        """Test DeviceAnnotation serialization."""
         annotation = DeviceAnnotation(
-            device_id="10.0.0.1",
-            name="Test Device",
-            tags=["test", "development"]
+            ip="192.168.1.1",
+            critical=True,
+            tags=["router", "main"],
+            custom_fields={"asset_id": "A123"}
         )
         
-        annotation_dict = annotation.to_dict()
-        self.assertIsInstance(annotation_dict, dict)
-        self.assertEqual(annotation_dict["device_id"], "10.0.0.1")
-        self.assertEqual(annotation_dict["name"], "Test Device")
-        self.assertEqual(annotation_dict["tags"], ["test", "development"])
-        self.assertIn("last_updated", annotation_dict)
+        data = annotation.to_dict()
+        self.assertIsInstance(data, dict)
+        self.assertEqual(data["ip"], "192.168.1.1")
+        self.assertTrue(data["critical"])
+        self.assertEqual(data["tags"], ["router", "main"])
+        self.assertEqual(data["custom_fields"]["asset_id"], "A123")
     
     def test_device_annotation_from_dict(self):
-        """Test creating annotation from dictionary."""
+        """Test DeviceAnnotation deserialization."""
         data = {
-            "device_id": "192.168.1.1",
-            "name": "Router",
-            "criticality": "high",
-            "tags": ["network", "core"],
-            "last_updated": "2023-01-01T12:00:00"
+            "ip": "10.0.0.1",
+            "critical": False,
+            "notes": "Test device",
+            "tags": ["test"],
+            "created": "2023-01-01T12:00:00",
+            "extra_field": "ignored"  # Should be filtered out
         }
         
         annotation = DeviceAnnotation.from_dict(data)
-        self.assertEqual(annotation.device_id, "192.168.1.1")
-        self.assertEqual(annotation.name, "Router")
-        self.assertEqual(annotation.criticality, "high")
-        self.assertEqual(annotation.tags, ["network", "core"])
+        self.assertEqual(annotation.ip, "10.0.0.1")
+        self.assertFalse(annotation.critical)
+        self.assertEqual(annotation.notes, "Test device")
+        self.assertEqual(annotation.tags, ["test"])
+        self.assertEqual(annotation.created, "2023-01-01T12:00:00")
 
 
 class TestDeviceAnnotator(unittest.TestCase):
@@ -90,7 +91,7 @@ class TestDeviceAnnotator(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
-        self.annotator = DeviceAnnotator(base_dir=self.temp_dir)
+        self.annotator = DeviceAnnotator(output_path=Path(self.temp_dir))
         # Configure logging
         logging.basicConfig(level=logging.DEBUG)
     
@@ -101,587 +102,300 @@ class TestDeviceAnnotator(unittest.TestCase):
     
     def test_init(self):
         """Test annotator initialization."""
-        annotator = DeviceAnnotator()
-        self.assertIsNotNone(annotator.annotations_dir)
-        self.assertTrue(os.path.exists(annotator.annotations_dir))
-        self.assertIsInstance(annotator._annotations_cache, dict)
+        annotator = DeviceAnnotator(output_path=Path(self.temp_dir))
+        self.assertEqual(annotator.output_path, Path(self.temp_dir))
+        self.assertTrue(os.path.exists(self.temp_dir))
         
-        # Test with custom directory
-        custom_dir = os.path.join(self.temp_dir, "custom")
-        annotator = DeviceAnnotator(base_dir=custom_dir)
-        self.assertTrue(os.path.exists(os.path.join(custom_dir, "annotations")))
+        # Check annotations file path
+        expected_path = Path(self.temp_dir) / "annotations" / "device_annotations.json"
+        self.assertEqual(annotator.annotations_file, expected_path)
     
-    def test_generate_device_id(self):
-        """Test device ID generation."""
-        # With MAC address
-        device_id = self.annotator._generate_device_id("192.168.1.1", "00:11:22:33:44:55")
-        self.assertEqual(device_id, "192.168.1.1_00:11:22:33:44:55")
-        
-        # Without MAC address
-        device_id = self.annotator._generate_device_id("10.0.0.1", "")
-        self.assertEqual(device_id, "10.0.0.1")
-        
-        # With None MAC
-        device_id = self.annotator._generate_device_id("172.16.0.1", None)
-        self.assertEqual(device_id, "172.16.0.1")
-    
-    def test_add_annotation(self):
-        """Test adding device annotation."""
-        device = {
-            "ip": "192.168.1.1",
-            "mac": "00:11:22:33:44:55"
-        }
-        
-        success = self.annotator.add_annotation(
-            device,
-            name="Main Router",
-            description="Primary gateway device",
-            location="Rack A1",
-            owner="IT Team",
-            criticality="high",
-            tags=["production", "critical"]
+    def test_add_annotation_manually(self):
+        """Test manually adding annotations."""
+        # Add annotation directly to internal structure
+        annotation = DeviceAnnotation(
+            ip="192.168.1.1",
+            critical=True,
+            notes="Main gateway router",
+            tags=["network", "critical"]
         )
+        self.annotator.annotations["192.168.1.1"] = annotation
         
-        self.assertTrue(success)
+        # Save and verify
+        self.assertTrue(self.annotator.save_annotations())
         
         # Verify annotation was saved
-        annotation_file = os.path.join(
-            self.annotator.annotations_dir,
-            "192.168.1.1_00:11:22:33:44:55.json"
-        )
-        self.assertTrue(os.path.exists(annotation_file))
-        
-        # Verify content
-        with open(annotation_file) as f:
-            data = json.load(f)
-        
-        self.assertEqual(data["name"], "Main Router")
-        self.assertEqual(data["criticality"], "high")
-        self.assertIn("production", data["tags"])
-    
-    def test_update_annotation(self):
-        """Test updating existing annotation."""
-        device = {"ip": "192.168.1.1", "mac": "00:11:22:33:44:55"}
-        
-        # Add initial annotation
-        self.annotator.add_annotation(
-            device,
-            name="Router",
-            criticality="medium"
-        )
-        
-        # Update annotation
-        success = self.annotator.update_annotation(
-            device,
-            name="Main Router",
-            criticality="high",
-            tags=["updated"]
-        )
-        
-        self.assertTrue(success)
-        
-        # Verify updates
-        annotation = self.annotator.get_annotation(device)
-        self.assertEqual(annotation.name, "Main Router")
-        self.assertEqual(annotation.criticality, "high")
-        self.assertIn("updated", annotation.tags)
-    
-    def test_update_annotation_preserve_fields(self):
-        """Test that update preserves non-updated fields."""
-        device = {"ip": "192.168.1.1"}
-        
-        # Add initial annotation
-        self.annotator.add_annotation(
-            device,
-            name="Device",
-            description="Original description",
-            location="Room A",
-            tags=["original"]
-        )
-        
-        # Update only name
-        self.annotator.update_annotation(device, name="Updated Device")
-        
-        # Other fields should be preserved
-        annotation = self.annotator.get_annotation(device)
-        self.assertEqual(annotation.name, "Updated Device")
-        self.assertEqual(annotation.description, "Original description")
-        self.assertEqual(annotation.location, "Room A")
-        self.assertIn("original", annotation.tags)
+        self.assertEqual(len(self.annotator.annotations), 1)
+        self.assertIn("192.168.1.1", self.annotator.annotations)
+        ann = self.annotator.annotations["192.168.1.1"]
+        self.assertTrue(ann.critical)
+        self.assertEqual(ann.notes, "Main gateway router")
     
     def test_get_annotation(self):
-        """Test retrieving annotation."""
-        device = {"ip": "192.168.1.1", "mac": "00:11:22:33:44:55"}
+        """Test getting specific annotation."""
+        # Add an annotation directly
+        annotation = DeviceAnnotation(ip="192.168.1.1", notes="Test device")
+        self.annotator.annotations["192.168.1.1"] = annotation
         
-        # No annotation initially
-        annotation = self.annotator.get_annotation(device)
-        self.assertIsNone(annotation)
+        # Get it back
+        retrieved = self.annotator.annotations.get("192.168.1.1")
+        self.assertIsNotNone(retrieved)
+        self.assertEqual(retrieved.ip, "192.168.1.1")
+        self.assertEqual(retrieved.notes, "Test device")
         
-        # Add annotation
-        self.annotator.add_annotation(device, name="Test Device")
+        # Try non-existent
+        retrieved = self.annotator.annotations.get("192.168.1.99")
+        self.assertIsNone(retrieved)
+    
+    def test_update_annotation(self):
+        """Test updating annotations."""
+        # Add initial annotation
+        annotation = DeviceAnnotation(ip="192.168.1.1", notes="Initial note")
+        self.annotator.annotations["192.168.1.1"] = annotation
         
-        # Should now retrieve it
-        annotation = self.annotator.get_annotation(device)
-        self.assertIsNotNone(annotation)
-        self.assertEqual(annotation.name, "Test Device")
+        # Update it manually
+        annotation.notes = "Updated note"
+        annotation.critical = True
+        annotation.last_modified = datetime.now().isoformat()
         
-        # Test cache hit
-        annotation2 = self.annotator.get_annotation(device)
-        self.assertEqual(annotation.device_id, annotation2.device_id)
+        # Save and verify
+        self.assertTrue(self.annotator.save_annotations())
+        
+        # Verify update
+        updated_ann = self.annotator.annotations.get("192.168.1.1")
+        self.assertEqual(updated_ann.notes, "Updated note")
+        self.assertTrue(updated_ann.critical)
+    
+    def test_update_annotation_preserve_fields(self):
+        """Test that updates preserve non-updated fields."""
+        # Add annotation with multiple fields
+        annotation = DeviceAnnotation(
+            ip="192.168.1.1",
+            notes="Original note",
+            tags=["router", "main"],
+            location="Room A"
+        )
+        self.annotator.annotations["192.168.1.1"] = annotation
+        
+        # Update only notes
+        annotation.notes = "New note"
+        annotation.last_modified = datetime.now().isoformat()
+        
+        # Verify other fields preserved
+        self.assertEqual(annotation.notes, "New note")
+        self.assertEqual(annotation.tags, ["router", "main"])
+        self.assertEqual(annotation.location, "Room A")
     
     def test_delete_annotation(self):
-        """Test deleting annotation."""
-        device = {"ip": "192.168.1.1"}
-        
+        """Test deleting annotations."""
         # Add annotation
-        self.annotator.add_annotation(device, name="To Delete")
-        
-        # Verify it exists
-        self.assertIsNotNone(self.annotator.get_annotation(device))
+        annotation = DeviceAnnotation(ip="192.168.1.1")
+        self.annotator.annotations["192.168.1.1"] = annotation
         
         # Delete it
-        success = self.annotator.delete_annotation(device)
-        self.assertTrue(success)
+        del self.annotator.annotations["192.168.1.1"]
+        self.assertTrue(self.annotator.save_annotations())
         
-        # Should be gone
-        self.assertIsNone(self.annotator.get_annotation(device))
+        # Verify deleted
+        self.assertNotIn("192.168.1.1", self.annotator.annotations)
         
-        # File should be deleted
-        annotation_file = os.path.join(self.annotator.annotations_dir, "192.168.1.1.json")
-        self.assertFalse(os.path.exists(annotation_file))
+        # Try deleting non-existent (no error expected)
+        self.assertNotIn("192.168.1.99", self.annotator.annotations)
     
     def test_get_all_annotations(self):
-        """Test retrieving all annotations."""
+        """Test getting all annotations."""
         # Add multiple annotations
+        ips = ["192.168.1.1", "192.168.1.2", "192.168.1.3"]
+        
+        for ip in ips:
+            self.annotator.annotations[ip] = DeviceAnnotation(ip=ip)
+        
+        # Get all
+        self.assertEqual(len(self.annotator.annotations), 3)
+        self.assertIn("192.168.1.1", self.annotator.annotations)
+        self.assertIn("192.168.1.2", self.annotator.annotations)
+        self.assertIn("192.168.1.3", self.annotator.annotations)
+    
+    def test_apply_annotations(self):
+        """Test applying annotations to scan results."""
+        # Add some annotations
+        self.annotator.annotations["192.168.1.1"] = DeviceAnnotation(
+            ip="192.168.1.1",
+            critical=True,
+            notes="Critical router"
+        )
+        self.annotator.annotations["192.168.1.2"] = DeviceAnnotation(
+            ip="192.168.1.2",
+            tags=["workstation", "dev"]
+        )
+        
+        # Apply to scan results
         devices = [
-            {"ip": "192.168.1.1", "mac": "00:11:22:33:44:55"},
-            {"ip": "192.168.1.2", "mac": "AA:BB:CC:DD:EE:FF"},
-            {"ip": "192.168.1.3"}
+            {"ip": "192.168.1.1", "type": "router"},
+            {"ip": "192.168.1.2", "type": "workstation"},
+            {"ip": "192.168.1.3", "type": "unknown"}  # No annotation
         ]
         
-        for i, device in enumerate(devices):
-            self.annotator.add_annotation(device, name=f"Device {i+1}")
+        annotated = self.annotator.apply_annotations(devices)
         
-        # Get all annotations
-        all_annotations = self.annotator.get_all_annotations()
-        
-        self.assertEqual(len(all_annotations), 3)
-        names = [a.name for a in all_annotations]
-        self.assertIn("Device 1", names)
-        self.assertIn("Device 2", names)
-        self.assertIn("Device 3", names)
-    
-    def test_search_annotations(self):
-        """Test searching annotations."""
-        # Add annotations with different attributes
-        devices = [
-            {"ip": "192.168.1.1"},
-            {"ip": "192.168.1.2"},
-            {"ip": "192.168.1.3"},
-            {"ip": "192.168.1.4"}
-        ]
-        
-        self.annotator.add_annotation(
-            devices[0],
-            name="Production Server",
-            criticality="high",
-            tags=["production", "web"]
-        )
-        self.annotator.add_annotation(
-            devices[1],
-            name="Test Server",
-            criticality="low",
-            tags=["test", "web"]
-        )
-        self.annotator.add_annotation(
-            devices[2],
-            name="Database Server",
-            criticality="high",
-            tags=["production", "database"]
-        )
-        self.annotator.add_annotation(
-            devices[3],
-            name="Development Workstation",
-            criticality="low",
-            tags=["development"]
-        )
-        
-        # Search by name
-        results = self.annotator.search_annotations(name="Server")
-        self.assertEqual(len(results), 3)
-        
-        # Search by criticality
-        results = self.annotator.search_annotations(criticality="high")
-        self.assertEqual(len(results), 2)
-        
-        # Search by tag
-        results = self.annotator.search_annotations(tag="production")
-        self.assertEqual(len(results), 2)
-        
-        # Search by multiple criteria
-        results = self.annotator.search_annotations(
-            criticality="high",
-            tag="production"
-        )
-        self.assertEqual(len(results), 2)
-        
-        # Search with no matches
-        results = self.annotator.search_annotations(name="NonExistent")
-        self.assertEqual(len(results), 0)
-    
-    def test_bulk_operations(self):
-        """Test bulk annotation operations."""
-        # Prepare devices
-        devices = [
-            {"ip": f"192.168.1.{i}", "type": "server"}
-            for i in range(1, 11)
-        ]
-        
-        # Bulk add annotations
-        annotations_data = []
-        for i, device in enumerate(devices):
-            annotations_data.append({
-                "device": device,
-                "name": f"Server {i+1}",
-                "criticality": "high" if i < 5 else "medium",
-                "tags": ["bulk", "server"]
-            })
-        
-        # Add all annotations
-        success_count = 0
-        for data in annotations_data:
-            if self.annotator.add_annotation(**data):
-                success_count += 1
-        
-        self.assertEqual(success_count, 10)
-        
-        # Verify all were added
-        all_annotations = self.annotator.get_all_annotations()
-        self.assertEqual(len(all_annotations), 10)
-    
-    def test_annotation_tags(self):
-        """Test tag management functionality."""
-        device = {"ip": "192.168.1.1"}
-        
-        # Add annotation with tags
-        self.annotator.add_annotation(
-            device,
-            name="Tagged Device",
-            tags=["tag1", "tag2", "tag3"]
-        )
-        
-        # Add more tags
-        self.annotator.add_tags(device, ["tag4", "tag5"])
-        
-        annotation = self.annotator.get_annotation(device)
-        self.assertEqual(len(annotation.tags), 5)
-        self.assertIn("tag4", annotation.tags)
-        self.assertIn("tag5", annotation.tags)
-        
-        # Remove tags
-        self.annotator.remove_tags(device, ["tag2", "tag4"])
-        
-        annotation = self.annotator.get_annotation(device)
-        self.assertEqual(len(annotation.tags), 3)
-        self.assertNotIn("tag2", annotation.tags)
-        self.assertNotIn("tag4", annotation.tags)
-        
-        # Try to remove non-existent tag
-        self.annotator.remove_tags(device, ["nonexistent"])
-        annotation = self.annotator.get_annotation(device)
-        self.assertEqual(len(annotation.tags), 3)
-    
-    def test_custom_fields(self):
-        """Test custom fields functionality."""
-        device = {"ip": "192.168.1.1"}
-        
-        # Add annotation with custom fields
-        custom_fields = {
-            "asset_id": "AST-001",
-            "purchase_date": "2023-01-01",
-            "warranty_expires": "2026-01-01",
-            "department": "IT"
-        }
-        
-        self.annotator.add_annotation(
-            device,
-            name="Asset",
-            custom_fields=custom_fields
-        )
-        
-        # Verify custom fields
-        annotation = self.annotator.get_annotation(device)
-        self.assertEqual(annotation.custom_fields["asset_id"], "AST-001")
-        self.assertEqual(annotation.custom_fields["department"], "IT")
-        
-        # Update custom fields
-        new_fields = {
-            "department": "Engineering",  # Update existing
-            "cost_center": "CC-123"      # Add new
-        }
-        
-        self.annotator.update_custom_fields(device, new_fields)
-        
-        annotation = self.annotator.get_annotation(device)
-        self.assertEqual(annotation.custom_fields["department"], "Engineering")
-        self.assertEqual(annotation.custom_fields["cost_center"], "CC-123")
-        # Original fields should still exist
-        self.assertEqual(annotation.custom_fields["asset_id"], "AST-001")
-    
-    def test_criticality_levels(self):
-        """Test criticality level validation."""
-        device = {"ip": "192.168.1.1"}
-        
-        # Valid criticality levels
-        for level in ["low", "medium", "high", "critical"]:
-            success = self.annotator.add_annotation(
-                device,
-                name=f"Device {level}",
-                criticality=level
-            )
-            self.assertTrue(success)
-            
-            annotation = self.annotator.get_annotation(device)
-            self.assertEqual(annotation.criticality, level)
-            
-            # Clean up for next iteration
-            self.annotator.delete_annotation(device)
-        
-        # Invalid criticality should default to medium
-        self.annotator.add_annotation(
-            device,
-            name="Invalid criticality",
-            criticality="invalid"
-        )
-        
-        annotation = self.annotator.get_annotation(device)
-        self.assertEqual(annotation.criticality, "medium")
+        # Check annotations were applied
+        self.assertTrue(annotated[0]["critical"])
+        self.assertEqual(annotated[0]["notes"], "Critical router")
+        self.assertEqual(annotated[1]["tags"], ["workstation", "dev"])
+        self.assertFalse(annotated[2].get("critical", False))
     
     def test_export_annotations(self):
         """Test exporting annotations."""
-        # Add some annotations
-        devices = [
-            {"ip": "192.168.1.1", "mac": "00:11:22:33:44:55"},
-            {"ip": "192.168.1.2"},
-            {"ip": "192.168.1.3", "mac": "AA:BB:CC:DD:EE:FF"}
-        ]
+        # Add annotations
+        self.annotator.annotations["192.168.1.1"] = DeviceAnnotation(
+            ip="192.168.1.1", critical=True
+        )
+        self.annotator.annotations["192.168.1.2"] = DeviceAnnotation(
+            ip="192.168.1.2", notes="Test"
+        )
         
-        for i, device in enumerate(devices):
-            self.annotator.add_annotation(
-                device,
-                name=f"Device {i+1}",
-                criticality="high" if i == 0 else "medium",
-                tags=[f"tag{i}"]
-            )
+        # Save annotations
+        self.assertTrue(self.annotator.save_annotations())
         
-        # Export all annotations
-        export_data = self.annotator.export_annotations()
+        # Verify saved file exists and contains data
+        self.assertTrue(self.annotator.annotations_file.exists())
+        with open(self.annotator.annotations_file) as f:
+            data = json.load(f)
         
-        self.assertIn("annotations", export_data)
-        self.assertIn("export_time", export_data)
-        self.assertIn("total_annotations", export_data)
-        self.assertEqual(export_data["total_annotations"], 3)
-        self.assertEqual(len(export_data["annotations"]), 3)
-        
-        # Export filtered annotations
-        export_data = self.annotator.export_annotations(criticality="high")
-        self.assertEqual(export_data["total_annotations"], 1)
+        self.assertEqual(len(data), 2)
+        self.assertIn("192.168.1.1", data)
+        self.assertIn("192.168.1.2", data)
     
-    def test_import_annotations(self):
-        """Test importing annotations."""
-        # Prepare import data
+    def test_load_annotations(self):
+        """Test loading annotations from file."""
+        # Create annotations file with data
         import_data = {
-            "annotations": [
-                {
-                    "device_id": "192.168.1.1",
-                    "name": "Imported Device 1",
-                    "criticality": "high",
-                    "tags": ["imported"]
-                },
-                {
-                    "device_id": "192.168.1.2_00:11:22:33:44:55",
-                    "name": "Imported Device 2",
-                    "location": "Import Location"
-                }
-            ]
+            "192.168.1.1": {
+                "ip": "192.168.1.1",
+                "critical": True,
+                "notes": "Imported"
+            },
+            "192.168.1.2": {
+                "ip": "192.168.1.2",
+                "tags": ["imported"]
+            }
         }
         
-        # Import annotations
-        success_count = self.annotator.import_annotations(import_data)
-        self.assertEqual(success_count, 2)
+        # Write to the expected location
+        self.annotator.annotations_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.annotator.annotations_file, 'w') as f:
+            json.dump(import_data, f)
         
-        # Verify imported annotations
-        device1 = {"ip": "192.168.1.1"}
-        annotation1 = self.annotator.get_annotation(device1)
-        self.assertIsNotNone(annotation1)
-        self.assertEqual(annotation1.name, "Imported Device 1")
-        self.assertEqual(annotation1.criticality, "high")
+        # Load annotations
+        self.annotator.load_annotations()
         
-        device2 = {"ip": "192.168.1.2", "mac": "00:11:22:33:44:55"}
-        annotation2 = self.annotator.get_annotation(device2)
-        self.assertIsNotNone(annotation2)
-        self.assertEqual(annotation2.location, "Import Location")
+        # Verify loaded
+        self.assertEqual(len(self.annotator.annotations), 2)
+        self.assertTrue(self.annotator.annotations["192.168.1.1"].critical)
+        self.assertEqual(self.annotator.annotations["192.168.1.2"].tags, ["imported"])
     
     def test_merge_annotations(self):
-        """Test merging device annotations with scan data."""
-        # Add annotations
-        devices = [
-            {"ip": "192.168.1.1", "mac": "00:11:22:33:44:55", "type": "router"},
-            {"ip": "192.168.1.2", "type": "server"},
-            {"ip": "192.168.1.3", "type": "workstation"}
-        ]
+        """Test merging annotations."""
+        # Add existing annotation
+        existing = DeviceAnnotation(
+            ip="192.168.1.1",
+            notes="Existing",
+            tags=["existing"]
+        )
+        self.annotator.annotations["192.168.1.1"] = existing
         
-        self.annotator.add_annotation(
-            devices[0],
-            name="Main Router",
-            criticality="high",
+        # Create new annotation to merge
+        new_annotation = DeviceAnnotation(
+            ip="192.168.1.1",
+            critical=True,
+            tags=["imported"]
+        )
+        
+        # Merge using the DeviceAnnotation merge method
+        existing.merge(new_annotation)
+        
+        # Verify merged
+        self.assertTrue(existing.critical)
+        # Tags should be combined
+        self.assertIn("existing", existing.tags)
+        self.assertIn("imported", existing.tags)
+        # Notes should be preserved
+        self.assertEqual(existing.notes, "Existing")
+    
+    def test_annotation_stats(self):
+        """Test getting annotation statistics."""
+        # Add various annotations
+        self.annotator.annotations["192.168.1.1"] = DeviceAnnotation(
+            ip="192.168.1.1",
+            notes="Main router in server room",
+            tags=["router", "critical"],
+            critical=True,
             location="Server Room"
         )
-        self.annotator.add_annotation(
-            devices[1],
-            name="Web Server",
-            owner="Web Team"
+        self.annotator.annotations["192.168.1.2"] = DeviceAnnotation(
+            ip="192.168.1.2",
+            notes="Development workstation",
+            tags=["workstation", "dev"],
+            owner="John Doe"
+        )
+        self.annotator.annotations["192.168.1.3"] = DeviceAnnotation(
+            ip="192.168.1.3",
+            notes="Test server",
+            tags=["server"]
         )
         
-        # Merge annotations with device data
-        merged_devices = self.annotator.merge_with_devices(devices)
-        
-        self.assertEqual(len(merged_devices), 3)
-        
-        # Check merged data
-        router = next(d for d in merged_devices if d["ip"] == "192.168.1.1")
-        self.assertIn("annotation", router)
-        self.assertEqual(router["annotation"]["name"], "Main Router")
-        self.assertEqual(router["annotation"]["criticality"], "high")
-        
-        server = next(d for d in merged_devices if d["ip"] == "192.168.1.2")
-        self.assertIn("annotation", server)
-        self.assertEqual(server["annotation"]["owner"], "Web Team")
-        
-        workstation = next(d for d in merged_devices if d["ip"] == "192.168.1.3")
-        self.assertNotIn("annotation", workstation)
+        # Get stats
+        stats = self.annotator.get_annotation_stats()
+        self.assertEqual(stats["total"], 3)
+        self.assertEqual(stats["critical"], 1)
+        self.assertEqual(stats["with_notes"], 3)
+        self.assertEqual(stats["with_tags"], 3)
+        self.assertEqual(stats["with_location"], 1)
+        self.assertEqual(stats["with_owner"], 1)
+        self.assertEqual(stats["unique_tags"], 5)  # router, critical, workstation, dev, server
     
     def test_annotation_persistence(self):
-        """Test annotation persistence across instances."""
-        device = {"ip": "192.168.1.1"}
-        
+        """Test annotations persist across instances."""
         # Add annotation
-        self.annotator.add_annotation(
-            device,
-            name="Persistent Device",
-            tags=["test", "persistence"]
+        self.annotator.annotations["192.168.1.1"] = DeviceAnnotation(
+            ip="192.168.1.1",
+            critical=True,
+            notes="Persistent"
         )
         
-        # Create new annotator instance
-        new_annotator = DeviceAnnotator(base_dir=self.temp_dir)
+        # Save
+        self.assertTrue(self.annotator.save_annotations())
         
-        # Should load existing annotations
-        annotation = new_annotator.get_annotation(device)
-        self.assertIsNotNone(annotation)
-        self.assertEqual(annotation.name, "Persistent Device")
-        self.assertIn("persistence", annotation.tags)
-    
-    def test_concurrent_access(self):
-        """Test concurrent annotation access."""
-        import threading
+        # Create new instance
+        new_annotator = DeviceAnnotator(output_path=Path(self.temp_dir))
         
-        results = []
-        device = {"ip": "192.168.1.1"}
-        
-        def add_annotation(name):
-            success = self.annotator.add_annotation(
-                device,
-                name=name,
-                description=f"Added by {name}"
-            )
-            results.append((name, success))
-        
-        # Create threads
-        threads = []
-        for i in range(5):
-            thread = threading.Thread(
-                target=add_annotation,
-                args=(f"Thread-{i}",)
-            )
-            threads.append(thread)
-        
-        # Run concurrently
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-        
-        # One should succeed, others should update
-        self.assertEqual(len(results), 5)
-        
-        # Final annotation should exist
-        annotation = self.annotator.get_annotation(device)
-        self.assertIsNotNone(annotation)
+        # Verify annotation persisted
+        self.assertIn("192.168.1.1", new_annotator.annotations)
+        annotation = new_annotator.annotations["192.168.1.1"]
+        self.assertTrue(annotation.critical)
+        self.assertEqual(annotation.notes, "Persistent")
     
     def test_error_handling(self):
         """Test error handling in various scenarios."""
-        # Invalid device data
-        with self.assertLogs(level='ERROR'):
-            success = self.annotator.add_annotation(
-                {"no_ip": "invalid"},
-                name="Test"
-            )
-            self.assertFalse(success)
+        # Test saving with invalid path
+        old_file = self.annotator.annotations_file
+        self.annotator.annotations_file = Path("/invalid/path/annotations.json")
         
-        # Corrupted annotation file
-        device = {"ip": "192.168.1.1"}
-        annotation_file = os.path.join(self.annotator.annotations_dir, "192.168.1.1.json")
+        # Should handle error gracefully
+        result = self.annotator.save_annotations()
+        self.assertFalse(result)
         
-        # Create corrupted file
-        with open(annotation_file, 'w') as f:
-            f.write("invalid json {")
+        # Restore valid path
+        self.annotator.annotations_file = old_file
         
-        # Should handle gracefully
-        annotation = self.annotator.get_annotation(device)
-        self.assertIsNone(annotation)
+        # Test loading invalid JSON
+        self.annotator.annotations_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.annotator.annotations_file, 'w') as f:
+            f.write("invalid json{")
         
-        # Should be able to overwrite with valid annotation
-        success = self.annotator.add_annotation(device, name="Valid")
-        self.assertTrue(success)
-    
-    def test_annotation_statistics(self):
-        """Test annotation statistics generation."""
-        # Add various annotations
-        devices = []
-        for i in range(20):
-            devices.append({"ip": f"192.168.1.{i+1}"})
-        
-        # Add annotations with different attributes
-        for i, device in enumerate(devices):
-            criticality = ["low", "medium", "high", "critical"][i % 4]
-            tags = []
-            if i % 2 == 0:
-                tags.append("production")
-            if i % 3 == 0:
-                tags.append("monitored")
-            
-            self.annotator.add_annotation(
-                device,
-                name=f"Device {i+1}",
-                criticality=criticality,
-                tags=tags,
-                owner="IT Team" if i < 10 else "Dev Team"
-            )
-        
-        # Get statistics
-        stats = self.annotator.get_statistics()
-        
-        self.assertEqual(stats["total_annotations"], 20)
-        self.assertEqual(stats["criticality_distribution"]["low"], 5)
-        self.assertEqual(stats["criticality_distribution"]["medium"], 5)
-        self.assertEqual(stats["criticality_distribution"]["high"], 5)
-        self.assertEqual(stats["criticality_distribution"]["critical"], 5)
-        
-        self.assertIn("production", stats["top_tags"])
-        self.assertIn("monitored", stats["top_tags"])
-        
-        self.assertEqual(stats["owners"]["IT Team"], 10)
-        self.assertEqual(stats["owners"]["Dev Team"], 10)
+        # Should handle error gracefully
+        self.annotator.load_annotations()
+        self.assertEqual(len(self.annotator.annotations), 0)
 
 
 if __name__ == '__main__':

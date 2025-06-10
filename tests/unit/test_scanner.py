@@ -82,7 +82,7 @@ scanners:
         # /16 network
         self.assertEqual(self.scanner._estimate_total_hosts("10.0.0.0/16"), 65534)
         # /32 single host
-        self.assertEqual(self.scanner._estimate_total_hosts("192.168.1.1/32"), 0)
+        self.assertEqual(self.scanner._estimate_total_hosts("192.168.1.1/32"), 1)
         # Invalid CIDR
         self.assertEqual(self.scanner._estimate_total_hosts("192.168.1.0/invalid"), 256)
     
@@ -340,16 +340,25 @@ scanners:
         
         # Mock nmap process
         mock_proc = MagicMock()
-        mock_proc.poll.return_value = None  # Process running
+        mock_proc.poll.side_effect = [None, None, None, None, 0]  # Process running then done
         mock_proc.returncode = 0
-        mock_proc.stdout.readline.side_effect = [
-            "Starting Nmap",
-            "Nmap scan report for 192.168.1.1",
-            "Host is up",
-            "Nmap done: 256 IP addresses (1 host up)",
-            ""  # End of output
-        ]
-        mock_proc.stderr.read.return_value = ""
+        # Use a generator that returns empty strings after the real output
+        def readline_generator():
+            outputs = [
+                "Starting Nmap",
+                "Nmap scan report for 192.168.1.1",
+                "Host is up",
+                "Nmap done: 256 IP addresses (1 host up) scanned",
+            ]
+            for output in outputs:
+                yield output
+            while True:
+                yield ""  # Keep returning empty strings
+        
+        mock_proc.stdout.readline.side_effect = readline_generator()
+        mock_proc.stderr = MagicMock()
+        mock_proc.stderr.__iter__ = Mock(return_value=iter([]))
+        mock_proc.wait.return_value = None
         mock_popen.return_value = mock_proc
         
         # Create mock XML file
@@ -533,8 +542,17 @@ class TestScannerIntegration(unittest.TestCase):
         mock_proc = MagicMock()
         mock_proc.poll.side_effect = [None] * (len(nmap_output) - 1) + [0]
         mock_proc.returncode = 0
-        mock_proc.stdout.readline.side_effect = nmap_output
-        mock_proc.stderr.read.return_value = ""
+        # Use a generator that returns empty strings after the real output
+        def readline_generator():
+            for output in nmap_output:
+                yield output
+            while True:
+                yield ""  # Keep returning empty strings
+        
+        mock_proc.stdout.readline.side_effect = readline_generator()
+        mock_proc.stderr = MagicMock()
+        mock_proc.stderr.__iter__ = Mock(return_value=iter([]))
+        mock_proc.wait.return_value = None
         mock_popen.return_value = mock_proc
         
         # Mock XML output

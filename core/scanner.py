@@ -102,7 +102,12 @@ class NetworkScanner:
             # CIDR notation
             try:
                 prefix = int(target.split("/")[1])
-                return 2 ** (32 - prefix) - 2  # Subtract network and broadcast
+                if prefix == 32:
+                    return 1  # Single host
+                elif prefix == 31:
+                    return 2  # Point-to-point link
+                else:
+                    return 2 ** (32 - prefix) - 2  # Subtract network and broadcast
             except:
                 return 256  # Default to /24
         else:

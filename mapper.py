@@ -178,20 +178,21 @@ class NetworkMapper:
 
         console.print(file_table)
 
-        if Confirm.ask("\nGenerate HTML report?"):
-            report_file, comparison_file = self.generate_html_report(devices, timestamp)
+        # Automatically generate and open visualization
+        console.print("\n[yellow]Generating interactive network visualization...[/yellow]")
+        report_file, comparison_file = self.generate_html_report(devices, timestamp)
 
-            # Show report paths
-            console.print(f"\n[bold]Report Files:[/bold]")
-            report_table = Table(show_header=False, box=None, padding=(0, 2))
-            report_table.add_column("Type", style="cyan")
-            report_table.add_column("Path", style="yellow")
+        # Show report paths
+        console.print(f"\n[bold]Generated Files:[/bold]")
+        report_table = Table(show_header=False, box=None, padding=(0, 2))
+        report_table.add_column("Type", style="cyan")
+        report_table.add_column("Path", style="yellow")
 
-            report_table.add_row("Main report:", str(report_file))
-            if comparison_file:
-                report_table.add_row("Comparison:", str(comparison_file))
+        report_table.add_row("Network Map:", str(report_file))
+        if comparison_file:
+            report_table.add_row("Comparison:", str(comparison_file))
 
-            console.print(report_table)
+        console.print(report_table)
 
         input("\nPress Enter to continue...")
 
@@ -292,12 +293,16 @@ class NetworkMapper:
 
         # Setup Jinja2
         env = Environment(loader=FileSystemLoader(self.base_path / "templates"))
-        template = env.get_template("report.html")
+        
+        # Get changes if available
+        changes = {}
+        if self.last_changes:
+            changes = self.last_changes
 
-        # Prepare report data - IMPORTANT: pass the actual scan timestamp
+        # Prepare report data
         report_data = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "scan_timestamp": timestamp,  # Add this for the JavaScript
+            "scan_timestamp": timestamp,
             "scan_date": datetime.now().strftime("%B %d, %Y"),
             "total_devices": len(devices),
             "devices": devices,
@@ -306,21 +311,48 @@ class NetworkMapper:
             "d3_data": json.dumps(d3_data),
             "three_data": json.dumps(three_data),
             "subnet_summary": self._get_subnet_summary(devices),
+            "changes": changes,  # Include changes data
         }
 
-        # Render and save report
-        report_file = self.output_path / "reports" / f"report_{timestamp}.html"
-        html_content = template.render(**report_data)
+        # Generate BOTH reports
+        generated_files = []
+        
+        # 1. Generate original detailed report
+        original_template = env.get_template("report.html")
+        original_report_file = self.output_path / "reports" / f"report_{timestamp}.html"
+        original_html = original_template.render(**report_data)
+        
+        with open(original_report_file, "w") as f:
+            f.write(original_html)
+        
+        generated_files.append(("Detailed Report", original_report_file))
+        
+        # 2. Generate new interactive visualization
+        viz_template = env.get_template("network_visualization.html")
+        viz_report_file = self.output_path / "reports" / f"network_map_{timestamp}.html"
+        viz_html = viz_template.render(**report_data)
+        
+        with open(viz_report_file, "w") as f:
+            f.write(viz_html)
+            
+        generated_files.append(("Network Map", viz_report_file))
 
-        with open(report_file, "w") as f:
-            f.write(html_content)
+        # Open BOTH in browser (visualization first, then report)
+        viz_url = f"file://{viz_report_file.absolute()}"
+        original_url = f"file://{original_report_file.absolute()}"
+        
+        # Open visualization first
+        webbrowser.open(viz_url)
+        # Small delay then open report
+        import time
+        time.sleep(0.5)
+        webbrowser.open(original_url)
 
-        # Open in browser
-        file_url = f"file://{report_file.absolute()}"
-        webbrowser.open(file_url)
-
-        # Show clickable link in terminal
-        console.print("\n[green]✓ Report generated and opened in browser![/green]")
+        # Show clickable links in terminal
+        console.print("\n[green]✓ Reports generated and opened in browser![/green]")
+        console.print(f"\n[bold cyan]Generated files:[/bold cyan]")
+        console.print(f"[yellow]Network Visualization:[/yellow] [underline]{viz_url}[/underline]")
+        console.print(f"[yellow]Detailed Report:[/yellow] [underline]{original_url}[/underline]\n")
 
         # Also generate comparison report if we have changes
         comparison_file = None
@@ -333,7 +365,7 @@ class NetworkMapper:
             if changes:
                 comparison_file = self.generate_comparison_report(devices, changes, timestamp)
 
-        return report_file, comparison_file
+        return viz_report_file, comparison_file
 
     def generate_comparison_report(self, current_devices, changes, timestamp):
         """Generate comparison report HTML"""
@@ -524,16 +556,23 @@ class NetworkMapper:
 
     def view_network_map(self):
         """Launch network map viewer"""
-        # Get most recent report
-        report_files = sorted((self.output_path / "reports").glob("report_*.html"), reverse=True)
+        # Get most recent network map
+        report_files = sorted((self.output_path / "reports").glob("network_map_*.html"), reverse=True)
+        
+        # Fall back to old report format if no new maps found
+        if not report_files:
+            report_files = sorted((self.output_path / "reports").glob("report_*.html"), reverse=True)
+            
         if report_files:
             import webbrowser
 
             file_url = f"file://{report_files[0].absolute()}"
             webbrowser.open(file_url)
             console.print("[green]Opening network map in browser...[/green]")
+            console.print(f"\n[bold cyan]Network map location:[/bold cyan]")
+            console.print(f"[yellow underline]{file_url}[/yellow underline]")
         else:
-            console.print("[yellow]No reports found. Generate a report first.[/yellow]")
+            console.print("[yellow]No network maps found. Run a scan first to generate a visualization.[/yellow]")
         input("\nPress Enter to continue...")
 
     def export_data(self):
