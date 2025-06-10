@@ -28,6 +28,7 @@ from utils.snmp_config import SNMPConfig
 from utils.traffic_analyzer import PassiveTrafficAnalyzer
 from utils.visualization import MapGenerator
 from utils.vulnerability_scanner import VulnerabilityScanner
+from modern_interface import ModernInterface
 
 app = typer.Typer()
 console = Console()
@@ -48,6 +49,7 @@ class NetworkMapper:
         self.export_mgr = ExportManager(self.output_path)
         self.snmp_config = SNMPConfig(self.output_path / "config")
         self.vuln_scanner = VulnerabilityScanner(self.output_path / "cache")
+        self.modern_ui = ModernInterface(self)
         self.traffic_analyzer = PassiveTrafficAnalyzer(output_path=self.output_path)
         self.cli_overrides = {}
         self.last_changes = None
@@ -439,7 +441,17 @@ class NetworkMapper:
             if "uptime_days" not in device:
                 device["uptime_days"] = 0
         
-        # Prepare report data
+        # Load scan metadata if available
+        metadata_file = self.output_path / "scans" / f"summary_{timestamp}.json"
+        scan_metadata = {}
+        if metadata_file.exists():
+            try:
+                with open(metadata_file) as f:
+                    scan_metadata = json.load(f)
+            except:
+                pass
+        
+        # Prepare report data with enhanced metadata
         report_data = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "scan_timestamp": timestamp,
@@ -452,6 +464,7 @@ class NetworkMapper:
             "three_data": json.dumps(three_data),
             "subnet_summary": self._get_subnet_summary(devices),
             "changes": changes,  # Include changes data
+            "scan_metadata": scan_metadata,  # Include scan metadata for footer
         }
 
         # Generate BOTH reports
@@ -1723,7 +1736,8 @@ def main(
             "snmp_version": snmp_version,
         }
 
-        mapper.interactive_menu()
+        # Use modern interface
+        mapper.modern_ui.interactive_menu()
     except KeyboardInterrupt:
         console.print("\n[red]Interrupted by user[/red]")
     except Exception as e:

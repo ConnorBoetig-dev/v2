@@ -24,10 +24,11 @@ A comprehensive Python-based network discovery and security assessment tool that
 git clone https://github.com/yourusername/networkmapper-v2.git
 cd networkmapper-v2
 
-# Install dependencies
-pip3 install -r requirements.txt
+# Quick setup and launch
+./quick_start.sh
 
-# Run NetworkMapper
+# OR manual installation:
+pip3 install -r requirements.txt
 python3 mapper.py
 ```
 
@@ -74,13 +75,12 @@ python3 mapper.py --disable-snmp
 python3 mapper.py --snmp-community private --snmp-version v2c
 ```
 
-### Using Make Commands
+### Using Helper Scripts
 ```bash
-make help       # Show all available commands
-make run        # Run NetworkMapper
-make demo       # Generate demo data
-make test       # Run test suite
-make lint       # Check code quality
+./quick_start.sh    # Quick setup and launch
+./run_demo.sh       # Run demo scenarios
+python scripts/verify_installation.py  # Verify setup
+python scripts/test_core_functionality.py  # Test features
 ```
 
 ## Scan Types
@@ -221,7 +221,8 @@ python3 -m http.server 8000
 
 ```
 networkmapper-v2/
-├── mapper.py              # Main application
+├── mapper.py              # Main application with modern UI
+├── modern_interface.py    # Sleek CLI interface components
 ├── core/                  # Core scanning modules
 │   ├── scanner.py        # Network scanning orchestration
 │   ├── parser.py         # Result parsing
@@ -229,12 +230,11 @@ networkmapper-v2/
 │   ├── tracker.py        # Change tracking
 │   └── annotator.py      # Device annotations
 ├── utils/                 # Utility modules
-│   ├── vulnerability_scanner.py  # CVE correlation
-│   ├── snmp_config.py           # SNMP configuration
-│   ├── export_manager.py        # Export functionality
-│   └── visualization.py         # Network visualization
 ├── templates/             # HTML report templates
 ├── tests/                 # Test suite
+├── demos/                 # Demo and example scripts
+├── scripts/               # Utility and testing scripts
+├── tools/                 # External tools and binaries
 └── output/               # Scan results and reports
 ```
 
@@ -242,18 +242,16 @@ networkmapper-v2/
 
 ```bash
 # Run all tests
-make test
+pytest tests/ -v
 
-# Run specific module tests
-make test-scanner
-make test-vulnerability
-make test-snmp
+# Quick functionality test
+python scripts/test_core_functionality.py
 
-# Run with coverage
-make coverage
+# Full system test
+python scripts/test_full_system.py
 
-# Quick smoke tests
-make quick
+# Verify installation
+python scripts/verify_installation.py
 ```
 
 ## Contributing
