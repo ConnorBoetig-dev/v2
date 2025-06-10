@@ -131,6 +131,85 @@ make lint       # Check code quality
 - **CSV**: Compatible with any spreadsheet app
 - **JSON**: Complete data for integration
 
+## Remote Access Setup
+
+NetworkMapper includes a built-in web server for accessing reports remotely.
+
+### 1. Local Network Access
+After completing a scan, the web server automatically starts:
+```bash
+python3 mapper.py
+# Note the URLs displayed after scan completion:
+# Local: http://localhost:5000
+# Network: http://YOUR-IP:5000
+```
+
+Access from any device on the same network using the network URL.
+
+### 2. Remote Access (Secure Methods)
+
+#### SSH Port Forwarding (Recommended)
+From your remote machine:
+```bash
+ssh -L 8080:localhost:5000 user@scanner-host
+# Then open http://localhost:8080 in your browser
+```
+
+#### VPN Access
+If you have VPN access to the network:
+```bash
+# Connect to VPN, then access directly
+http://scanner-host-ip:5000
+```
+
+### 3. Cloud Deployment
+
+#### Quick Cloud Setup (AWS/GCP/Azure)
+1. Launch Ubuntu 20.04+ VM instance
+2. Configure security group to allow SSH (port 22) from your IP
+3. Install NetworkMapper:
+```bash
+ssh ubuntu@your-vm-ip
+sudo apt update && sudo apt install python3-pip nmap arp-scan git -y
+git clone <your-repo>
+cd networkmapper-v2
+pip3 install -r requirements.txt
+```
+
+4. Run scan and access via SSH tunnel:
+```bash
+# On VM
+python3 mapper.py
+
+# From your machine
+ssh -L 8080:localhost:5000 ubuntu@your-vm-ip
+# Open http://localhost:8080
+```
+
+### 4. Alternative Access Methods
+
+#### File Transfer
+If remote web access isn't available:
+```bash
+# Copy reports to local machine
+scp user@scanner-host:~/networkmapper-v2/output/reports/*.html .
+scp user@scanner-host:~/networkmapper-v2/output/exports/*.pdf .
+```
+
+#### Simple HTTP Server
+For one-time sharing of static reports:
+```bash
+cd output/reports
+python3 -m http.server 8000
+# Access via http://scanner-host:8000
+```
+
+### Security Notes
+- Default configuration only binds to localhost for security
+- Use SSH tunneling for remote access instead of exposing ports
+- Reports may contain sensitive network information
+- Only scan networks you own or have permission to scan
+
 ## Documentation
 
 - [Detailed Documentation](CLAUDE.md) - Architecture and implementation details

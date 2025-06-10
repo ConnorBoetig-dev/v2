@@ -1,4 +1,4 @@
-#\!/usr/bin/env python3
+#!/usr/bin/env python3
 """Test visualization data generation"""
 
 import json
@@ -59,4 +59,3 @@ with open(test_output, 'w') as f:
     }, f, indent=2)
 
 print(f"\nTest data saved to {test_output}")
-EOF < /dev/null

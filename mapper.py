@@ -6,6 +6,8 @@ NetworkMapper 2.0 - Network Discovery and Mapping Tool
 import csv
 import json
 import logging
+import time
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Tuple
@@ -23,6 +25,7 @@ from core.scanner import NetworkScanner
 from core.tracker import ChangeTracker
 from utils.export_manager import ExportManager
 from utils.snmp_config import SNMPConfig
+from utils.traffic_analyzer import PassiveTrafficAnalyzer
 from utils.visualization import MapGenerator
 from utils.vulnerability_scanner import VulnerabilityScanner
 
@@ -45,8 +48,10 @@ class NetworkMapper:
         self.export_mgr = ExportManager(self.output_path)
         self.snmp_config = SNMPConfig(self.output_path / "config")
         self.vuln_scanner = VulnerabilityScanner(self.output_path / "cache")
+        self.traffic_analyzer = PassiveTrafficAnalyzer(output_path=self.output_path)
         self.cli_overrides = {}
         self.last_changes = None
+        self.passive_analysis_results = None
 
     def ensure_directories(self):
         """Create output directories if they don't exist"""
@@ -125,6 +130,9 @@ class NetworkMapper:
         # Interactive vulnerability scanning setup
         vuln_enabled = self._handle_vulnerability_setup()
 
+        # Passive traffic analysis setup
+        passive_enabled, passive_duration = self._handle_passive_analysis_setup()
+
         # Run scan
         console.print(f"\n[yellow]Starting {scan_name} on {target}...[/yellow]\n")
 
@@ -145,6 +153,63 @@ class NetworkMapper:
         # Parse and classify
         devices = self.parser.parse_results(results)
         devices = self.classifier.classify_devices(devices)
+
+        # Run passive traffic analysis if enabled
+        if passive_enabled:
+            console.print("\n[cyan]Starting passive traffic analysis...[/cyan]")
+            console.print("[dim]This will discover stealth devices and map traffic flows[/dim]")
+
+            try:
+                # Start passive capture
+                self.traffic_analyzer.start_capture(duration=passive_duration)
+
+                # Show progress
+                with console.status(
+                    f"[cyan]Analyzing network traffic for {passive_duration} seconds...[/cyan]"
+                ) as status:
+                    start_time = time.time()
+                    while (
+                        self.traffic_analyzer.running
+                        and (time.time() - start_time) < passive_duration + 5
+                    ):
+                        elapsed = int(time.time() - start_time)
+                        discovered = self.traffic_analyzer.stats["devices_discovered"]
+                        flows = self.traffic_analyzer.stats["flows_tracked"]
+                        status.update(
+                            f"[cyan]Passive analysis: {elapsed}s elapsed, {discovered} devices, {flows} flows[/cyan]"
+                        )
+                        time.sleep(1)
+
+                # Stop capture
+                self.traffic_analyzer.stop_capture()
+
+                # Export passive results
+                devices_file, flows_file = self.traffic_analyzer.export_results(timestamp)
+
+                # Merge with active scan results
+                devices = self.traffic_analyzer.merge_with_active_scan(devices)
+
+                # Display summary
+                passive_summary = {
+                    "stealth_devices": len([d for d in devices if d.get("stealth_device", False)]),
+                    "total_flows": len(self.traffic_analyzer.flows),
+                    "top_talkers": self.traffic_analyzer.get_top_talkers(3),
+                }
+                self._display_passive_analysis_summary(passive_summary)
+
+                # Store results for later use
+                self.passive_analysis_results = {
+                    "devices_file": devices_file,
+                    "flows_file": flows_file,
+                    "flow_matrix": self.traffic_analyzer.get_flow_matrix(),
+                    "service_usage": self.traffic_analyzer.get_service_usage(),
+                    "duration": passive_duration,
+                }
+
+            except Exception as e:
+                console.print(f"[yellow]Warning: Passive analysis failed: {e}[/yellow]")
+                console.print("[yellow]This feature requires root/sudo privileges[/yellow]")
+                logger.error(f"Passive analysis error: {e}")
 
         # Vulnerability scanning if enabled
         if vuln_enabled:
@@ -238,6 +303,10 @@ class NetworkMapper:
                 "critical",
                 "notes",
                 "last_seen",
+                "stealth_device",
+                "discovery_method",
+                "traffic_flows",
+                "communication_peers",
             ]
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
@@ -257,6 +326,9 @@ class NetworkMapper:
                 else:
                     vuln_summary = "No vulnerabilities detected"
 
+                # Get passive analysis data if available
+                passive_data = device.get("passive_analysis", {})
+
                 row = {
                     "ip": device.get("ip"),
                     "hostname": device.get("hostname", ""),
@@ -273,6 +345,10 @@ class NetworkMapper:
                     "critical": device.get("critical", False),
                     "notes": device.get("notes", ""),
                     "last_seen": device.get("last_seen", datetime.now().isoformat()),
+                    "stealth_device": "Yes" if device.get("stealth_device", False) else "No",
+                    "discovery_method": device.get("discovery_method", "active"),
+                    "traffic_flows": passive_data.get("traffic_flows", 0),
+                    "communication_peers": passive_data.get("communication_peers", 0),
                 }
                 writer.writerow(row)
 
@@ -330,7 +406,14 @@ class NetworkMapper:
         devices = self.annotator.apply_annotations(devices)
 
         # Generate visualization data
-        d3_data = self.map_gen.generate_d3_data(devices)
+        if self.passive_analysis_results and self.passive_analysis_results.get("flow_matrix"):
+            # Use traffic flow enhanced visualization
+            d3_data = self.map_gen.generate_traffic_flow_data(
+                devices, self.passive_analysis_results["flow_matrix"]
+            )
+        else:
+            d3_data = self.map_gen.generate_d3_data(devices)
+
         three_data = self.map_gen.generate_threejs_data(devices)
 
         # Setup Jinja2
@@ -341,6 +424,21 @@ class NetworkMapper:
         if self.last_changes:
             changes = self.last_changes
 
+        # Ensure all devices have required fields for templates
+        for device in devices:
+            if "vulnerability_count" not in device:
+                device["vulnerability_count"] = 0
+            if "vulnerabilities" not in device:
+                device["vulnerabilities"] = []
+            if "critical_vulns" not in device:
+                device["critical_vulns"] = 0
+            if "high_vulns" not in device:
+                device["high_vulns"] = 0
+            if "dependent_count" not in device:
+                device["dependent_count"] = 0
+            if "uptime_days" not in device:
+                device["uptime_days"] = 0
+        
         # Prepare report data
         report_data = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -379,7 +477,86 @@ class NetworkMapper:
 
         generated_files.append(("Network Map", viz_report_file))
 
-        # Open BOTH in browser (visualization first, then report)
+        # 3. Generate traffic flow report if passive analysis was performed
+        if self.passive_analysis_results:
+            traffic_template = env.get_template("traffic_flow_report.html")
+            traffic_report_file = self.output_path / "reports" / f"traffic_flow_{timestamp}.html"
+
+            # Prepare traffic flow data
+            flow_data = self.passive_analysis_results.get("flow_matrix", {})
+            service_usage = self.passive_analysis_results.get("service_usage", {})
+
+            # Calculate statistics
+            stealth_devices = len([d for d in devices if d.get("stealth_device", False)])
+            total_flows = sum(len(flows) for flows in flow_data.values())
+            services_count = len(service_usage)
+
+            # Get top talkers with enhanced info
+            top_talkers = []
+            if flow_data:
+                traffic_totals = defaultdict(int)
+                for src, destinations in flow_data.items():
+                    for dst, packets in destinations.items():
+                        traffic_totals[src] += packets
+                        traffic_totals[dst] += packets
+
+                # Get device info for top talkers
+                for ip, traffic_volume in sorted(
+                    traffic_totals.items(), key=lambda x: x[1], reverse=True
+                )[:10]:
+                    device = next((d for d in devices if d["ip"] == ip), None)
+                    if device:
+                        color_map = {
+                            "router": "#F44336",
+                            "server": "#2196F3",
+                            "workstation": "#4CAF50",
+                            "unknown": "#9E9E9E",
+                        }
+                        top_talkers.append(
+                            {
+                                "ip": ip,
+                                "hostname": device.get("hostname", ""),
+                                "type": device.get("type", "unknown"),
+                                "stealth": device.get("stealth_device", False),
+                                "traffic_volume": traffic_volume
+                                * 1500,  # Estimate bytes from packets
+                                "color": color_map.get(device.get("type", "unknown"), "#9E9E9E"),
+                            }
+                        )
+
+            # Calculate max service count for visualization
+            max_service_count = 1
+            if service_usage:
+                for ips in service_usage.values():
+                    if isinstance(ips, list):
+                        max_service_count = max(max_service_count, len(ips))
+                    else:
+                        max_service_count = max(max_service_count, ips)
+
+            traffic_report_data = {
+                **report_data,
+                "devices": devices,  # Add full devices data for risk analysis
+                "stealth_devices": stealth_devices,
+                "total_flows": total_flows,
+                "services_count": services_count,
+                "flow_matrix": json.dumps(flow_data),
+                "service_usage": service_usage,
+                "max_service_count": max_service_count,
+                "top_talkers": top_talkers,
+                "stats": {
+                    "packets_captured": getattr(self.traffic_analyzer, 'stats', {}).get("packets_captured", 0),
+                    "duration": self.passive_analysis_results.get("duration", 0),
+                },
+            }
+
+            traffic_html = traffic_template.render(**traffic_report_data)
+
+            with open(traffic_report_file, "w") as f:
+                f.write(traffic_html)
+
+            generated_files.append(("Traffic Flow Analysis", traffic_report_file))
+
+        # Open all reports in browser
         viz_url = f"file://{viz_report_file.absolute()}"
         original_url = f"file://{original_report_file.absolute()}"
 
@@ -391,11 +568,25 @@ class NetworkMapper:
         time.sleep(0.5)
         webbrowser.open(original_url)
 
+        # Open traffic flow report if generated
+        if self.passive_analysis_results and len(generated_files) > 2:
+            traffic_report_file = generated_files[2][1]  # Get the traffic report file
+            traffic_url = f"file://{traffic_report_file.absolute()}"
+            time.sleep(0.5)
+            webbrowser.open(traffic_url)
+
         # Show clickable links in terminal
         console.print("\n[green]✓ Reports generated and opened in browser![/green]")
         console.print(f"\n[bold cyan]Generated files:[/bold cyan]")
         console.print(f"[yellow]Network Visualization:[/yellow] [underline]{viz_url}[/underline]")
-        console.print(f"[yellow]Detailed Report:[/yellow] [underline]{original_url}[/underline]\n")
+        console.print(f"[yellow]Detailed Report:[/yellow] [underline]{original_url}[/underline]")
+
+        if self.passive_analysis_results:
+            console.print(
+                f"[yellow]Traffic Flow Analysis:[/yellow] [underline]{traffic_url}[/underline]"
+            )
+
+        console.print("\n")
 
         # Also generate comparison report if we have changes
         comparison_file = None
@@ -1324,6 +1515,60 @@ class NetworkMapper:
 
         return enabled
 
+    def _handle_passive_analysis_setup(self) -> Tuple[bool, int]:
+        """Handle passive traffic analysis setup"""
+        console.print("\n[bold]Passive Traffic Analysis[/bold]")
+        console.print("Discover stealth devices and map real-time traffic flows")
+        console.print("[dim]Requires root/sudo privileges - captures network packets[/dim]")
+
+        enabled = Confirm.ask("Enable passive traffic analysis", default=False)
+        duration = 30  # Default duration
+
+        if enabled:
+            console.print("\n[bold]Capture Duration[/bold]")
+            console.print("How long to analyze traffic? (longer = more accurate)")
+            console.print("  1. Quick (30 seconds)")
+            console.print("  2. Standard (60 seconds)")
+            console.print("  3. Extended (120 seconds)")
+            console.print("  4. Custom duration")
+
+            choice = Prompt.ask("Select duration", choices=["1", "2", "3", "4"], default="2")
+
+            if choice == "1":
+                duration = 30
+            elif choice == "2":
+                duration = 60
+            elif choice == "3":
+                duration = 120
+            elif choice == "4":
+                duration = int(Prompt.ask("Enter duration in seconds", default="60"))
+
+            console.print(f"[green]→ Passive analysis enabled for {duration} seconds[/green]")
+        else:
+            console.print("[dim]→ Passive analysis disabled[/dim]")
+
+        return enabled, duration
+
+    def _display_passive_analysis_summary(self, summary: Dict):
+        """Display passive analysis summary"""
+        console.print("\n[bold cyan]Passive Analysis Results[/bold cyan]")
+
+        # Summary table
+        summary_table = Table(show_header=False, box=None, padding=(0, 2))
+        summary_table.add_column("Metric", style="cyan")
+        summary_table.add_column("Value", style="yellow")
+
+        summary_table.add_row("Stealth devices found", str(summary["stealth_devices"]))
+        summary_table.add_row("Traffic flows captured", str(summary["total_flows"]))
+
+        console.print(summary_table)
+
+        # Top talkers
+        if summary.get("top_talkers"):
+            console.print("\n[bold]Top Traffic Generators:[/bold]")
+            for ip, bytes_count in summary["top_talkers"]:
+                console.print(f"  • {ip}: {bytes_count:,} bytes")
+
     def _display_vulnerability_summary(self, vuln_report: Dict):
         """Display vulnerability scan summary"""
         if vuln_report["total_vulnerabilities"] == 0:
@@ -1487,4 +1732,3 @@ def main(
 
 if __name__ == "__main__":
     app()
-

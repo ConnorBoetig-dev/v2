@@ -1,6 +1,7 @@
 import math
 import random
-from typing import Dict, List
+from collections import defaultdict
+from typing import Dict, List, Optional, Tuple
 
 
 class MapGenerator:
@@ -21,22 +22,30 @@ class MapGenerator:
         links = []
         node_map = {}
 
-        # Create device nodes (no subnet nodes for cleaner topology)
+        # Create device nodes with enhanced metadata
         for device in devices:
             device_node = {
                 "id": device["ip"],
                 "name": device.get("hostname", device["ip"]),
                 "type": device.get("type", "unknown"),
+                "subtype": device.get("subtype", ""),
                 "critical": device.get("critical", False),
                 "services": device.get("services", []),
                 "vendor": device.get("vendor", ""),
                 "group": self._get_device_group(device),
+                "tags": device.get("tags", []),
+                "dependent_count": device.get("dependent_count", 0),
+                "uptime_days": device.get("uptime_days", 0),
+                "always_on": device.get("always_on", False),
             }
             nodes.append(device_node)
             node_map[device["ip"]] = device_node
 
         # Create intelligent connections based on network topology
         self._create_network_links(devices, links, node_map)
+
+        # Calculate critical asset statistics
+        critical_stats = self._calculate_critical_stats(devices)
 
         return {
             "nodes": nodes,
@@ -45,27 +54,180 @@ class MapGenerator:
                 "total_devices": len(devices),
                 "subnets": len(subnets),
                 "device_types": self._count_types(devices),
+                "critical_assets": critical_stats,
             },
         }
 
-    def _get_device_group(self, device: Dict) -> int:
-        """Assign group based on device characteristics"""
-        device_type = device.get("type", "unknown")
+    def generate_traffic_flow_data(
+        self, devices: List[Dict], flow_matrix: Optional[Dict] = None
+    ) -> Dict:
+        """Generate D3.js data with traffic flow information
 
-        # Group hierarchy: infrastructure > servers > clients
-        if device_type in ["router"]:
+        Args:
+            devices: List of devices including passive discoveries
+            flow_matrix: Optional traffic flow matrix from passive analysis
+
+        Returns:
+            Enhanced D3.js data with traffic flows
+        """
+        # For traffic flow visualization, we start fresh and only show real connections
+        nodes = []
+        node_map = {}
+
+        # Create nodes with enhanced metadata
+        for device in devices:
+            device_node = {
+                "id": device["ip"],
+                "name": device.get("hostname", device["ip"]),
+                "type": device.get("type", "unknown"),
+                "subtype": device.get("subtype", ""),
+                "critical": device.get("critical", False),
+                "services": device.get("services", []),
+                "vendor": device.get("vendor", ""),
+                "group": self._get_device_group(device),
+                "tags": device.get("tags", []),
+                "dependent_count": device.get("dependent_count", 0),
+                "uptime_days": device.get("uptime_days", 0),
+                "always_on": device.get("always_on", False),
+            }
+            nodes.append(device_node)
+            node_map[device["ip"]] = device_node
+
+        # Create node index for quick lookup
+        node_index = {node["id"]: i for i, node in enumerate(nodes)}
+
+        # Add traffic flow information to nodes
+        if flow_matrix:
+            for node in nodes:
+                ip = node["id"]
+
+                # Calculate traffic volume
+                outbound = sum(flow_matrix.get(ip, {}).values())
+                inbound = sum(flow_matrix.get(src, {}).get(ip, 0) for src in flow_matrix)
+
+                node["traffic"] = {
+                    "inbound": inbound,
+                    "outbound": outbound,
+                    "total": inbound + outbound,
+                }
+
+                # Mark stealth devices and add enhanced metadata
+                device = next((d for d in devices if d["ip"] == ip), None)
+                if device and device.get("stealth_device", False):
+                    node["stealth"] = True
+                    node["discovery_method"] = "passive"
+
+        # Create links ONLY from actual traffic flows
+        links = []
+        if flow_matrix:
+            # Debug: Track skipped connections
+            skipped_sources = 0
+            skipped_targets = 0
+            
+            for src_ip, destinations in flow_matrix.items():
+                if src_ip not in node_index:
+                    skipped_sources += 1
+                    continue
+
+                for dst_ip, packet_count in destinations.items():
+                    if dst_ip not in node_index:
+                        skipped_targets += 1
+                        continue
+                    
+                    if packet_count == 0:
+                        continue
+
+                    # Scale link width based on traffic (logarithmic scale)
+                    link_width = min(10, 1 + math.log10(packet_count))
+
+                    links.append(
+                        {
+                            "source": src_ip,  # Use IP addresses, not indices
+                            "target": dst_ip,  # Use IP addresses, not indices
+                            "value": link_width,
+                            "packets": packet_count,
+                            "type": "traffic_flow",
+                        }
+                    )
+            
+            # Add debug info to metadata if connections were skipped
+            if skipped_sources > 0 or skipped_targets > 0:
+                print(f"[DEBUG] Skipped {skipped_sources} source IPs and {skipped_targets} target IPs not in device list")
+
+        return {
+            "nodes": nodes,
+            "links": links,  # Only real traffic flows, no inferred connections
+            "metadata": {
+                "total_devices": len(devices),
+                "traffic_flows": len(links),
+                "stealth_devices": len([n for n in nodes if n.get("stealth", False)]),
+                "data_source": "traffic_analysis",
+            },
+        }
+
+    def _merge_links(self, traffic_links: List[Dict], topology_links: List[Dict]) -> List[Dict]:
+        """Merge traffic flow links with topology links
+
+        Prefers traffic flow links when both exist between same nodes
+        """
+        # Create a set of node pairs that have traffic flows
+        traffic_pairs = set()
+        for link in traffic_links:
+            pair = (link["source"], link["target"])
+            traffic_pairs.add(pair)
+            traffic_pairs.add((link["target"], link["source"]))  # Bidirectional
+
+        # Add topology links that don't have traffic flows
+        merged = traffic_links.copy()
+        for link in topology_links:
+            pair = (link["source"], link["target"])
+            if pair not in traffic_pairs:
+                merged.append(link)
+
+        return merged
+
+    def _get_device_group(self, device: Dict) -> int:
+        """Assign group based on device characteristics and criticality"""
+        device_type = device.get("type", "unknown")
+        subtype = device.get("subtype", "")
+        is_critical = device.get("critical", False)
+        dependent_count = device.get("dependent_count", 0)
+        
+        # Critical infrastructure (group 1)
+        if device_type in ["router", "firewall"] or subtype == "gateway":
             return 1
-        elif device_type in ["switch"]:
+        # Core infrastructure (group 2)
+        elif device_type in ["switch", "domain_controller", "dns_server", "ntp_server"]:
             return 2
-        elif "server" in device_type or device_type in ["web_server", "database"]:
+        # Critical services with many dependents (group 3)
+        elif is_critical and dependent_count > 20:
             return 3
-        elif device_type in ["workstation", "printer", "iot"]:
+        # Server infrastructure (group 4)
+        elif "server" in device_type or device_type in ["web_server", "database", "backup_server", "monitoring_server"]:
             return 4
-        else:
+        # Industrial/OT systems (group 5)
+        elif device_type in ["plc", "scada", "ups"] or subtype in ["plc", "scada", "ups"]:
             return 5
+        # End user devices (group 6)
+        elif device_type in ["workstation", "printer", "voip"]:
+            return 6
+        # IoT and other devices (group 7)
+        elif device_type == "iot":
+            return 7
+        else:
+            return 8
 
     def _create_network_links(self, devices: List[Dict], links: List[Dict], node_map: Dict):
-        """Create realistic network topology links"""
+        """Create network topology links based on device types and relationships
+
+        This method attempts to infer logical network connections based on:
+        1. Device types (routers, switches, servers, workstations)
+        2. Network hierarchy (routers -> switches -> end devices)
+        3. Service relationships (web servers -> databases)
+
+        For small networks without infrastructure devices, no connections are created
+        unless there's actual traffic flow data available.
+        """
         # Categorize devices
         routers = [d for d in devices if d.get("type") == "router"]
         switches = [d for d in devices if d.get("type") == "switch"]
@@ -76,6 +238,40 @@ class MapGenerator:
         ]
         workstations = [d for d in devices if d.get("type") == "workstation"]
         others = [d for d in devices if d.get("type") in ["printer", "iot", "unknown"]]
+
+        # If no infrastructure devices exist, don't create artificial connections
+        # The traffic flow data will show the real connections
+        if not routers and not switches:
+            # Only create connections if we have clear evidence of infrastructure
+            # For example, if there's a device that looks like it's acting as a gateway
+            gateway_candidates = []
+            for device in devices:
+                # Check if device has router/firewall-like characteristics
+                services = device.get("services", [])
+                if any(svc in services for svc in ["ssh", "telnet", "https", "snmp"]):
+                    if len(device.get("open_ports", [])) > 5:  # Multiple services
+                        gateway_candidates.append(device)
+
+            # If we found a likely gateway, connect other devices to it
+            if gateway_candidates:
+                gateway = gateway_candidates[0]  # Pick the most likely gateway
+                for device in devices:
+                    if device["ip"] != gateway["ip"]:
+                        # Only connect if it makes sense (not between two workstations)
+                        if (
+                            device.get("type") != "workstation"
+                            or gateway.get("type") != "workstation"
+                        ):
+                            links.append(
+                                {
+                                    "source": gateway["ip"],
+                                    "target": device["ip"],
+                                    "value": 1,
+                                    "type": "inferred",
+                                }
+                            )
+
+            return  # Exit early - let traffic flow data show real connections
 
         # Strategy 1: Connect all infrastructure devices
         if len(routers) > 1:
@@ -416,6 +612,44 @@ class MapGenerator:
             dtype = device.get("type", "unknown")
             counts[dtype] = counts.get(dtype, 0) + 1
         return counts
+    
+    def _calculate_critical_stats(self, devices: List[Dict]) -> Dict:
+        """Calculate statistics about critical assets"""
+        stats = {
+            "total_critical": 0,
+            "high_dependency": 0,  # >20 dependents
+            "always_on": 0,
+            "long_uptime": 0,  # >180 days
+            "critical_by_type": {},
+            "critical_tags": {},
+        }
+        
+        for device in devices:
+            if device.get("critical", False):
+                stats["total_critical"] += 1
+                
+                # Count by type
+                dtype = device.get("type", "unknown")
+                stats["critical_by_type"][dtype] = stats["critical_by_type"].get(dtype, 0) + 1
+            
+            # High dependency devices
+            if device.get("dependent_count", 0) > 20:
+                stats["high_dependency"] += 1
+            
+            # Always-on devices
+            if device.get("always_on", False):
+                stats["always_on"] += 1
+            
+            # Long uptime devices
+            if device.get("uptime_days", 0) > 180:
+                stats["long_uptime"] += 1
+            
+            # Count tags
+            for tag in device.get("tags", []):
+                if tag in ["critical", "high_dependency", "always_on", "long_uptime"]:
+                    stats["critical_tags"][tag] = stats["critical_tags"].get(tag, 0) + 1
+        
+        return stats
 
     def generate_subnet_topology(self, devices: List[Dict]) -> Dict:
         """Generate subnet-level topology view"""

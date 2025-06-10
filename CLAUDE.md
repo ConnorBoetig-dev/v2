@@ -76,9 +76,22 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 # Run linting checks
 ./lint.sh
 
+# Run test suite
+pytest tests/ -v
+
+# Run specific test module
+pytest tests/test_scanner.py -v
+
+# Run with coverage
+pytest tests/ --cov=core --cov=utils --cov-report=html
+
 # Test scan functionality
 python generate_test_data.py
 python generate_minimal_network_test.py
+
+# Demo large network (reduced to ~55 devices)
+python demo_large_network.py
+python demo_full_simulation.py
 ```
 
 ### Development Workflow
@@ -248,11 +261,27 @@ These enhancements would transform NetworkMapper from a scanning tool into a com
 
 ## Recent Updates (2025)
 
+### Latest Changes (January 2025)
+1. **Reduced Demo Network Size** ✅
+   - Scaled down from ~220 to ~55 devices for better visualization
+   - Consolidated from 10 subnets to 3 focused subnets
+   - Improved network topology readability
+   - Updated demo_large_network.py and demo_full_simulation.py
+
+2. **Comprehensive Test Suite** ✅
+   - Created full pytest test suite with 100+ tests
+   - Unit tests for all core modules (scanner, classifier, parser, tracker, annotator)
+   - Integration tests for complete workflows
+   - Utility function tests (MAC lookup, network utils, visualization)
+   - Added pytest configuration and shared fixtures
+   - Coverage reporting support
+
 ### Completed Enhancements
 1. **Comprehensive Test Suite** ✅
    - 100+ unit tests covering all core modules
    - Integration tests for full workflow validation
-   - Makefile with 40+ test automation targets
+   - Pytest-based testing framework
+   - Coverage reporting capabilities
    - Fixed logger initialization issues
 
 2. **Modern Network Visualization** ✅

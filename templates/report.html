@@ -336,8 +336,8 @@
             border-color: #007bff;
         }
 
-        .node-tooltip {
-            position: absolute;
+        .node-tooltip, #tooltip-2d {
+            position: fixed;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border: 1px solid #dee2e6;
@@ -346,10 +346,12 @@
             color: #333;
             font-size: 13px;
             pointer-events: none;
-            z-index: 1000;
+            z-index: 9999;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             max-width: 280px;
             min-width: 200px;
+            display: none;
+            transition: opacity 0.2s ease-in-out;
         }
 
         .node-tooltip h4 {
@@ -1127,6 +1129,7 @@
 
         <div class="tabs">
             <button class="tab active" onclick="showTab('devices')">Devices</button>
+            <button class="tab" onclick="showTab('critical')">Critical Assets</button>
             <button class="tab" onclick="showTab('vulnerabilities')">Security Report</button>
             <button class="tab" onclick="showTab('services')">Services</button>
             <button class="tab" onclick="showTab('subnets')">Subnets</button>
@@ -1197,6 +1200,176 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <div id="critical-tab" class="tab-content hidden">
+            <h2>Critical Assets Overview</h2>
+            
+            {% set critical_devices = devices|selectattr('critical', 'defined')|selectattr('critical')|list %}
+            {% set high_dependency_devices = [] %}
+            {% for device in devices %}
+                {% if device.get('dependent_count', 0) > 20 %}
+                    {% if high_dependency_devices.append(device) %}{% endif %}
+                {% endif %}
+            {% endfor %}
+            {% set always_on_devices = devices|selectattr('always_on', 'defined')|selectattr('always_on')|list %}
+            {% set long_uptime_devices = [] %}
+            {% for device in devices %}
+                {% if device.get('uptime_days', 0) > 180 %}
+                    {% if long_uptime_devices.append(device) %}{% endif %}
+                {% endif %}
+            {% endfor %}
+            
+            <div class="critical-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                <div class="stat-card">
+                    <h3>Marked Critical</h3>
+                    <div class="stat-number" style="color: #ff6b6b;">{{ critical_devices|length }}</div>
+                    <div class="stat-label">devices</div>
+                </div>
+                <div class="stat-card">
+                    <h3>High Dependencies</h3>
+                    <div class="stat-number" style="color: #ff9800;">{{ high_dependency_devices|length }}</div>
+                    <div class="stat-label">>20 dependents</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Always On</h3>
+                    <div class="stat-number" style="color: #4ec9b0;">{{ always_on_devices|length }}</div>
+                    <div class="stat-label">systems</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Long Uptime</h3>
+                    <div class="stat-number" style="color: #569cd6;">{{ long_uptime_devices|length }}</div>
+                    <div class="stat-label">>180 days</div>
+                </div>
+            </div>
+            
+            {% if critical_devices %}
+            <h3>Critical Infrastructure</h3>
+            <table class="device-table">
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>Hostname</th>
+                        <th>Type</th>
+                        <th>Services</th>
+                        <th>Dependent Count</th>
+                        <th>Uptime</th>
+                        <th>Tags</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for device in critical_devices|sort(attribute='dependent_count', reverse=true) %}
+                    <tr>
+                        <td>{{ device.ip }}</td>
+                        <td><strong>{{ device.hostname or '-' }}</strong></td>
+                        <td><span class="device-type type-{{ device.type }}">{{ device.type }}</span></td>
+                        <td class="services">
+                            {% if device.services %}
+                            {{ device.services[:3]|join(', ') }}
+                            {% if device.services|length > 3 %}...{% endif %}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center;">
+                            {% if device.get('dependent_count', 0) > 20 %}
+                            <span style="color: #ff6b6b; font-weight: bold;">{{ device.get('dependent_count', 0) }}</span>
+                            {% else %}
+                            {{ device.get('dependent_count', 0) }}
+                            {% endif %}
+                        </td>
+                        <td>{{ device.get('uptime_days', '-') }} days</td>
+                        <td>
+                            {% if device.get('tags') %}
+                                {% for tag in device.tags[:3] %}
+                                <span style="display: inline-block; padding: 2px 6px; margin: 1px; background: #3e3e42; border-radius: 3px; font-size: 0.8rem;">{{ tag }}</span>
+                                {% endfor %}
+                                {% if device.tags|length > 3 %}...{% endif %}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>{{ device.notes or '' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+            
+            {% if high_dependency_devices and high_dependency_devices != critical_devices %}
+            <h3 style="margin-top: 2rem;">High Dependency Devices</h3>
+            <p style="color: #858585; margin-bottom: 1rem;">These devices have many other systems depending on them and could cause significant impact if they fail.</p>
+            <table class="device-table">
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>Hostname</th>
+                        <th>Type</th>
+                        <th>Dependent Count</th>
+                        <th>Critical Services</th>
+                        <th>Redundancy Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for device in high_dependency_devices|sort(attribute='dependent_count', reverse=true) %}
+                    {% if not device.get('critical', False) %}
+                    <tr>
+                        <td>{{ device.ip }}</td>
+                        <td>{{ device.hostname or '-' }}</td>
+                        <td><span class="device-type type-{{ device.type }}">{{ device.type }}</span></td>
+                        <td style="text-align: center; color: #ff9800; font-weight: bold;">{{ device.get('dependent_count', 0) }}</td>
+                        <td>
+                            {% set critical_services = [] %}
+                            {% for service in device.get('services', []) %}
+                                {% if 'dns' in service.lower() or 'ldap' in service.lower() or 'ntp' in service.lower() %}
+                                    {% if critical_services.append(service) %}{% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if critical_services %}
+                                {{ critical_services|join(', ') }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set same_type_count = devices|selectattr('type', 'equalto', device.type)|list|length %}
+                            {% if same_type_count > 1 %}
+                                <span style="color: #4ec9b0;">✓ {{ same_type_count - 1 }} backup(s)</span>
+                            {% else %}
+                                <span style="color: #ff6b6b;">⚠ No redundancy</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+            
+            <div style="margin-top: 2rem; padding: 1rem; background: #252526; border-radius: 8px; border: 1px solid #3e3e42;">
+                <h4 style="color: #569cd6; margin-bottom: 0.5rem;">Critical Asset Recommendations</h4>
+                <ul style="color: #cccccc; margin-left: 1.5rem;">
+                    {% if critical_devices|length == 0 %}
+                    <li>No devices are currently marked as critical. Review your infrastructure and identify critical assets.</li>
+                    {% endif %}
+                    {% if high_dependency_devices|length > 0 %}
+                    <li>{{ high_dependency_devices|length }} device(s) have high dependency counts. Consider implementing redundancy.</li>
+                    {% endif %}
+                    {% set no_redundancy = [] %}
+                    {% for device in critical_devices %}
+                        {% set same_type = devices|selectattr('type', 'equalto', device.type)|list|length %}
+                        {% if same_type == 1 %}
+                            {% if no_redundancy.append(device) %}{% endif %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if no_redundancy %}
+                    <li>{{ no_redundancy|length }} critical device(s) have no redundancy. Deploy backup systems for high availability.</li>
+                    {% endif %}
+                    <li>Implement monitoring alerts for all critical infrastructure components.</li>
+                    <li>Create documented recovery procedures for critical device failures.</li>
+                </ul>
+            </div>
         </div>
 
         <div id="vulnerabilities-tab" class="tab-content hidden">
@@ -1375,6 +1548,7 @@
                 {% endfor %}
             </div>
         </div>
+
     </div>
 
     <div class="device-sidebar" id="device-sidebar">
@@ -1386,26 +1560,11 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <div id="tooltip-2d" class="node-tooltip"></div>
+    
     <script>
         const devicesData = {{ devices | tojson }};
         const scanTimestamp = '{{ scan_timestamp }}';
-        const d3Data = {{ d3_data | safe }};
-        const threeData = {{ three_data | safe }};
-
-        let svg, simulation, node, link, label, zoom, g;
-        let currentLayout = 'force';
-        let showLabels = true;
-
-        let scene, camera, renderer, controls;
-        let nodes3D = [];
-        let connections3D = [];
-        let labels3D = [];
-        let autoRotate = false; // CHANGED: Default to false
-        let showConnections = true;
-        let show3DLabels = true;
-        let manualRotation = false;
 
         function showTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(tab => {
@@ -1476,834 +1635,6 @@
         function refreshScan() {
             alert('To run a new scan, please return to the NetworkMapper CLI and select "Run Network Scan"');
         }
-
-        function initializeD3Network() {
-            const container = document.getElementById('network-2d');
-            const width = container.clientWidth;
-            const height = container.clientHeight;
-
-            document.getElementById('loading-2d').style.display = 'flex';
-
-            d3.select("#network-2d").selectAll("*").remove();
-
-            svg = d3.select("#network-2d")
-                .attr("width", width)
-                .attr("height", height);
-
-            zoom = d3.zoom()
-                .scaleExtent([0.1, 10])
-                .on("zoom", (event) => {
-                    g.attr("transform", event.transform);
-                });
-
-            svg.call(zoom);
-
-            g = svg.append("g");
-
-            createLayout2D();
-
-            setTimeout(() => {
-                document.getElementById('loading-2d').style.display = 'none';
-            }, 500);
-        }
-
-        function createLayout2D() {
-            const width = document.getElementById('network-2d').clientWidth;
-            const height = document.getElementById('network-2d').clientHeight;
-
-            g.selectAll("*").remove();
-
-            const nodes = d3Data.nodes.map(d => ({ ...d }));
-            const links = d3Data.links.map(d => ({ ...d }));
-
-            // FIXED: Create links FIRST (so they appear behind nodes)
-            link = g.append("g")
-                .attr("class", "links")
-                .selectAll("line")
-                .data(links)
-                .enter().append("line")
-                .attr("class", d => d.type || 'default')
-                .style("stroke", d => {
-                    const linkColors = {
-                        backbone: "#ff4444",
-                        uplink: "#0088cc",
-                        critical: "#ff0000",
-                        server_link: "#00aa44",
-                        access: "#8844aa",
-                        peripheral: "#ffaa00",
-                        application: "#0066ff",
-                        default: "#666666"
-                    };
-                    return linkColors[d.type] || "#666666";
-                })
-                .style("stroke-width", d => {
-                    const widths = {
-                        backbone: 3,
-                        uplink: 2.5,
-                        critical: 3,
-                        server_link: 2,
-                        access: 1.5,
-                        peripheral: 1,
-                        application: 2,
-                        default: 1.5
-                    };
-                    return widths[d.type] || 1.5;
-                })
-                .style("stroke-opacity", 0.6)
-                .style("stroke-dasharray", d => {
-                    if (d.type === 'peripheral') return "5, 5";
-                    if (d.type === 'application') return "3, 3";
-                    return null;
-                });
-
-            // Create nodes (after links)
-            node = g.append("g")
-                .attr("class", "nodes")
-                .selectAll("circle")
-                .data(nodes)
-                .enter().append("circle")
-                .attr("r", d => {
-                    if (d.critical) return 14;
-                    if (d.type === 'router' || d.type === 'switch') return 12;
-                    return 10;
-                })
-                .style("fill", d => getNodeColor(d.type))
-                .style("stroke", d => d.critical ? "#ff0000" : "#333")
-                .style("stroke-width", d => d.critical ? 3 : 2)
-                .style("cursor", "pointer")
-                .call(d3.drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended));
-
-            // Set up simulation
-            if (currentLayout === 'force') {
-                simulation = d3.forceSimulation(nodes)
-                    .force("link", d3.forceLink(links).id(d => d.id).distance(100).strength(0.5))
-                    .force("charge", d3.forceManyBody().strength(-500))
-                    .force("center", d3.forceCenter(width / 2, height / 2))
-                    .force("collision", d3.forceCollide().radius(30))
-                    .alphaMin(0.001)
-                    .alphaDecay(0.02);
-            } else if (currentLayout === 'circular') {
-                const deviceTypes = [...new Set(nodes.map(n => n.type))];
-                const angleStep = (2 * Math.PI) / deviceTypes.length;
-
-                nodes.forEach((node, i) => {
-                    const typeIndex = deviceTypes.indexOf(node.type);
-                    const radius = 150 + (typeIndex * 50);
-                    const angle = angleStep * typeIndex + (i * 0.3);
-                    node.fx = width / 2 + radius * Math.cos(angle);
-                    node.fy = height / 2 + radius * Math.sin(angle);
-                });
-
-                simulation = d3.forceSimulation(nodes)
-                    .force("link", d3.forceLink(links).id(d => d.id).distance(50));
-            } else if (currentLayout === 'grid') {
-                const cols = Math.ceil(Math.sqrt(nodes.length));
-                const cellWidth = width / cols;
-                const cellHeight = height / Math.ceil(nodes.length / cols);
-
-                nodes.forEach((node, i) => {
-                    node.fx = (i % cols) * cellWidth + cellWidth / 2;
-                    node.fy = Math.floor(i / cols) * cellHeight + cellHeight / 2;
-                });
-
-                simulation = d3.forceSimulation(nodes)
-                    .force("link", d3.forceLink(links).id(d => d.id));
-            }
-
-            // Add hover effects to nodes
-            node
-                .on("mouseover", function (event, d) {
-                    showTooltip2D(event, d);
-                    d3.select(this).style("stroke-width", 4).style("stroke", "#0066ff");
-
-                    // Highlight connected links
-                    link.style("stroke-opacity", l =>
-                        (l.source === d || l.target === d || l.source.id === d.id || l.target.id === d.id) ? 1 : 0.2
-                    );
-                })
-                .on("mouseout", function (event, d) {
-                    hideTooltip2D();
-                    d3.select(this).style("stroke-width", d.critical ? 3 : 2)
-                        .style("stroke", d.critical ? "#ff0000" : "#333");
-
-                    // Reset link opacity
-                    link.style("stroke-opacity", 0.6);
-                })
-                .on("click", function (event, d) {
-                    showDeviceDetails(d);
-                });
-
-            // Add labels
-            if (showLabels) {
-                label = g.append("g")
-                    .attr("class", "labels")
-                    .selectAll("text")
-                    .data(nodes)
-                    .enter().append("text")
-                    .text(d => d.name)
-                    .style("font-size", "11px")
-                    .style("fill", "#333")
-                    .style("font-weight", "600")
-                    .style("text-anchor", "middle")
-                    .style("pointer-events", "none")
-                    .style("text-shadow", "0 0 3px white, 0 0 3px white, 0 0 3px white");
-            }
-
-            // CRITICAL FIX: Update positions on simulation tick
-            if (simulation) {
-                simulation.on("tick", () => {
-                    link
-                        .attr("x1", d => d.source.x)
-                        .attr("y1", d => d.source.y)
-                        .attr("x2", d => d.target.x)
-                        .attr("y2", d => d.target.y);
-
-                    node
-                        .attr("cx", d => d.x)
-                        .attr("cy", d => d.y);
-
-                    if (label) {
-                        label
-                            .attr("x", d => d.x)
-                            .attr("y", d => d.y + 25);
-                    }
-                });
-            }
-        }
-
-        function getNodeColor(type) {
-            const colors = {
-                router: "#ff3333",
-                switch: "#0077cc",
-                server: "#00aa44",
-                windows_server: "#00aa44",
-                linux_server: "#00cc66",
-                web_server: "#0066cc",
-                database: "#8844aa",
-                workstation: "#4488ff",
-                printer: "#ff8800",
-                iot: "#cc9900",
-                subnet: "#888888",
-                unknown: "#999999"
-            };
-            return colors[type] || "#999999";
-        }
-
-        function showTooltip2D(event, d) {
-            const tooltip = document.getElementById('tooltip-2d');
-            const device = devicesData.find(dev => dev.ip === d.id) || d;
-
-            let content = `<h4>${d.name}</h4>`;
-            content += `<div class="detail-row"><span class="detail-label">IP:</span> <span class="detail-value">${d.id}</span></div>`;
-            content += `<div class="detail-row"><span class="detail-label">Type:</span> <span class="detail-value">${d.type}</span></div>`;
-
-            if (device.vendor) {
-                content += `<div class="detail-row"><span class="detail-label">Vendor:</span> <span class="detail-value">${device.vendor}</span></div>`;
-            }
-            if (device.os) {
-                content += `<div class="detail-row"><span class="detail-label">OS:</span> <span class="detail-value">${device.os}</span></div>`;
-            }
-            if (device.services && device.services.length > 0) {
-                content += `<div class="detail-row"><span class="detail-label">Services:</span> <span class="detail-value">${device.services.slice(0, 3).join(', ')}</span></div>`;
-            }
-            if (device.critical) {
-                content += `<div class="detail-row"><span class="detail-label" style="color: #ff0000;">CRITICAL</span></div>`;
-            }
-
-            tooltip.innerHTML = content;
-            tooltip.style.display = 'block';
-            tooltip.style.left = (event.pageX + 10) + 'px';
-            tooltip.style.top = (event.pageY - 10) + 'px';
-        }
-
-        function hideTooltip2D() {
-            document.getElementById('tooltip-2d').style.display = 'none';
-        }
-
-        function showDeviceDetails(d) {
-            const device = devicesData.find(dev => dev.ip === d.id) || d;
-            const sidebar = document.getElementById('device-sidebar');
-            const title = document.getElementById('sidebar-title');
-            const content = document.getElementById('sidebar-content');
-
-            title.textContent = `${device.hostname || device.ip}`;
-
-            let html = '';
-
-            html += '<div class="sidebar-section">';
-            html += '<h3>Basic Information</h3>';
-            html += '<div class="sidebar-grid">';
-            html += `<span class="sidebar-label">IP Address:</span><span class="sidebar-value">${device.ip}</span>`;
-            html += `<span class="sidebar-label">Hostname:</span><span class="sidebar-value">${device.hostname || 'N/A'}</span>`;
-            html += `<span class="sidebar-label">MAC:</span><span class="sidebar-value">${device.mac || 'N/A'}</span>`;
-            html += `<span class="sidebar-label">Vendor:</span><span class="sidebar-value">${device.vendor || 'N/A'}</span>`;
-            html += `<span class="sidebar-label">Type:</span><span class="sidebar-value">${device.type}</span>`;
-            html += `<span class="sidebar-label">OS:</span><span class="sidebar-value">${device.os || 'N/A'}</span>`;
-            html += '</div></div>';
-
-            if (device.services && device.services.length > 0) {
-                html += '<div class="sidebar-section">';
-                html += '<h3>Services</h3>';
-                html += '<ul style="list-style: none; padding: 0;">';
-                device.services.forEach(service => {
-                    html += `<li style="padding: 2px 0; color: #d4d4d4;">${service}</li>`;
-                });
-                html += '</ul></div>';
-            }
-
-            if (device.open_ports && device.open_ports.length > 0) {
-                html += '<div class="sidebar-section">';
-                html += '<h3>Open Ports</h3>';
-                html += '<div style="display: flex; flex-wrap: wrap; gap: 5px;">';
-                device.open_ports.forEach(port => {
-                    html += `<span style="background: #3e3e42; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem;">${port}</span>`;
-                });
-                html += '</div></div>';
-            }
-
-            html += '<div class="sidebar-section">';
-            html += '<h3>Status & Notes</h3>';
-            html += '<div class="sidebar-grid">';
-            html += `<span class="sidebar-label">Critical:</span><span class="sidebar-value" style="color: ${device.critical ? '#ff0000' : '#00aa00'}">${device.critical ? 'YES' : 'No'}</span>`;
-            html += `<span class="sidebar-label">Last Seen:</span><span class="sidebar-value">${device.last_seen || 'N/A'}</span>`;
-            if (device.notes) {
-                html += `<span class="sidebar-label">Notes:</span><span class="sidebar-value">${device.notes}</span>`;
-            }
-            html += '</div></div>';
-
-            content.innerHTML = html;
-            sidebar.classList.add('open');
-        }
-
-        function closeSidebar() {
-            document.getElementById('device-sidebar').classList.remove('open');
-        }
-
-        function resetZoom2D() {
-            if (zoom && svg) {
-                svg.transition().duration(750).call(
-                    zoom.transform,
-                    d3.zoomIdentity
-                );
-            }
-        }
-
-        function zoomIn2D() {
-            if (zoom && svg) {
-                svg.transition().duration(300).call(
-                    zoom.scaleBy, 1.5
-                );
-            }
-        }
-
-        function zoomOut2D() {
-            if (zoom && svg) {
-                svg.transition().duration(300).call(
-                    zoom.scaleBy, 1 / 1.5
-                );
-            }
-        }
-
-        function toggleLabels2D() {
-            showLabels = document.getElementById('show-labels').checked;
-            if (window.d3Initialized) {
-                createLayout2D();
-            }
-        }
-
-        function changeLayout2D() {
-            currentLayout = document.getElementById('layout-select').value;
-            if (window.d3Initialized) {
-                createLayout2D();
-            }
-        }
-
-        function download2DMap() {
-            const svgElement = document.getElementById('network-2d');
-            const svgData = new XMLSerializer().serializeToString(svgElement);
-
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const img = new Image();
-
-            canvas.width = svgElement.clientWidth;
-            canvas.height = svgElement.clientHeight;
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-            const url = URL.createObjectURL(svgBlob);
-
-            img.onload = function () {
-                ctx.drawImage(img, 0, 0);
-                URL.revokeObjectURL(url);
-
-                const link = document.createElement('a');
-                link.download = `network_map_2d_${scanTimestamp}.png`;
-                link.href = canvas.toDataURL();
-                link.click();
-            };
-
-            img.src = url;
-        }
-
-        function toggleFullscreen2D() {
-            const container = document.querySelector('#network-map-tab .visualization');
-            if (!document.fullscreenElement) {
-                container.requestFullscreen();
-            } else {
-                document.exitFullscreen();
-            }
-        }
-
-        function dragstarted(event, d) {
-            if (!event.active && simulation) simulation.alphaTarget(0.3).restart();
-            d.fx = d.x;
-            d.fy = d.y;
-        }
-
-        function dragged(event, d) {
-            d.fx = event.x;
-            d.fy = event.y;
-        }
-
-        function dragended(event, d) {
-            if (!event.active && simulation) simulation.alphaTarget(0);
-            if (currentLayout === 'force') {
-                d.fx = null;
-                d.fy = null;
-            }
-        }
-
-        // 3D Network Functions
-        function initialize3DNetwork() {
-            const container = document.getElementById('network-3d');
-            document.getElementById('loading-3d').style.display = 'flex';
-
-            container.innerHTML = '';
-
-            // Scene setup
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xffffff);
-            scene.fog = new THREE.Fog(0xffffff, 50, 200);
-
-            // Camera setup
-            camera = new THREE.PerspectiveCamera(
-                60,
-                container.clientWidth / container.clientHeight,
-                0.1,
-                1000
-            );
-            camera.position.set(25, 20, 25);
-
-            // Renderer setup
-            renderer = new THREE.WebGLRenderer({
-                antialias: true,
-                preserveDrawingBuffer: true,
-                alpha: true
-            });
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.2;
-            container.appendChild(renderer.domElement);
-
-            // Enhanced lighting
-            const ambientLight = new THREE.AmbientLight(0x606060, 0.8);
-            scene.add(ambientLight);
-
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-            directionalLight.position.set(30, 30, 30);
-            directionalLight.castShadow = true;
-            directionalLight.shadow.mapSize.width = 2048;
-            directionalLight.shadow.mapSize.height = 2048;
-            directionalLight.shadow.camera.near = 0.5;
-            directionalLight.shadow.camera.far = 500;
-            scene.add(directionalLight);
-
-            // Add subtle point lights for ambiance
-            const pointLight1 = new THREE.PointLight(0x4a90e2, 0.3, 100);
-            pointLight1.position.set(20, 15, 20);
-            scene.add(pointLight1);
-
-            const pointLight2 = new THREE.PointLight(0xe24a4a, 0.2, 100);
-            pointLight2.position.set(-20, 15, -20);
-            scene.add(pointLight2);
-
-            // Add grid helper for better depth perception
-            const gridHelper = new THREE.GridHelper(50, 50, 0xcccccc, 0xeeeeee);
-            gridHelper.position.y = -5;
-            scene.add(gridHelper);
-
-            // Create nodes from visualization data
-            nodes3D = [];
-            labels3D = [];
-            const nodeMap = new Map();
-
-            // Create nodes using the positions from threeData
-            threeData.positions.forEach((position, index) => {
-                const color = new THREE.Color(threeData.colors[index]);
-                const labelData = threeData.labels[index];
-                const device = devicesData.find(d => d.ip === labelData.text || d.hostname === labelData.text);
-
-                // Node size based on type
-                let radius = 0.4;
-                if (labelData.critical) radius = 0.7;
-                else if (['router', 'switch'].includes(labelData.type)) radius = 0.6;
-                else if (labelData.type.includes('server')) radius = 0.5;
-
-                // Create sphere
-                const geometry = new THREE.SphereGeometry(radius, 32, 32);
-                const material = new THREE.MeshPhongMaterial({
-                    color: color,
-                    emissive: color.clone().multiplyScalar(0.1),
-                    shininess: 100,
-                    transparent: true,
-                    opacity: 0.9
-                });
-
-                if (labelData.critical) {
-                    material.emissive = color.clone().multiplyScalar(0.3);
-                    material.emissiveIntensity = 0.5;
-                }
-
-                const mesh = new THREE.Mesh(geometry, material);
-                mesh.position.set(position.x, position.y, position.z);
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                mesh.userData = { device: device || labelData, position, index };
-
-                scene.add(mesh);
-
-                const nodeData = {
-                    mesh,
-                    device: device || labelData,
-                    position,
-                    label: null
-                };
-
-                nodes3D.push(nodeData);
-                if (device) {
-                    nodeMap.set(device.ip, nodeData);
-                }
-
-                // Create label
-                create3DLabel(labelData.text, position, labelData.critical, nodeData);
-            });
-
-            // Create connections
-            if (showConnections && threeData.connections) {
-                createConnections3D(threeData.connections);
-            }
-
-            // Mouse interaction
-            const raycaster = new THREE.Raycaster();
-            const mouse = new THREE.Vector2();
-            let hoveredObject = null;
-            let selectedObject = null;
-
-            function onMouseMove(event) {
-                const rect = renderer.domElement.getBoundingClientRect();
-                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-                raycaster.setFromCamera(mouse, camera);
-                const intersects = raycaster.intersectObjects(nodes3D.map(n => n.mesh));
-
-                if (hoveredObject && hoveredObject !== selectedObject) {
-                    hoveredObject.scale.setScalar(1);
-                }
-
-                if (intersects.length > 0) {
-                    hoveredObject = intersects[0].object;
-                    if (hoveredObject !== selectedObject) {
-                        hoveredObject.scale.setScalar(1.1);
-                    }
-                    container.style.cursor = 'pointer';
-                } else {
-                    hoveredObject = null;
-                    container.style.cursor = 'default';
-                }
-            }
-
-            function onClick(event) {
-                if (hoveredObject) {
-                    if (selectedObject) {
-                        selectedObject.scale.setScalar(1);
-                    }
-
-                    selectedObject = hoveredObject;
-                    selectedObject.scale.setScalar(1.2);
-
-                    showDeviceInfo3D(selectedObject.userData.device);
-                }
-            }
-
-            renderer.domElement.addEventListener('mousemove', onMouseMove);
-            renderer.domElement.addEventListener('click', onClick);
-
-            // Camera controls
-            let mouseDown = false;
-            let mouseX = 0;
-            let mouseY = 0;
-
-            renderer.domElement.addEventListener('mousedown', (event) => {
-                if (event.button === 0) { // Left click only
-                    mouseDown = true;
-                    mouseX = event.clientX;
-                    mouseY = event.clientY;
-                    manualRotation = true; // Stop auto-rotation when user interacts
-                }
-            });
-
-            renderer.domElement.addEventListener('mouseup', () => {
-                mouseDown = false;
-            });
-
-            renderer.domElement.addEventListener('mousemove', (event) => {
-                if (!mouseDown) return;
-
-                const deltaX = event.clientX - mouseX;
-                const deltaY = event.clientY - mouseY;
-
-                const spherical = new THREE.Spherical();
-                spherical.setFromVector3(camera.position);
-                spherical.theta -= deltaX * 0.01;
-                spherical.phi += deltaY * 0.01;
-                spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-
-                camera.position.setFromSpherical(spherical);
-                camera.lookAt(0, 0, 0);
-
-                mouseX = event.clientX;
-                mouseY = event.clientY;
-            });
-
-            renderer.domElement.addEventListener('wheel', (event) => {
-                event.preventDefault();
-                const scale = event.deltaY > 0 ? 1.1 : 0.9;
-                camera.position.multiplyScalar(scale);
-                camera.position.clampLength(8, 150);
-            });
-
-            // Animation loop - FIXED
-            function animate() {
-                requestAnimationFrame(animate);
-
-                // REMOVED: The problematic floating animation
-                // No more sin wave movement for nodes
-
-                // Auto rotate - FIXED: only when enabled and not manually rotating
-                if (autoRotate && !mouseDown && !manualRotation) {
-                    const time = Date.now() * 0.001;
-                    const radius = camera.position.length();
-                    camera.position.x = Math.cos(time * 0.1) * radius; // Slower rotation
-                    camera.position.z = Math.sin(time * 0.1) * radius;
-                    camera.lookAt(0, 0, 0);
-                }
-
-                updateLabelVisibility();
-                renderer.render(scene, camera);
-            }
-
-            animate();
-
-            // Handle resize
-            function onWindowResize() {
-                camera.aspect = container.clientWidth / container.clientHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(container.clientWidth, container.clientHeight);
-            }
-
-            window.addEventListener('resize', onWindowResize);
-
-            // Hide loading
-            setTimeout(() => {
-                document.getElementById('loading-3d').style.display = 'none';
-            }, 1000);
-        }
-
-        function create3DLabel(text, position, isCritical, nodeData) {
-            const labelDiv = document.createElement('div');
-            labelDiv.className = 'label3d' + (isCritical ? ' critical' : '');
-            labelDiv.textContent = text;
-            labelDiv.style.display = show3DLabels ? 'block' : 'none';
-
-            document.getElementById('network-3d').appendChild(labelDiv);
-
-            nodeData.label = {
-                element: labelDiv,
-                position: position
-            };
-
-            labels3D.push(nodeData.label);
-        }
-
-        function updateLabelVisibility() {
-            if (!camera || !renderer) return;
-
-            labels3D.forEach(label => {
-                if (!label || !label.element) return;
-
-                const vector = new THREE.Vector3(
-                    label.position.x,
-                    label.position.y + 1,
-                    label.position.z
-                );
-
-                vector.project(camera);
-
-                const x = (vector.x * 0.5 + 0.5) * renderer.domElement.clientWidth;
-                const y = (vector.y * -0.5 + 0.5) * renderer.domElement.clientHeight;
-
-                label.element.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
-
-                // Hide labels that are behind the camera
-                if (vector.z > 1) {
-                    label.element.style.display = 'none';
-                } else {
-                    label.element.style.display = show3DLabels ? 'block' : 'none';
-                }
-            });
-        }
-
-        function createConnections3D(connectionData) {
-            // Clear existing connections
-            connections3D.forEach(conn => {
-                if (conn.line) scene.remove(conn.line);
-            });
-            connections3D = [];
-
-            if (!showConnections) return;
-
-            connectionData.forEach(conn => {
-                const points = [
-                    new THREE.Vector3(conn.start.x, conn.start.y, conn.start.z),
-                    new THREE.Vector3(conn.end.x, conn.end.y, conn.end.z)
-                ];
-
-                const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                const material = new THREE.LineBasicMaterial({
-                    color: new THREE.Color(conn.color),
-                    opacity: conn.opacity || 0.6,
-                    transparent: true,
-                    linewidth: conn.thickness || 1
-                });
-
-                const line = new THREE.Line(geometry, material);
-                scene.add(line);
-
-                connections3D.push({ line, ...conn });
-            });
-        }
-
-        function showDeviceInfo3D(device) {
-            const panel = document.getElementById('device-info-3d');
-            const content = panel.querySelector('.info-content');
-
-            let html = '';
-
-            if (device.hostname || device.ip) {
-                html += `<div class="device-title">${device.hostname || device.ip}</div>`;
-            }
-
-            html += `<div class="info-row"><span class="info-label">IP:</span><span class="info-value">${device.ip || 'N/A'}</span></div>`;
-            html += `<div class="info-row"><span class="info-label">Type:</span><span class="info-value">${device.type || 'unknown'}</span></div>`;
-
-            if (device.vendor) {
-                html += `<div class="info-row"><span class="info-label">Vendor:</span><span class="info-value">${device.vendor}</span></div>`;
-            }
-
-            if (device.os) {
-                html += `<div class="info-row"><span class="info-label">OS:</span><span class="info-value">${device.os}</span></div>`;
-            }
-
-            if (device.critical) {
-                html += `<div class="info-row"><span class="info-label" style="color: #ff6b6b;">CRITICAL DEVICE</span></div>`;
-            }
-
-            if (device.services && device.services.length > 0) {
-                html += `<div class="info-row"><span class="info-label">Services:</span><span class="info-value">${device.services.slice(0, 3).join(', ')}</span></div>`;
-            }
-
-            content.innerHTML = html;
-        }
-
-        function reset3DView() {
-            if (camera) {
-                camera.position.set(25, 20, 25);
-                camera.lookAt(0, 0, 0);
-                manualRotation = false; // Allow auto-rotation again if enabled
-            }
-        }
-
-        function zoom3DIn() {
-            if (camera) {
-                camera.position.multiplyScalar(0.8);
-                camera.position.clampLength(5, 100);
-            }
-        }
-
-        function zoom3DOut() {
-            if (camera) {
-                camera.position.multiplyScalar(1.25);
-                camera.position.clampLength(5, 100);
-            }
-        }
-
-        function toggle3DRotation() {
-            autoRotate = document.getElementById('auto-rotate').checked;
-            if (!autoRotate) {
-                manualRotation = false; // Reset manual rotation flag
-            }
-        }
-
-        function toggle3DConnections() {
-            showConnections = document.getElementById('show-connections').checked;
-            if (window.threeInitialized && scene) {
-                createConnections3D(threeData.connections || []);
-            }
-        }
-
-        function toggle3DLabels() {
-            show3DLabels = document.getElementById('show-3d-labels').checked;
-            labels3D.forEach(label => {
-                if (label && label.element) {
-                    label.element.style.display = show3DLabels ? 'block' : 'none';
-                }
-            });
-        }
-
-        function download3DMap() {
-            if (renderer) {
-                const link = document.createElement('a');
-                link.download = `network_map_3d_${scanTimestamp}.png`;
-                link.href = renderer.domElement.toDataURL();
-                link.click();
-            }
-        }
-
-        function toggle3DFullscreen() {
-            const container = document.querySelector('#3d-view-tab .visualization');
-            if (!document.fullscreenElement) {
-                container.requestFullscreen();
-            } else {
-                document.exitFullscreen();
-            }
-        }
-
-        document.addEventListener('click', function (event) {
-            const sidebar = document.getElementById('device-sidebar');
-            if (sidebar.classList.contains('open') && !sidebar.contains(event.target) && !event.target.closest('circle')) {
-                closeSidebar();
-            }
-        });
     </script>
 </body>
-
 </html>

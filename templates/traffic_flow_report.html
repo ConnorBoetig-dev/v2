@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Traffic Flow Analysis - {{ scan_date }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e1e;
+            color: #cccccc;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #FF6B6B 0%, #4ECDC4 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: #252526;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #3e3e42;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            color: #569cd6;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #4ec9b0;
+        }
+
+        .visualization-container {
+            background: #252526;
+            border-radius: 10px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid #3e3e42;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #traffic-flow-viz {
+            width: 100%;
+            height: 600px;
+            background: #1e1e1e;
+            border-radius: 8px;
+        }
+
+        .controls {
+            background: #2d2d30;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .control-group label {
+            color: #cccccc;
+            font-size: 0.875rem;
+        }
+
+        .control-group select,
+        .control-group input {
+            background: #1e1e1e;
+            color: #cccccc;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .legend {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+
+        .top-talkers {
+            background: #252526;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #3e3e42;
+            margin-bottom: 2rem;
+        }
+
+        .talker-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem;
+            border-bottom: 1px solid #3e3e42;
+        }
+
+        .talker-item:last-child {
+            border-bottom: none;
+        }
+
+        .device-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .device-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+        }
+
+        .traffic-volume {
+            font-weight: bold;
+            color: #4ec9b0;
+        }
+
+        .stealth-badge {
+            background: #ff6b6b;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+
+        .tooltip {
+            position: absolute;
+            text-align: left;
+            padding: 10px;
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            border-radius: 5px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        .flow-link {
+            fill: none;
+            stroke-opacity: 0.6;
+            transition: stroke-opacity 0.3s;
+        }
+
+        .flow-link:hover {
+            stroke-opacity: 1;
+            stroke-width: 3;
+        }
+
+        .node {
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .node:hover {
+            transform: scale(1.1);
+        }
+
+        .node-label {
+            font-size: 10px;
+            pointer-events: none;
+        }
+
+        .service-distribution {
+            background: #252526;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #3e3e42;
+            margin-bottom: 2rem;
+        }
+
+        .service-bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .service-name {
+            width: 100px;
+            text-align: right;
+            padding-right: 1rem;
+            color: #569cd6;
+        }
+
+        .service-bar-fill {
+            height: 20px;
+            background: linear-gradient(90deg, #4ec9b0 0%, #569cd6 100%);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .service-count {
+            margin-left: 1rem;
+            color: #cccccc;
+        }
+        
+        /* Risk Propagation Styles */
+        .risk-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(37, 37, 38, 0.95);
+            border: 1px solid #3e3e42;
+            border-radius: 8px;
+            padding: 1rem;
+            width: 300px;
+            max-height: 80%;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .risk-panel h3 {
+            color: #ff6b6b;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+        
+        .risk-mode-toggle {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .risk-mode-toggle:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+        }
+        
+        .risk-mode-toggle.active {
+            background: #c44336;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .node.failed {
+            fill: #ff1744 !important;
+            stroke: #b71c1c !important;
+            stroke-width: 4px !important;
+            animation: pulse 1s infinite;
+        }
+        
+        .node.impacted {
+            fill: #ff9800 !important;
+            stroke: #e65100 !important;
+            stroke-width: 3px !important;
+        }
+        
+        .node.at-risk {
+            fill: #ffc107 !important;
+            stroke: #f57c00 !important;
+            stroke-dasharray: 5,5;
+            animation: dash 2s linear infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes dash {
+            to { stroke-dashoffset: -10; }
+        }
+        
+        .impact-summary {
+            background: #3e3e42;
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        
+        .impact-stat {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.5rem 0;
+            font-size: 0.9rem;
+        }
+        
+        .impact-stat-value {
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+        
+        .severity-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .severity-critical { background: #d32f2f; color: white; }
+        .severity-high { background: #f57c00; color: white; }
+        .severity-medium { background: #fbc02d; color: #333; }
+        .severity-low { background: #689f38; color: white; }
+        
+        .mitigation-list {
+            margin-top: 1rem;
+            font-size: 0.85rem;
+        }
+        
+        .mitigation-item {
+            background: #2d2d30;
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            border-radius: 4px;
+            border-left: 3px solid #4ec9b0;
+        }
+        
+        .reset-simulation {
+            background: #4ec9b0;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Devices</h3>
+                <div class="stat-number">{{ total_devices }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Stealth Devices</h3>
+                <div class="stat-number" style="color: #ff6b6b;">{{ stealth_devices|default(0) }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Traffic Flows</h3>
+                <div class="stat-number">{{ total_flows|default(0) }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Services Detected</h3>
+                <div class="stat-number">{{ services_count|default(0) }}</div>
+            </div>
+        </div>
+
+        <div class="visualization-container">
+            <h2>Live Traffic Flow Visualization</h2>
+            {% if total_flows == 0 %}
+            <div style="background: #3e3e42; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <p style="color: #ffd93d; margin: 0;">
+                    <strong>No traffic flows detected.</strong> 
+                    This visualization only shows actual observed network traffic. 
+                    If passive analysis was not enabled or no traffic was captured, no connections will be displayed.
+                </p>
+            </div>
+            {% endif %}
+            <div class="controls">
+                <div class="control-group">
+                    <label>Show:</label>
+                    <select id="flow-filter">
+                        <option value="all">All Flows</option>
+                        <option value="high">High Traffic Only</option>
+                        <option value="stealth">Stealth Devices</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Layout:</label>
+                    <select id="layout-type">
+                        <option value="force">Force Directed</option>
+                        <option value="circular">Circular</option>
+                        <option value="hierarchical">Hierarchical</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label><input type="checkbox" id="show-labels" checked> Show Labels</label>
+                </div>
+                <div class="control-group">
+                    <label><input type="checkbox" id="animate-flows" checked> Animate Flows</label>
+                </div>
+                <div class="control-group">
+                    <button class="risk-mode-toggle" id="risk-mode-btn" onclick="toggleRiskMode()">
+                        🔥 Risk Analysis Mode
+                    </button>
+                </div>
+            </div>
+            <div id="traffic-flow-viz">
+                <div class="risk-panel" id="risk-panel">
+                    <h3>Risk Propagation Analysis</h3>
+                    <p style="font-size: 0.9rem; color: #cccccc; margin-bottom: 1rem;">
+                        Click on any device to simulate its failure and see the cascading impact on your network.
+                    </p>
+                    <div id="impact-details"></div>
+                    <button class="reset-simulation" onclick="resetSimulation()">Reset Simulation</button>
+                </div>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4ec9b0;"></div>
+                    <span>Normal Device</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff6b6b;"></div>
+                    <span>Stealth Device</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffd93d;"></div>
+                    <span>High Traffic</span>
+                </div>
+            </div>
+        </div>
+
+        {% if top_talkers %}
+        <div class="top-talkers">
+            <h2>Top Traffic Generators</h2>
+            {% for talker in top_talkers %}
+            <div class="talker-item">
+                <div class="device-info">
+                    <div class="device-icon" style="background: {{ talker.color|default('#569cd6') }};">
+                        {{ talker.type[:1].upper() }}
+                    </div>
+                    <div>
+                        <strong>{{ talker.hostname|default(talker.ip) }}</strong>
+                        {% if talker.stealth %}
+                        <span class="stealth-badge">STEALTH</span>
+                        {% endif %}
+                        <br>
+                        <small>{{ talker.ip }} - {{ talker.type }}</small>
+                    </div>
+                </div>
+                <div class="traffic-volume">
+                    {{ talker.traffic_volume|filesizeformat }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if service_usage %}
+        <div class="service-distribution">
+            <h2>Service Usage Distribution</h2>
+            {% for service, ips in service_usage.items() %}
+            {% set count = ips|length if ips is sequence else ips %}
+            <div class="service-bar">
+                <div class="service-name">{{ service.upper() }}</div>
+                <div class="service-bar-fill" style="width: {{ (count / max_service_count * 100)|int }}%;"></div>
+                <div class="service-count">{{ count }} devices</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script>
+        const trafficData = {{ d3_data | safe }};
+        const flowMatrix = {{ flow_matrix | safe }};
+        const devicesData = {{ devices | tojson }};
+        
+        let svg, simulation, node, link, label;
+        const width = document.getElementById('traffic-flow-viz').clientWidth;
+        const height = 600;
+        
+        // Risk propagation state
+        let riskModeActive = false;
+        let dependencyGraph = {};
+        let currentSimulation = null;
+        
+        function initVisualization() {
+            svg = d3.select("#traffic-flow-viz")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+            
+            // Add zoom behavior
+            const zoom = d3.zoom()
+                .scaleExtent([0.1, 10])
+                .on("zoom", (event) => {
+                    svg.selectAll("g").attr("transform", event.transform);
+                });
+            
+            svg.call(zoom);
+            
+            const g = svg.append("g");
+            
+            // Create force simulation
+            simulation = d3.forceSimulation(trafficData.nodes)
+                .force("link", d3.forceLink(trafficData.links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-300))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collision", d3.forceCollide().radius(30));
+            
+            // Create links
+            link = g.append("g")
+                .selectAll("path")
+                .data(trafficData.links)
+                .enter().append("path")
+                .attr("class", "flow-link")
+                .attr("stroke", d => getFlowColor(d))
+                .attr("stroke-width", d => Math.sqrt(d.value))
+                .attr("marker-end", "url(#arrowhead)");
+            
+            // Create nodes
+            node = g.append("g")
+                .selectAll("circle")
+                .data(trafficData.nodes)
+                .enter().append("circle")
+                .attr("class", "node")
+                .attr("r", d => getNodeSize(d))
+                .attr("fill", d => getNodeColor(d))
+                .attr("stroke", "#fff")
+                .attr("stroke-width", 2)
+                .call(drag(simulation))
+                .on("mouseover", showTooltip)
+                .on("mouseout", hideTooltip)
+                .on("click", handleNodeClick);
+            
+            // Create labels
+            label = g.append("g")
+                .selectAll("text")
+                .data(trafficData.nodes)
+                .enter().append("text")
+                .attr("class", "node-label")
+                .attr("text-anchor", "middle")
+                .attr("dy", -15)
+                .text(d => d.name)
+                .style("fill", "#cccccc")
+                .style("display", document.getElementById('show-labels').checked ? 'block' : 'none');
+            
+            // Create arrow markers
+            svg.append("defs").append("marker")
+                .attr("id", "arrowhead")
+                .attr("viewBox", "-0 -5 10 10")
+                .attr("refX", 20)
+                .attr("refY", 0)
+                .attr("orient", "auto")
+                .attr("markerWidth", 10)
+                .attr("markerHeight", 10)
+                .append("path")
+                .attr("d", "M 0,-5 L 10,0 L 0,5")
+                .attr("fill", "#999");
+            
+            simulation.on("tick", ticked);
+            
+            // Animate flows if enabled
+            if (document.getElementById('animate-flows').checked) {
+                animateFlows();
+            }
+        }
+        
+        function ticked() {
+            link.attr("d", d => {
+                const dx = d.target.x - d.source.x;
+                const dy = d.target.y - d.source.y;
+                const dr = Math.sqrt(dx * dx + dy * dy);
+                return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+            });
+            
+            node
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+            
+            label
+                .attr("x", d => d.x)
+                .attr("y", d => d.y);
+        }
+        
+        function drag(simulation) {
+            function dragstarted(event) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                event.subject.fx = event.subject.x;
+                event.subject.fy = event.subject.y;
+            }
+            
+            function dragged(event) {
+                event.subject.fx = event.x;
+                event.subject.fy = event.y;
+            }
+            
+            function dragended(event) {
+                if (!event.active) simulation.alphaTarget(0);
+                event.subject.fx = null;
+                event.subject.fy = null;
+            }
+            
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+        }
+        
+        function getNodeSize(d) {
+            const baseSize = 10;
+            if (d.traffic && d.traffic.total > 0) {
+                return baseSize + Math.min(20, Math.log10(d.traffic.total) * 5);
+            }
+            return baseSize;
+        }
+        
+        function getNodeColor(d) {
+            if (d.stealth) return "#ff6b6b";
+            if (d.traffic && d.traffic.total > 10000) return "#ffd93d";
+            if (d.critical) return "#e74c3c";
+            return "#4ec9b0";
+        }
+        
+        function getFlowColor(d) {
+            if (d.packets > 1000) return "#ff6b6b";
+            if (d.packets > 100) return "#ffd93d";
+            return "#4ec9b0";
+        }
+        
+        function showTooltip(event, d) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.opacity = 1;
+            tooltip.style.left = (event.pageX + 10) + 'px';
+            tooltip.style.top = (event.pageY - 10) + 'px';
+            
+            let content = `<strong>${d.name}</strong><br>`;
+            content += `IP: ${d.id}<br>`;
+            content += `Type: ${d.type}<br>`;
+            if (d.stealth) content += `<span style="color: #ff6b6b;">STEALTH DEVICE</span><br>`;
+            if (d.traffic) {
+                content += `Inbound: ${d.traffic.inbound} packets<br>`;
+                content += `Outbound: ${d.traffic.outbound} packets<br>`;
+            }
+            
+            tooltip.innerHTML = content;
+        }
+        
+        function hideTooltip() {
+            document.getElementById('tooltip').style.opacity = 0;
+        }
+        
+        function animateFlows() {
+            link.each(function(d) {
+                const path = d3.select(this);
+                const totalLength = this.getTotalLength();
+                
+                path
+                    .attr("stroke-dasharray", totalLength + " " + totalLength)
+                    .attr("stroke-dashoffset", totalLength)
+                    .transition()
+                    .duration(2000)
+                    .ease(d3.easeLinear)
+                    .attr("stroke-dashoffset", 0)
+                    .on("end", function() {
+                        // Repeat animation
+                        if (document.getElementById('animate-flows').checked) {
+                            animateFlows();
+                        }
+                    });
+            });
+        }
+        
+        // Event listeners
+        document.getElementById('show-labels').addEventListener('change', (e) => {
+            label.style("display", e.target.checked ? 'block' : 'none');
+        });
+        
+        document.getElementById('animate-flows').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                animateFlows();
+            } else {
+                link.attr("stroke-dasharray", null).attr("stroke-dashoffset", null);
+            }
+        });
+        
+        document.getElementById('flow-filter').addEventListener('change', (e) => {
+            const filter = e.target.value;
+            
+            link.style("display", d => {
+                if (filter === 'all') return 'block';
+                if (filter === 'high' && d.packets > 100) return 'block';
+                if (filter === 'stealth') {
+                    const sourceNode = trafficData.nodes.find(n => n.id === d.source.id || n.id === d.source);
+                    const targetNode = trafficData.nodes.find(n => n.id === d.target.id || n.id === d.target);
+                    if (sourceNode?.stealth || targetNode?.stealth) return 'block';
+                }
+                return 'none';
+            });
+            
+            node.style("display", d => {
+                if (filter === 'all') return 'block';
+                if (filter === 'high' && d.traffic?.total > 1000) return 'block';
+                if (filter === 'stealth' && d.stealth) return 'block';
+                return 'block'; // Always show nodes
+            });
+        });
+        
+        // Initialize
+        initVisualization();
+        buildDependencyGraph();
+        
+        // Risk Propagation Functions
+        function toggleRiskMode() {
+            riskModeActive = !riskModeActive;
+            const btn = document.getElementById('risk-mode-btn');
+            const panel = document.getElementById('risk-panel');
+            
+            if (riskModeActive) {
+                btn.classList.add('active');
+                panel.style.display = 'block';
+                // Change cursor for nodes
+                node.style("cursor", "pointer");
+            } else {
+                btn.classList.remove('active');
+                panel.style.display = 'none';
+                resetSimulation();
+                node.style("cursor", "grab");
+            }
+        }
+        
+        function buildDependencyGraph() {
+            // Build dependency graph from devices and flow matrix
+            dependencyGraph = {};
+            
+            // Initialize graph
+            devicesData.forEach(device => {
+                dependencyGraph[device.ip] = {
+                    device: device,
+                    depends_on: new Set(),
+                    dependents: new Set()
+                };
+            });
+            
+            // Add dependencies from device data
+            devicesData.forEach(device => {
+                if (device.dependencies) {
+                    device.dependencies.forEach(depHostname => {
+                        const depDevice = devicesData.find(d => d.hostname === depHostname);
+                        if (depDevice) {
+                            dependencyGraph[device.ip].depends_on.add(depDevice.ip);
+                            dependencyGraph[depDevice.ip].dependents.add(device.ip);
+                        }
+                    });
+                }
+            });
+            
+            // Add dependencies from traffic flows
+            if (flowMatrix) {
+                Object.entries(flowMatrix).forEach(([src, destinations]) => {
+                    Object.entries(destinations).forEach(([dst, packets]) => {
+                        if (packets > 100) { // Significant traffic
+                            const dstDevice = devicesData.find(d => d.ip === dst);
+                            if (dstDevice) {
+                                // Check if destination provides critical services
+                                const criticalServices = ['dns', 'ldap', 'ntp', 'dhcp'];
+                                const hasCtriticalService = dstDevice.services?.some(s => 
+                                    criticalServices.some(cs => s.toLowerCase().includes(cs))
+                                );
+                                
+                                if (hasCtriticalService || dstDevice.critical) {
+                                    dependencyGraph[src].depends_on.add(dst);
+                                    dependencyGraph[dst].dependents.add(src);
+                                }
+                            }
+                        }
+                    });
+                });
+            }
+        }
+        
+        function handleNodeClick(event, d) {
+            if (!riskModeActive) return;
+            
+            event.stopPropagation();
+            simulateDeviceFailure(d.id);
+        }
+        
+        function simulateDeviceFailure(deviceIp) {
+            resetSimulation();
+            
+            currentSimulation = {
+                failed: deviceIp,
+                directly_impacted: new Set(),
+                indirectly_impacted: new Set(),
+                impact_chains: []
+            };
+            
+            // Find all impacted devices using BFS
+            const visited = new Set();
+            const queue = [{ip: deviceIp, depth: 0}];
+            const impactByDepth = {};
+            
+            while (queue.length > 0) {
+                const {ip, depth} = queue.shift();
+                
+                if (visited.has(ip)) continue;
+                visited.add(ip);
+                
+                if (!impactByDepth[depth]) impactByDepth[depth] = [];
+                impactByDepth[depth].push(ip);
+                
+                // Add dependents to queue
+                const deps = dependencyGraph[ip]?.dependents || new Set();
+                deps.forEach(depIp => {
+                    if (!visited.has(depIp)) {
+                        queue.push({ip: depIp, depth: depth + 1});
+                        
+                        if (depth === 0) {
+                            currentSimulation.directly_impacted.add(depIp);
+                        } else {
+                            currentSimulation.indirectly_impacted.add(depIp);
+                        }
+                    }
+                });
+            }
+            
+            // Update node appearances
+            node.classed("failed", d => d.id === deviceIp)
+                .classed("impacted", d => currentSimulation.directly_impacted.has(d.id))
+                .classed("at-risk", d => currentSimulation.indirectly_impacted.has(d.id));
+            
+            // Update impact panel
+            updateImpactPanel(deviceIp, impactByDepth);
+        }
+        
+        function updateImpactPanel(failedIp, impactByDepth) {
+            const device = devicesData.find(d => d.ip === failedIp);
+            const totalImpacted = currentSimulation.directly_impacted.size + 
+                                currentSimulation.indirectly_impacted.size;
+            
+            // Calculate severity
+            let severity = "Low";
+            if (device?.critical || totalImpacted > 50) {
+                severity = "Critical";
+            } else if (totalImpacted > 20) {
+                severity = "High";
+            } else if (totalImpacted > 5) {
+                severity = "Medium";
+            }
+            
+            // Generate mitigation suggestions
+            const mitigations = [];
+            
+            if (!hasRedundancy(device)) {
+                mitigations.push(`Deploy redundant ${device?.type || 'device'} for high availability`);
+            }
+            
+            if (device?.type === 'router' || device?.type === 'firewall') {
+                mitigations.push("Configure backup gateway/route for network redundancy");
+            }
+            
+            if (device?.services?.some(s => s.includes('dns'))) {
+                mitigations.push("Configure secondary DNS servers on all devices");
+            }
+            
+            if (totalImpacted > 20) {
+                mitigations.push("Consider distributing load across multiple devices");
+                mitigations.push("Implement network segmentation to limit failure impact");
+            }
+            
+            // Update panel content
+            const content = `
+                <div class="impact-summary">
+                    <h4 style="margin-bottom: 0.5rem;">
+                        ${device?.hostname || failedIp} Failure Impact
+                    </h4>
+                    <div class="impact-stat">
+                        <span>Device Type:</span>
+                        <span>${device?.type || 'Unknown'}</span>
+                    </div>
+                    <div class="impact-stat">
+                        <span>Total Impacted:</span>
+                        <span class="impact-stat-value">${totalImpacted} devices</span>
+                    </div>
+                    <div class="impact-stat">
+                        <span>Direct Impact:</span>
+                        <span class="impact-stat-value">${currentSimulation.directly_impacted.size}</span>
+                    </div>
+                    <div class="impact-stat">
+                        <span>Cascade Impact:</span>
+                        <span class="impact-stat-value">${currentSimulation.indirectly_impacted.size}</span>
+                    </div>
+                    <div class="impact-stat">
+                        <span>Severity:</span>
+                        <span class="severity-badge severity-${severity.toLowerCase()}">${severity}</span>
+                    </div>
+                </div>
+                
+                ${device?.services?.length ? `
+                <div style="margin: 1rem 0;">
+                    <strong>Services Lost:</strong>
+                    <div style="margin-top: 0.5rem;">
+                        ${device.services.map(s => 
+                            `<span style="display: inline-block; background: #3e3e42; 
+                                   padding: 2px 8px; margin: 2px; border-radius: 4px; 
+                                   font-size: 0.8rem;">${s}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                <div class="mitigation-list">
+                    <strong>Mitigation Suggestions:</strong>
+                    ${mitigations.map(m => 
+                        `<div class="mitigation-item">${m}</div>`
+                    ).join('')}
+                </div>
+            `;
+            
+            document.getElementById('impact-details').innerHTML = content;
+        }
+        
+        function hasRedundancy(device) {
+            if (!device) return false;
+            
+            // Check if there are other devices of the same type
+            const sameType = devicesData.filter(d => 
+                d.ip !== device.ip && 
+                d.type === device.type &&
+                d.services?.some(s => device.services?.includes(s))
+            );
+            
+            return sameType.length > 0;
+        }
+        
+        function resetSimulation() {
+            currentSimulation = null;
+            
+            // Reset node classes
+            node.classed("failed", false)
+                .classed("impacted", false)
+                .classed("at-risk", false);
+            
+            // Clear impact details
+            document.getElementById('impact-details').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

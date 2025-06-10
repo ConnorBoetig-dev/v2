@@ -24,6 +24,7 @@ class DeviceType(Enum):
     WEB_SERVER = "web_server"
     MAIL_SERVER = "mail_server"
     DNS_SERVER = "dns_server"
+    DOMAIN_CONTROLLER = "domain_controller"
     WINDOWS_SERVER = "windows_server"
     LINUX_SERVER = "linux_server"
     PRINTER = "printer"
@@ -33,6 +34,12 @@ class DeviceType(Enum):
     IOT = "iot"
     VOIP = "voip"
     MEDIA_SERVER = "media_server"
+    UPS = "ups"
+    PLC = "plc"
+    SCADA = "scada"
+    NTP_SERVER = "ntp_server"
+    MONITORING_SERVER = "monitoring_server"
+    BACKUP_SERVER = "backup_server"
     UNKNOWN = "unknown"
 
 
@@ -157,7 +164,61 @@ class DeviceClassifier:
                 ports=[53],
                 services=["dns", "domain"],
                 keywords=["bind", "named", "dns", "resolver", "unbound", "powerdns"],
+                priority=95,  # DNS is critical infrastructure
+            ),
+            DeviceType.DOMAIN_CONTROLLER: DeviceSignature(
+                device_type=DeviceType.DOMAIN_CONTROLLER,
+                ports=[88, 135, 139, 389, 445, 464, 636, 3268],  # Kerberos, LDAP, SMB
+                services=["kerberos", "ldap", "ldaps", "msrpc", "netbios", "microsoft-ds"],
+                keywords=["domain controller", "active directory", "ldap", "kerberos", "dc01", "dc02"],
+                vendor_patterns=["Microsoft"],
+                priority=95,  # Critical infrastructure
+            ),
+            DeviceType.NTP_SERVER: DeviceSignature(
+                device_type=DeviceType.NTP_SERVER,
+                ports=[123],
+                services=["ntp"],
+                keywords=["ntp", "time", "chrony", "ntpd"],
                 priority=85,
+            ),
+            DeviceType.UPS: DeviceSignature(
+                device_type=DeviceType.UPS,
+                ports=[161, 3493, 80],  # SNMP, NUT, HTTP
+                services=["snmp", "nut", "http"],
+                keywords=["ups", "apc", "eaton", "power", "battery", "schneider"],
+                vendor_patterns=["APC", "Eaton", "Schneider", "CyberPower"],
+                priority=80,
+            ),
+            DeviceType.PLC: DeviceSignature(
+                device_type=DeviceType.PLC,
+                ports=[502, 2222, 44818, 47808],  # Modbus, EtherNet/IP, BACnet
+                services=["modbus", "ethernet-ip", "bacnet"],
+                keywords=["plc", "siemens", "allen bradley", "schneider", "omron", "rockwell"],
+                vendor_patterns=["Siemens", "Rockwell", "Schneider", "Allen-Bradley"],
+                priority=85,
+            ),
+            DeviceType.SCADA: DeviceSignature(
+                device_type=DeviceType.SCADA,
+                ports=[502, 20000, 2404, 4911],  # Modbus, DNP3, IEC-104, OPC
+                services=["modbus", "dnp3", "iec104", "opc"],
+                keywords=["scada", "hmi", "wonderware", "indusoft", "ignition", "wincc"],
+                vendor_patterns=["Wonderware", "Indusoft", "Siemens", "GE"],
+                priority=90,
+            ),
+            DeviceType.MONITORING_SERVER: DeviceSignature(
+                device_type=DeviceType.MONITORING_SERVER,
+                ports=[161, 162, 514, 5666, 9090, 3000],  # SNMP, syslog, NRPE, Prometheus, Grafana
+                services=["snmp", "syslog", "nrpe", "prometheus", "grafana"],
+                keywords=["nagios", "zabbix", "prometheus", "monitoring", "grafana", "prtg"],
+                priority=75,
+            ),
+            DeviceType.BACKUP_SERVER: DeviceSignature(
+                device_type=DeviceType.BACKUP_SERVER,
+                ports=[9392, 10050, 3260, 11165],  # Veeam, Bacula, iSCSI, Acronis
+                services=["veeam", "bacula", "iscsi", "acronis"],
+                keywords=["backup", "veeam", "bacula", "commvault", "acronis", "veritas"],
+                vendor_patterns=["Veeam", "Veritas", "Commvault"],
+                priority=75,
             ),
             DeviceType.WINDOWS_SERVER: DeviceSignature(
                 device_type=DeviceType.WINDOWS_SERVER,
@@ -251,8 +312,8 @@ class DeviceClassifier:
             ),
             DeviceType.IOT: DeviceSignature(
                 device_type=DeviceType.IOT,
-                ports=[80, 443, 8080, 1883, 8883, 5683, 1900],  # HTTP, MQTT, CoAP, UPnP
-                services=["http", "https", "mqtt", "coap", "upnp"],
+                ports=[80, 443, 8080, 1883, 8883, 5683, 1900, 502, 554],  # Added Modbus, RTSP
+                services=["http", "https", "mqtt", "coap", "upnp", "modbus", "rtsp"],
                 keywords=[
                     "camera",
                     "sensor",
@@ -263,8 +324,11 @@ class DeviceClassifier:
                     "tasmota",
                     "zigbee",
                     "hue",
+                    "hvac",
+                    "thermostat",
+                    "security",
                 ],
-                vendor_patterns=["Espressif", "Raspberry", "Arduino", "Tuya", "Philips"],
+                vendor_patterns=["Espressif", "Raspberry", "Arduino", "Tuya", "Philips", "Honeywell", "Hikvision"],
                 priority=30,
             ),
             DeviceType.VOIP: DeviceSignature(
@@ -287,7 +351,7 @@ class DeviceClassifier:
     def _build_vendor_patterns(self) -> Dict[str, List[DeviceType]]:
         """Build vendor to device type mapping."""
         return {
-            "Cisco": [DeviceType.ROUTER, DeviceType.SWITCH],
+            "Cisco": [DeviceType.ROUTER, DeviceType.SWITCH, DeviceType.VOIP],
             "Juniper": [DeviceType.ROUTER, DeviceType.FIREWALL],
             "Fortinet|FortiGate": [DeviceType.FIREWALL],
             "Dell|PowerEdge": [DeviceType.WINDOWS_SERVER, DeviceType.LINUX_SERVER],
@@ -299,10 +363,19 @@ class DeviceClassifier:
             "Raspberry": [DeviceType.IOT],
             "Ubiquiti": [DeviceType.ROUTER, DeviceType.SWITCH],
             "MikroTik": [DeviceType.ROUTER],
-            "Netgear": [DeviceType.ROUTER, DeviceType.SWITCH],
+            "Netgear": [DeviceType.ROUTER, DeviceType.SWITCH, DeviceType.NAS],
             "TP-Link": [DeviceType.ROUTER, DeviceType.SWITCH, DeviceType.IOT],
             "VMware": [DeviceType.HYPERVISOR],
-            "Microsoft": [DeviceType.WINDOWS_SERVER, DeviceType.WORKSTATION],
+            "Microsoft": [DeviceType.WINDOWS_SERVER, DeviceType.WORKSTATION, DeviceType.DOMAIN_CONTROLLER],
+            "APC|Schneider": [DeviceType.UPS],
+            "Eaton": [DeviceType.UPS],
+            "Siemens": [DeviceType.PLC, DeviceType.SCADA],
+            "Rockwell|Allen-Bradley": [DeviceType.PLC],
+            "Wonderware": [DeviceType.SCADA],
+            "Veeam": [DeviceType.BACKUP_SERVER],
+            "Veritas": [DeviceType.BACKUP_SERVER],
+            "Hikvision|Dahua": [DeviceType.IOT],
+            "Polycom|Yealink": [DeviceType.VOIP],
         }
 
     def _build_service_hints(self) -> Dict[str, DeviceType]:
