@@ -28,6 +28,7 @@ from utils.snmp_config import SNMPConfig
 from utils.traffic_analyzer import PassiveTrafficAnalyzer
 from utils.visualization import MapGenerator
 from utils.vulnerability_scanner import VulnerabilityScanner
+from utils.scan_status import ScanStatusIndicator
 from modern_interface import ModernInterface
 
 app = typer.Typer()
@@ -136,14 +137,22 @@ class NetworkMapper:
         passive_enabled, passive_duration = self._handle_passive_analysis_setup()
 
         # Run scan
-        console.print(f"\n[yellow]Starting {scan_name} on {target}...[/yellow]\n")
-
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+        # Create status indicator
+        status_indicator = ScanStatusIndicator(console)
+        
         # Handle ARP scan separately
         if scan_type == "arp":
-            results = self.scanner._run_arp_scan(target)
+            # ARP scans are quick, use simple indicator
+            console.print(f"\n[yellow]Starting ARP scan on {target}...[/yellow]\n")
+            with console.status("[cyan]Running ARP scan...[/cyan]", spinner="dots"):
+                results = self.scanner._run_arp_scan(target)
         else:
+            # Show scan status
+            status_indicator.show_scan_starting(target, scan_type)
+            
+            # Run scan (scanner has its own progress bars)
             results = self.scanner.scan(
                 target=target,
                 scan_type=scan_type,
@@ -151,6 +160,10 @@ class NetworkMapper:
                 needs_root=needs_root,
                 snmp_config=snmp_config if snmp_enabled else None,
             )
+            
+            # Show completion
+            device_count = len(results) if results else 0
+            status_indicator.show_scan_complete(device_count)
 
         # Parse and classify
         devices = self.parser.parse_results(results)

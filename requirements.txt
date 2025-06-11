@@ -4,7 +4,7 @@
 
 # ==================== Core Dependencies ====================
 # CLI and Display
-typer==0.9.0
+typer==0.16.0  # Updated from 0.9.0 to fix click compatibility
 rich==13.7.0
 
 # Network Scanning
@@ -28,7 +28,7 @@ openpyxl==3.1.2
 pandas==2.0.3
 
 # Data Processing
-numpy>=1.23.2  # Required by pandas
+numpy==1.24.3  # Fixed version to prevent pandas compatibility issues
 python-dateutil>=2.8.2
 pytz>=2020.1
 
