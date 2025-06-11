@@ -9,6 +9,10 @@ import sys
 import time
 from pathlib import Path
 import logging
+import warnings
+
+# Suppress all warnings including cryptography deprecation warnings
+warnings.filterwarnings("ignore")
 
 # Suppress scapy warnings and output
 logging.getLogger("scapy").setLevel(logging.ERROR)
@@ -31,6 +35,13 @@ def capture_packets(interface, duration, output_file):
     
     packets_data = []
     start_time = time.time()
+    
+    # Debug: Log capture parameters
+    debug_info = {
+        "interface": interface,
+        "duration": duration,
+        "start_time": start_time
+    }
     
     def packet_handler(pkt):
         # Don't check duration here - let stop_filter handle it
@@ -76,31 +87,35 @@ def capture_packets(interface, duration, output_file):
             old_stdout = sys.stdout
             sys.stdout = devnull
             
-            # Start sniffing
+            # Start sniffing - remove filter to capture all traffic for testing
             sniff(
                 iface=interface,
                 prn=packet_handler,
-                filter="not port 22",  # Exclude SSH
+                # filter="not port 22",  # Temporarily disabled to capture all traffic
                 timeout=duration,
-                store=False,
-                stop_filter=lambda x: time.time() - start_time > duration
+                store=False
+                # stop_filter removed - let timeout handle it
             )
             
             # Restore stdout
             sys.stdout = old_stdout
         
         # Save results
+        debug_info["packets_captured"] = len(packets_data)
+        debug_info["capture_time"] = time.time() - start_time
+        
         with open(output_file, 'w') as f:
             json.dump({
                 "packets": packets_data,
                 "stats": {
                     "total_packets": len(packets_data),
                     "duration": duration,
-                    "interface": interface
+                    "interface": interface,
+                    "debug": debug_info
                 }
             }, f)
             
-        print(json.dumps({"success": True, "packets": len(packets_data)}))
+        print(json.dumps({"success": True, "packets": len(packets_data), "debug": debug_info}))
         
     except Exception as e:
         print(json.dumps({"error": str(e)}))

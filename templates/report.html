@@ -1175,7 +1175,12 @@
                         <td>{{ device.ip }}</td>
                         <td>{{ device.hostname or '-' }}</td>
                         <td><span class="device-type type-{{ device.type }}">{{ device.type }}</span></td>
-                        <td>{{ device.vendor or '-' }}</td>
+                        <td title="Source: {{ device.api_intelligence.data_sources.mac_vendor if device.api_intelligence and device.api_intelligence.data_sources else 'local' }}">
+                            {{ device.vendor or '-' }}
+                            {% if device.api_intelligence and device.api_intelligence.data_sources and device.api_intelligence.data_sources.mac_vendor %}
+                            <sup style="font-size: 0.7em; color: #666;">{{ device.api_intelligence.data_sources.mac_vendor }}</sup>
+                            {% endif %}
+                        </td>
                         <td>{{ device.os or '-' }}</td>
                         <td class="services">
                             {% if device.services %}

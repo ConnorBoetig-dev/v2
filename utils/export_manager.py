@@ -662,6 +662,31 @@ class ExportManager:
             df["services"] = df["services"].apply(
                 lambda x: ";".join(x) if isinstance(x, list) else ""
             )
+        
+        # Extract data from API intelligence
+        if "api_intelligence" in df.columns:
+            # Extract data sources
+            df["vendor_source"] = df["api_intelligence"].apply(
+                lambda x: x.get("data_sources", {}).get("mac_vendor", "") if isinstance(x, dict) else ""
+            )
+            
+            # Extract API confidence
+            df["api_confidence"] = df["api_intelligence"].apply(
+                lambda x: x.get("confidence", 0) if isinstance(x, dict) else 0
+            )
+            
+            # Drop the complex api_intelligence column
+            df = df.drop(columns=["api_intelligence"])
+        
+        # Extract passive analysis data if present
+        if "passive_analysis" in df.columns:
+            df["traffic_flows"] = df["passive_analysis"].apply(
+                lambda x: x.get("traffic_flows", 0) if isinstance(x, dict) else 0
+            )
+            df["passive_services"] = df["passive_analysis"].apply(
+                lambda x: ";".join(x.get("services_observed", [])) if isinstance(x, dict) else ""
+            )
+            df = df.drop(columns=["passive_analysis"])
 
         # Save to CSV
         df.to_csv(filepath, index=False)

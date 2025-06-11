@@ -33,6 +33,14 @@ except ImportError:
     SCAPY_AVAILABLE = False
     logging.warning("Scapy not available - passive traffic analysis will be limited")
 
+# Import API intelligence layer
+try:
+    from .api_intelligence import APIIntelligenceLayer, DeviceIntelligence
+    API_INTELLIGENCE_AVAILABLE = True
+except ImportError:
+    logger.warning("API Intelligence layer not available")
+    API_INTELLIGENCE_AVAILABLE = False
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -89,10 +97,13 @@ class StealthDevice:
     total_flows: int = 0
     inbound_flows: int = 0
     outbound_flows: int = 0
+    ports_used: Set[int] = field(default_factory=set)
+    user_agent: str = ""
+    api_intelligence: Optional[Dict] = None
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for serialization"""
-        return {
+        device_dict = {
             "ip": self.ip,
             "mac": self.mac,
             "hostname": self.hostname,
@@ -104,8 +115,16 @@ class StealthDevice:
             "total_flows": self.total_flows,
             "inbound_flows": self.inbound_flows,
             "outbound_flows": self.outbound_flows,
+            "ports_used": list(self.ports_used),
+            "user_agent": self.user_agent,
             "likely_type": self.guess_device_type(),
         }
+        
+        # Add API intelligence if available
+        if self.api_intelligence:
+            device_dict["api_intelligence"] = self.api_intelligence
+            
+        return device_dict
 
     def guess_device_type(self) -> str:
         """Guess device type based on traffic patterns"""
@@ -162,6 +181,15 @@ class PassiveTrafficAnalyzer:
         self.capture_thread = None
         self.process_thread = None
 
+        # Initialize API intelligence layer
+        self.api_intelligence = None
+        if API_INTELLIGENCE_AVAILABLE:
+            try:
+                self.api_intelligence = APIIntelligenceLayer(cache_dir=self.output_path / "cache")
+                logger.info("API Intelligence layer initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize API Intelligence: {e}")
+
         # Statistics
         self.stats = {
             "packets_captured": 0,
@@ -169,6 +197,7 @@ class PassiveTrafficAnalyzer:
             "flows_tracked": 0,
             "devices_discovered": 0,
             "start_time": datetime.now().isoformat(),
+            "api_intelligence_enabled": self.api_intelligence is not None,
         }
 
     def _detect_interface(self) -> str:
@@ -184,21 +213,55 @@ class PassiveTrafficAnalyzer:
                 if "dev" in parts:
                     idx = parts.index("dev")
                     if idx + 1 < len(parts):
-                        return parts[idx + 1]
+                        interface = parts[idx + 1]
+                        logger.info(f"Auto-detected interface: {interface}")
+                        return interface
         except Exception as e:
             logger.warning(f"Failed to auto-detect interface: {e}")
 
         # Fallback to first non-loopback interface
         try:
-            import netifaces
+            # Get all interfaces
+            result = subprocess.run(
+                ["ip", "link", "show"], capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    if ':' in line and 'lo:' not in line:
+                        # Extract interface name (e.g., "2: enp0s1:" -> "enp0s1")
+                        parts = line.split(':')
+                        if len(parts) >= 2:
+                            interface = parts[1].strip()
+                            if interface and interface != 'lo':
+                                logger.info(f"Using first non-loopback interface: {interface}")
+                                return interface
+        except Exception as e:
+            logger.warning(f"Failed to list interfaces: {e}")
 
+        # Try netifaces if available
+        try:
+            import netifaces
             for iface in netifaces.interfaces():
                 if iface != "lo" and netifaces.AF_INET in netifaces.ifaddresses(iface):
+                    logger.info(f"Using interface from netifaces: {iface}")
                     return iface
         except ImportError:
             pass
 
-        # Last resort
+        # Last resort - try common interface names
+        common_names = ["enp0s1", "eth0", "ens33", "enp0s3"]
+        for name in common_names:
+            try:
+                result = subprocess.run(
+                    ["ip", "link", "show", name], capture_output=True, text=True
+                )
+                if result.returncode == 0:
+                    logger.info(f"Using common interface name: {name}")
+                    return name
+            except:
+                pass
+
+        logger.warning("Could not detect interface, defaulting to eth0")
         return "eth0"
 
     def _init_service_patterns(self) -> Dict[int, str]:
@@ -291,6 +354,11 @@ class PassiveTrafficAnalyzer:
         if self.process_thread:
             self.process_thread.join(timeout=5)
 
+        # Enrich devices with API intelligence after capture
+        if self.devices:
+            logger.info("Enriching devices with API intelligence...")
+            self.enrich_devices_with_api_intelligence()
+
         logger.info(f"Stopped passive traffic capture. Stats: {self.stats}")
 
     def _capture_packets(self, duration: int, packet_count: int) -> None:
@@ -328,21 +396,41 @@ class PassiveTrafficAnalyzer:
                 error_msg = result.stderr or result.stdout
                 if "password" in error_msg.lower():
                     logger.error("Sudo authentication required for packet capture")
+                    logger.error("Please run with: sudo python3 mapper.py")
                 else:
-                    logger.error(f"Capture failed: {error_msg}")
-                return
+                    # Log the full error including any warnings
+                    logger.error(f"Capture failed with return code {result.returncode}")
+                    if result.stderr:
+                        # Check if it's just warnings (which shouldn't fail the capture)
+                        if "CryptographyDeprecationWarning" in result.stderr:
+                            logger.warning("Ignoring cryptography deprecation warning")
+                            # Don't return, continue processing
+                        else:
+                            logger.error(f"Stderr: {result.stderr}")
+                            return
+                    if result.stdout:
+                        logger.error(f"Stdout: {result.stdout}")
+                
+                # Only return if it's a real error, not just warnings
+                if result.returncode != 0 and "warning" not in error_msg.lower():
+                    return
             
-            # Check if there's any stdout output (which might contain "False" prints)
+            # Check if there's any stdout output
             if result.stdout and result.stdout.strip():
+                # Log the full output for debugging
+                logger.info(f"Capture script output: {result.stdout}")
+                
                 # Try to parse as JSON (expected format)
                 try:
                     output_data = json.loads(result.stdout.strip())
                     if "error" in output_data:
                         logger.error(f"Capture error: {output_data['error']}")
                         return
+                    elif "debug" in output_data:
+                        logger.info(f"Capture debug info: {output_data['debug']}")
                 except json.JSONDecodeError:
                     # If it's not JSON, log it but continue
-                    logger.debug(f"Non-JSON output from capture: {result.stdout}")
+                    logger.warning(f"Non-JSON output from capture: {result.stdout}")
                 
             # Parse capture results
             if os.path.exists(temp_file):
@@ -553,13 +641,24 @@ class PassiveTrafficAnalyzer:
         flow.bytes += len(pkt)
         flow.last_seen = datetime.now()
 
-        # Update device flow statistics
+        # Update device flow statistics and port tracking
         if direction == "forward":
-            self._update_device_flows(ip.src, outbound=True, service=flow.service, peer=ip.dst)
-            self._update_device_flows(ip.dst, outbound=False, service=flow.service, peer=ip.src)
+            self._update_device_flows(ip.src, outbound=True, service=flow.service, peer=ip.dst, port=dport)
+            self._update_device_flows(ip.dst, outbound=False, service=flow.service, peer=ip.src, port=sport)
         else:
-            self._update_device_flows(ip.dst, outbound=True, service=flow.service, peer=ip.src)
-            self._update_device_flows(ip.src, outbound=False, service=flow.service, peer=ip.dst)
+            self._update_device_flows(ip.dst, outbound=True, service=flow.service, peer=ip.src, port=sport)
+            self._update_device_flows(ip.src, outbound=False, service=flow.service, peer=ip.dst, port=dport)
+            
+        # Extract HTTP User-Agent if available
+        if pkt.haslayer(HTTPRequest):
+            try:
+                headers = pkt[HTTPRequest].fields
+                if b'User-Agent' in headers:
+                    user_agent = headers[b'User-Agent'].decode('utf-8', errors='ignore')
+                    if ip.src in self.devices and not self.devices[ip.src].user_agent:
+                        self.devices[ip.src].user_agent = user_agent
+            except Exception as e:
+                logger.debug(f"Error extracting User-Agent: {e}")
 
     def _identify_service(self, port: int) -> str:
         """Identify service from port number"""
@@ -588,7 +687,7 @@ class PassiveTrafficAnalyzer:
         if hostname and not device.hostname:
             device.hostname = hostname
 
-    def _update_device_flows(self, ip: str, outbound: bool, service: str, peer: str) -> None:
+    def _update_device_flows(self, ip: str, outbound: bool, service: str, peer: str, port: int = 0) -> None:
         """Update device flow statistics"""
         if ip not in self.devices:
             return
@@ -606,6 +705,9 @@ class PassiveTrafficAnalyzer:
 
         if peer:
             device.communication_peers.add(peer)
+            
+        if port > 0:
+            device.ports_used.add(port)
 
     def _is_valid_ip(self, ip: str) -> bool:
         """Check if IP address is valid"""
@@ -614,6 +716,42 @@ class PassiveTrafficAnalyzer:
             return True
         except:
             return False
+
+    def enrich_devices_with_api_intelligence(self):
+        """Enrich discovered devices using API intelligence"""
+        if not self.api_intelligence:
+            logger.debug("API intelligence not available for device enrichment")
+            return
+        
+        logger.info(f"Enriching {len(self.devices)} devices with API intelligence...")
+        
+        for ip, device in self.devices.items():
+            try:
+                # Gather device intelligence from APIs
+                device_intel = self.api_intelligence.analyze_device(
+                    ip=ip,
+                    mac=device.mac,
+                    ports=list(device.ports_used),
+                    user_agent=device.user_agent,
+                    hostname=device.hostname
+                )
+                
+                # Update device with API intelligence
+                device.api_intelligence = device_intel.to_dict()
+                
+                # Update vendor from API if not already set
+                if device_intel.mac_vendor and device_intel.mac_vendor != "Unknown":
+                    if not device.vendor or device.vendor == "Unknown":
+                        device.vendor = device_intel.mac_vendor
+                
+                # Log enrichment
+                if device_intel.sources:
+                    logger.debug(f"Enriched {ip} with sources: {device_intel.sources}")
+                
+            except Exception as e:
+                logger.warning(f"Failed to enrich device {ip}: {e}")
+        
+        logger.info("Device enrichment completed")
 
     def get_discovered_devices(self) -> List[Dict]:
         """Get all discovered devices"""
@@ -742,14 +880,19 @@ class PassiveTrafficAnalyzer:
                 # Update hostname if discovered
                 if passive_device.hostname and not device.get("hostname"):
                     device["hostname"] = passive_device.hostname
+                    
+                # Merge API intelligence if available
+                if passive_device.api_intelligence:
+                    device["api_intelligence"] = passive_device.api_intelligence
 
             else:
                 # Add stealth device not found in active scan
-                active_map[ip] = {
+                device_data = {
                     "ip": ip,
                     "mac": passive_device.mac,
                     "hostname": passive_device.hostname,
                     "type": passive_device.guess_device_type(),
+                    "vendor": passive_device.vendor,
                     "stealth_device": True,
                     "discovery_method": "passive",
                     "first_seen": passive_device.first_seen.isoformat(),
@@ -762,9 +905,24 @@ class PassiveTrafficAnalyzer:
                         "outbound_flows": passive_device.outbound_flows,
                     },
                 }
+                
+                # Add API intelligence if available
+                if passive_device.api_intelligence:
+                    device_data["api_intelligence"] = passive_device.api_intelligence
+                    
+                active_map[ip] = device_data
                 logger.info(f"Added stealth device from passive analysis: {ip}")
 
         return list(active_map.values())
+
+    def cleanup(self):
+        """Cleanup resources"""
+        if self.api_intelligence:
+            self.api_intelligence.close()
+
+    def __del__(self):
+        """Cleanup on destruction"""
+        self.cleanup()
 
 
 # Example usage and testing
