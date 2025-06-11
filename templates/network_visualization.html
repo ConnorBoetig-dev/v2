@@ -12,7 +12,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
     <!-- OrbitControls for Three.js -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
     <style>
         /* Modern Dark Theme Design System */
@@ -47,6 +47,24 @@
             --device-iot: #84cc16;
             --device-firewall: #ef4444;
             --device-unknown: #6b7280;
+            
+            /* Additional Device Types */
+            --device-windows_server: #0078d4;  /* Microsoft Blue */
+            --device-linux_server: #fcc624;    /* Linux Yellow/Orange */
+            --device-web_server: #22c55e;      /* Web Green */
+            --device-mail_server: #a855f7;     /* Mail Purple */
+            --device-dns_server: #14b8a6;      /* DNS Teal */
+            --device-domain_controller: #1e40af; /* AD Dark Blue */
+            --device-nas: #64748b;             /* Storage Gray */
+            --device-hypervisor: #7c3aed;      /* VM Purple */
+            --device-voip: #eab308;            /* VoIP Yellow */
+            --device-media_server: #dc2626;    /* Media Red */
+            --device-ups: #854d0e;             /* UPS Brown */
+            --device-plc: #991b1b;             /* PLC Dark Red */
+            --device-scada: #b91c1c;           /* SCADA Red */
+            --device-ntp_server: #0891b2;      /* NTP Cyan */
+            --device-monitoring_server: #4f46e5; /* Monitor Indigo */
+            --device-backup_server: #059669;   /* Backup Emerald */
             
             /* Shadows and Effects */
             --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -1313,6 +1331,22 @@
                     printer: '🖨',
                     iot: '📡',
                     firewall: '🛡',
+                    windows_server: '🪟',
+                    linux_server: '🐧',
+                    web_server: '🌐',
+                    mail_server: '📧',
+                    dns_server: '🔍',
+                    domain_controller: '🏢',
+                    nas: '💽',
+                    hypervisor: '🔲',
+                    voip: '📞',
+                    media_server: '🎬',
+                    ups: '🔋',
+                    plc: '⚙️',
+                    scada: '🏭',
+                    ntp_server: '⏰',
+                    monitoring_server: '📊',
+                    backup_server: '💾',
                     unknown: '❓'
                 };
                 return icons[node.type] || icons.unknown;
@@ -1622,13 +1656,22 @@
                 // Clear container
                 this.container.innerHTML = '';
 
+                // Ensure container has dimensions
+                const width = this.container.clientWidth || window.innerWidth;
+                const height = this.container.clientHeight || window.innerHeight;
+                
+                if (width === 0 || height === 0) {
+                    console.error('3D container has no dimensions!');
+                    return;
+                }
+
                 // Create scene
                 this.scene = new THREE.Scene();
                 this.scene.background = new THREE.Color(0x0a0e1a);
                 this.scene.fog = new THREE.Fog(0x0a0e1a, 50, 200);
 
                 // Create camera
-                const aspect = this.container.clientWidth / this.container.clientHeight;
+                const aspect = width / height;
                 this.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
                 // Better initial position for viewing the network
                 this.camera.position.set(40, 30, 40);
@@ -1636,7 +1679,7 @@
 
                 // Create renderer
                 this.renderer = new THREE.WebGLRenderer({ antialias: true });
-                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+                this.renderer.setSize(width, height);
                 this.renderer.shadowMap.enabled = true;
                 this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                 this.container.appendChild(this.renderer.domElement);
@@ -1980,6 +2023,22 @@
                     printer: 0xec4899,
                     iot: 0x84cc16,
                     firewall: 0xef4444,
+                    windows_server: 0x0078d4,
+                    linux_server: 0xfcc624,
+                    web_server: 0x22c55e,
+                    mail_server: 0xa855f7,
+                    dns_server: 0x14b8a6,
+                    domain_controller: 0x1e40af,
+                    nas: 0x64748b,
+                    hypervisor: 0x7c3aed,
+                    voip: 0xeab308,
+                    media_server: 0xdc2626,
+                    ups: 0x854d0e,
+                    plc: 0x991b1b,
+                    scada: 0xb91c1c,
+                    ntp_server: 0x0891b2,
+                    monitoring_server: 0x4f46e5,
+                    backup_server: 0x059669,
                     unknown: 0x6b7280
                 };
                 return colors[type] || colors.unknown;
