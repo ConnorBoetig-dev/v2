@@ -17,3 +17,37 @@ output/
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude/MCP related
+claude_code-multi-AI-MCP/
+CLAUDE.md
+.claudemd
+*.claudemd
+
+# MCP server credentials
+credentials.json
+
+# Export directories
+exports/
+
+# Temporary and cache files
+cache/
+*.cache
+*.tmp
+.temp/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Test output
+test_output/
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/

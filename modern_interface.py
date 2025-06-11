@@ -4,6 +4,7 @@ Modern Interactive Interface for NetworkMapper v2
 """
 
 import json
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -86,7 +87,8 @@ class ModernInterface:
                 ("6", "📈", "Report Generator", "Create detailed reports", "#87ff00"),
                 ("7", "🗺️", "Network Visualization", "Interactive network maps", "#ff5f87"),
                 ("8", "📤", "Data Export", "Export to various formats", "#00ffff"),
-                ("9", "❌", "Exit", "Close NetworkMapper", "#ff6b6b")
+                ("9", "🧹", "Clear Scan History", "Remove all scan data", "#ffd700"),
+                ("10", "❌", "Exit", "Close NetworkMapper", "#ff6b6b")
             ]
             
             menu_panels = []
@@ -137,7 +139,7 @@ class ModernInterface:
             # Get user choice with enhanced prompt
             choice = Prompt.ask(
                 "\n[bold cyan]❯[/bold cyan] Select option",
-                choices=[str(i) for i in range(1, 10)],
+                choices=[str(i) for i in range(1, 11)],
                 show_choices=False
             )
             
@@ -158,6 +160,8 @@ class ModernInterface:
             elif choice == "8":
                 self.mapper.export_data()
             elif choice == "9":
+                self.clear_scan_history()
+            elif choice == "10":
                 if self._confirm_exit():
                     break
                     
@@ -857,3 +861,69 @@ class ModernInterface:
             if subnet:
                 subnets.add(subnet)
         return list(subnets)
+    
+    def clear_scan_history(self):
+        """Clear all scan history and reports"""
+        console.clear()
+        
+        # Create confirmation panel
+        warning_panel = Panel(
+            Align.center(
+                Text.assemble(
+                    ("⚠️  ", "bold yellow"),
+                    ("Clear Scan History", "bold red"),
+                    "\n\n",
+                    ("This will permanently delete:", "bold"),
+                    "\n",
+                    ("• All scan results", "yellow"),
+                    "\n",
+                    ("• All generated reports", "yellow"),
+                    "\n", 
+                    ("• All change tracking data", "yellow"),
+                    "\n",
+                    ("• All device annotations", "yellow"),
+                    "\n",
+                    ("• All exported files", "yellow"),
+                    "\n\n",
+                    ("This action cannot be undone!", "bold red")
+                )
+            ),
+            style="red",
+            box=box.DOUBLE_EDGE,
+            padding=(2, 4)
+        )
+        
+        console.print(warning_panel)
+        console.print()
+        
+        # Ask for confirmation
+        if not Confirm.ask("[bold red]Are you sure you want to delete all scan data?[/bold red]", default=False):
+            console.print("\n[green]Operation cancelled. No data was deleted.[/green]")
+            input("\nPress Enter to continue...")
+            return
+        
+        # Run the cleanup script
+        try:
+            import subprocess
+            from pathlib import Path
+            
+            # Get the path to the cleanup script
+            cleanup_script = Path(__file__).parent / "scripts" / "clean_output.py"
+            
+            # Run with -y flag to skip confirmation
+            result = subprocess.run(
+                [sys.executable, str(cleanup_script), "-y"],
+                capture_output=True,
+                text=True
+            )
+            
+            if result.returncode == 0:
+                console.print("\n[green]✅ All scan history and reports have been cleared successfully![/green]")
+                console.print("\n[dim]Output directories have been reset and are ready for new scans.[/dim]")
+            else:
+                console.print(f"\n[red]Error clearing scan history: {result.stderr}[/red]")
+                
+        except Exception as e:
+            console.print(f"\n[red]Failed to clear scan history: {e}[/red]")
+        
+        input("\nPress Enter to continue...")
