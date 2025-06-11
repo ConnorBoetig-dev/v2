@@ -11,8 +11,8 @@
     <!-- Three.js for 3D visualization -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
-    <!-- OrbitControls for Three.js -->
-    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- OrbitControls for Three.js - matching version -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
     <style>
         /* Modern Dark Theme Design System */
@@ -908,7 +908,7 @@
                 <svg id="network-2d"></svg>
 
                 <!-- 3D Network View -->
-                <div id="network-3d" style="display: none;"></div>
+                <div id="network-3d" style="display: none; width: 100%; height: 100%;"></div>
 
                 <!-- Legend -->
                 <div class="legend">
@@ -946,7 +946,6 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         // Global Variables
         const networkData = {
@@ -1056,13 +1055,83 @@
 
             const container = document.getElementById('network-3d');
             
-            // Create Three.js visualization
-            visualization3D = new NetworkVisualization3D(container, networkData, {
-                onNodeClick: showDeviceDetails,
-                onNodeHover: showTooltip
-            });
+            // Debug logging
+            console.log('Initializing 3D visualization...');
+            console.log('Container:', container);
+            console.log('Container dimensions:', container ? {
+                width: container.clientWidth,
+                height: container.clientHeight
+            } : 'null');
+            
+            if (!container) {
+                console.error('3D container not found!');
+                return;
+            }
+            
+            // Check WebGL availability first
+            const testCanvas = document.createElement('canvas');
+            const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+            if (!gl) {
+                showWebGLFallback(container);
+                return;
+            }
+            
+            // Ensure container is visible and has dimensions
+            container.style.display = 'block';
+            if (container.clientWidth === 0 || container.clientHeight === 0) {
+                console.warn('3D container has no dimensions, setting default size');
+                container.style.width = '100%';
+                container.style.height = '600px';
+            }
+            
+            try {
+                // Create Three.js visualization
+                visualization3D = new NetworkVisualization3D(container, networkData, {
+                    onNodeClick: showDeviceDetails,
+                    onNodeHover: showTooltip
+                });
 
-            visualization3D.render();
+                visualization3D.render();
+                console.log('3D visualization initialized successfully');
+            } catch (error) {
+                console.error('Error initializing 3D visualization:', error);
+                showWebGLFallback(container, error.message);
+            }
+        }
+        
+        // Show fallback when WebGL is not available
+        function showWebGLFallback(container, errorMessage = '') {
+            container.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-primary); text-align: center; padding: 2rem;">
+                    <svg style="width: 64px; height: 64px; margin-bottom: 1rem; fill: var(--accent-red);" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
+                    <h2 style="margin-bottom: 1rem;">3D View Unavailable</h2>
+                    <p style="color: var(--text-secondary); max-width: 500px; margin-bottom: 1rem;">
+                        WebGL is not supported or enabled in your browser. The 3D visualization requires WebGL to function.
+                        ${detectVM() ? '<br><br><strong>Note:</strong> You appear to be running in a Virtual Machine. VMs have limited 3D graphics support. See solutions below.' : ''}
+                    </p>
+                    ${errorMessage ? `<p style="color: var(--accent-yellow); font-size: 0.875rem; margin-bottom: 1rem;">Error: ${errorMessage}</p>` : ''}
+                    <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                        <h3 style="margin-bottom: 0.5rem;">Try these solutions:</h3>
+                        <ul style="text-align: left; color: var(--text-secondary); font-size: 0.875rem;">
+                            ${detectVM() ? `
+                            <li><strong>For VMs:</strong> Enable 3D acceleration in VM settings</li>
+                            <li><strong>Firefox:</strong> Type about:config, set webgl.force-enabled to true</li>
+                            <li><strong>Chrome:</strong> Use --use-gl=swiftshader flag</li>
+                            ` : ''}
+                            <li>Enable hardware acceleration in your browser settings</li>
+                            <li>Update your graphics drivers</li>
+                            <li>Try a different browser (Chrome, Firefox, Edge)</li>
+                            <li>Check if WebGL is blacklisted: <a href="chrome://gpu" style="color: var(--accent-blue);">chrome://gpu</a></li>
+                            <li>Disable browser extensions that might interfere</li>
+                        </ul>
+                    </div>
+                    <button class="control-btn" onclick="switchView('2d')" style="background: var(--accent-blue); color: white;">
+                        Switch to 2D View
+                    </button>
+                </div>
+            `;
         }
 
         // 2D Network Visualization Class
@@ -1182,7 +1251,8 @@
                     .force("collision", d3.forceCollide()
                         .radius(d => {
                             // Larger collision radius for important devices
-                            if (d.critical) return 40;
+                            const connectionCount = this.getConnectionCount(d.id);
+                            if (connectionCount > 3 || d.critical) return 40;
                             if (d.type === 'router' || d.type === 'switch') return 35;
                             return 30;
                         }))
@@ -1200,7 +1270,14 @@
                 // Also apply zoom after a delay for initial view
                 setTimeout(() => {
                     this.applyZoom();
-                }, 1500);
+                }, 2500);
+                
+                // Extra call to ensure it works even if simulation is slow
+                setTimeout(() => {
+                    if (this.nodes.length > 0) {
+                        this.applyZoom();
+                    }
+                }, 4000);
             }
 
             createLinks() {
@@ -1239,13 +1316,16 @@
                     .attr("r", d => this.getNodeRadius(d))
                     .attr("fill", d => this.getNodeColor(d))
                     .attr("stroke", d => {
-                        if (d.critical) return "var(--accent-red)";
+                        // Mark as critical if more than 3 connections
+                        const connectionCount = this.getConnectionCount(d.id);
+                        if (connectionCount > 3 || d.critical) return "var(--accent-red)";
                         if (this.isNewDevice(d)) return "var(--accent-green)";
                         if (this.isChangedDevice(d)) return "var(--accent-yellow)";
                         return "rgba(255, 255, 255, 0.2)";
                     })
                     .attr("stroke-width", d => {
-                        if (d.critical || this.isNewDevice(d) || this.isChangedDevice(d)) return 3;
+                        const connectionCount = this.getConnectionCount(d.id);
+                        if (connectionCount > 3 || d.critical || this.isNewDevice(d) || this.isChangedDevice(d)) return 3;
                         return 2;
                     })
                     .style("cursor", "pointer");
@@ -1311,7 +1391,8 @@
             }
 
             getNodeRadius(node) {
-                if (node.critical) return 20;
+                const connectionCount = this.getConnectionCount(node.id);
+                if (connectionCount > 3 || node.critical) return 20;
                 if (node.type === 'router' || node.type === 'switch') return 18;
                 if (node.type.includes('server')) return 16;
                 return 14;
@@ -1554,6 +1635,17 @@
                 });
                 return Array.from(neighbors);
             }
+            
+            getConnectionCount(nodeId) {
+                // Count total connections for a node
+                let count = 0;
+                this.links.forEach(link => {
+                    if (link.source.id === nodeId || link.target.id === nodeId) {
+                        count++;
+                    }
+                });
+                return count;
+            }
 
             clearHighlight() {
                 this.nodeElements.selectAll("circle").style("opacity", 1);
@@ -1640,6 +1732,8 @@
                 this.raycaster = new THREE.Raycaster();
                 this.mouse = new THREE.Vector2();
                 this.activeFilters = this.getActiveFilters();
+                this.animationId = null;
+                this.isDisposed = false;
             }
 
             render() {
@@ -1653,16 +1747,40 @@
             }
 
             setupScene() {
+                // Check WebGL availability first
+                if (!this.webGLAvailable()) {
+                    throw new Error('WebGL is not available in your browser');
+                }
+                
                 // Clear container
                 this.container.innerHTML = '';
 
-                // Ensure container has dimensions
-                const width = this.container.clientWidth || window.innerWidth;
-                const height = this.container.clientHeight || window.innerHeight;
+                // Ensure container has dimensions - use let for reassignment
+                let width = this.container.clientWidth;
+                let height = this.container.clientHeight;
+                
+                console.log('Initial container dimensions:', { width, height });
                 
                 if (width === 0 || height === 0) {
-                    console.error('3D container has no dimensions!');
-                    return;
+                    console.warn('3D container has no dimensions, forcing size...');
+                    // Force container to be visible
+                    this.container.style.display = 'block';
+                    this.container.style.width = '100%';
+                    this.container.style.height = '600px';
+                    this.container.style.position = 'relative';
+                    
+                    // Force layout recalculation
+                    this.container.offsetHeight;
+                    
+                    // Re-read dimensions
+                    width = this.container.clientWidth || 800;
+                    height = this.container.clientHeight || 600;
+                    
+                    console.log('After forcing dimensions:', { width, height });
+                    
+                    if (width === 0 || height === 0) {
+                        throw new Error('Cannot set container dimensions');
+                    }
                 }
 
                 // Create scene
@@ -1677,15 +1795,56 @@
                 this.camera.position.set(40, 30, 40);
                 this.camera.lookAt(0, 0, 0);
 
-                // Create renderer
-                this.renderer = new THREE.WebGLRenderer({ antialias: true });
-                this.renderer.setSize(width, height);
-                this.renderer.shadowMap.enabled = true;
-                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-                this.container.appendChild(this.renderer.domElement);
+                // Create renderer with error handling
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    // Try different context attributes for VM compatibility
+                    const contextAttributes = {
+                        canvas: canvas,
+                        antialias: false,  // Disable for better VM performance
+                        alpha: true,
+                        depth: true,
+                        stencil: false,
+                        powerPreference: 'low-power',  // Better for VMs
+                        failIfMajorPerformanceCaveat: false,
+                        preserveDrawingBuffer: true
+                    };
+                    
+                    this.renderer = new THREE.WebGLRenderer(contextAttributes);
+                    
+                    this.renderer.setSize(width, height);
+                    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                    this.renderer.shadowMap.enabled = true;
+                    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                    
+                    // Add canvas to container
+                    this.container.appendChild(this.renderer.domElement);
+                    
+                    // Add context loss handlers
+                    this.renderer.domElement.addEventListener('webglcontextlost', (e) => {
+                        e.preventDefault();
+                        console.error('WebGL context lost');
+                        this.handleContextLost();
+                    }, false);
+                    
+                    this.renderer.domElement.addEventListener('webglcontextrestored', () => {
+                        console.log('WebGL context restored');
+                        this.handleContextRestored();
+                    }, false);
+                    
+                } catch (error) {
+                    console.error('Failed to create WebGL renderer:', error);
+                    throw new Error(`WebGL initialization failed: ${error.message}`);
+                }
 
-                // Handle resize
-                window.addEventListener('resize', () => this.onWindowResize());
+                // Handle resize - only add once
+                if (!this.resizeHandler) {
+                    this.resizeHandler = () => this.onWindowResize();
+                    window.addEventListener('resize', this.resizeHandler);
+                }
             }
 
             createNodes() {
@@ -1713,8 +1872,9 @@
                     mesh.receiveShadow = true;
                     mesh.userData = { device };
 
-                    // Add glow for critical devices
-                    if (device.critical) {
+                    // Add glow for critical devices (based on connections or flag)
+                    const connectionCount = this.getConnectionCount(device.ip);
+                    if (connectionCount > 3 || device.critical) {
                         this.addGlow(mesh, 0xff0000);
                     }
 
@@ -1937,7 +2097,9 @@
             }
 
             animate() {
-                requestAnimationFrame(() => this.animate());
+                if (this.isDisposed) return;
+                
+                this.animationId = requestAnimationFrame(() => this.animate());
 
                 // Update controls if using OrbitControls
                 if (this.controls && this.controls.update) {
@@ -1959,7 +2121,9 @@
                     node.position.y += Math.sin(time + index) * 0.001;
                 });
 
-                this.renderer.render(this.scene, this.camera);
+                if (this.renderer && this.scene && this.camera) {
+                    this.renderer.render(this.scene, this.camera);
+                }
             }
 
             onWindowResize() {
@@ -2045,10 +2209,36 @@
             }
 
             getNodeRadius(device) {
-                if (device.critical) return 1.2;
+                const connectionCount = this.getConnectionCount(device.ip);
+                if (connectionCount > 3 || device.critical) return 1.2;
                 if (device.type === 'router' || device.type === 'switch') return 1.0;
                 if (device.type.includes('server')) return 0.8;
                 return 0.6;
+            }
+            
+            getConnectionCount(deviceIp) {
+                // Count total connections for a device
+                let count = 0;
+                // Count from the raw data connections
+                if (this.data.threeData && this.data.threeData.connections) {
+                    this.data.threeData.connections.forEach(conn => {
+                        // Check if this device is involved in the connection
+                        const isSource = this.nodes.some(n => 
+                            n.userData.device.ip === deviceIp &&
+                            Math.abs(n.position.x - conn.start.x) < 0.1 &&
+                            Math.abs(n.position.y - conn.start.y) < 0.1 &&
+                            Math.abs(n.position.z - conn.start.z) < 0.1
+                        );
+                        const isTarget = this.nodes.some(n => 
+                            n.userData.device.ip === deviceIp &&
+                            Math.abs(n.position.x - conn.end.x) < 0.1 &&
+                            Math.abs(n.position.y - conn.end.y) < 0.1 &&
+                            Math.abs(n.position.z - conn.end.z) < 0.1
+                        );
+                        if (isSource || isTarget) count++;
+                    });
+                }
+                return count;
             }
 
             addGlow(mesh, color) {
@@ -2096,6 +2286,90 @@
                 link.href = this.renderer.domElement.toDataURL();
                 link.click();
             }
+
+            webGLAvailable() {
+                try {
+                    const testCanvas = document.createElement('canvas');
+                    const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+                    return !!gl;
+                } catch (e) {
+                    return false;
+                }
+            }
+            
+            handleContextLost() {
+                this.isDisposed = true;
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+            }
+            
+            handleContextRestored() {
+                this.isDisposed = false;
+                this.animate();
+            }
+
+            dispose() {
+                // Mark as disposed to stop animation loop
+                this.isDisposed = true;
+                
+                // Cancel animation frame
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                    this.animationId = null;
+                }
+                
+                // Remove event listeners
+                if (this.resizeHandler) {
+                    window.removeEventListener('resize', this.resizeHandler);
+                    this.resizeHandler = null;
+                }
+                
+                // Dispose of Three.js objects
+                if (this.scene) {
+                    // Dispose all geometries and materials
+                    this.scene.traverse((object) => {
+                        if (object.geometry) {
+                            object.geometry.dispose();
+                        }
+                        if (object.material) {
+                            if (Array.isArray(object.material)) {
+                                object.material.forEach(material => material.dispose());
+                            } else {
+                                object.material.dispose();
+                            }
+                        }
+                        if (object.texture) {
+                            object.texture.dispose();
+                        }
+                    });
+                    
+                    // Clear scene
+                    while(this.scene.children.length > 0) {
+                        this.scene.remove(this.scene.children[0]);
+                    }
+                }
+                
+                // Dispose renderer
+                if (this.renderer) {
+                    this.renderer.dispose();
+                    this.renderer.forceContextLoss();
+                    this.renderer.domElement = null;
+                    this.renderer = null;
+                }
+                
+                // Clear references
+                this.scene = null;
+                this.camera = null;
+                this.controls = null;
+                this.nodes = [];
+                this.links = [];
+                
+                // Clear container
+                if (this.container) {
+                    this.container.innerHTML = '';
+                }
+            }
         }
 
         // Helper Functions
@@ -2112,6 +2386,12 @@
             });
             event.target.classList.add('active');
 
+            // Dispose of 3D visualization when switching away to prevent WebGL context issues
+            if (view === '2d' && visualization3D) {
+                visualization3D.dispose();
+                visualization3D = null;
+            }
+
             // Show/hide visualizations
             if (view === '2d') {
                 document.getElementById('network-2d').style.display = 'block';
@@ -2120,7 +2400,12 @@
             } else {
                 document.getElementById('network-2d').style.display = 'none';
                 document.getElementById('network-3d').style.display = 'block';
-                if (!visualization3D) initialize3DVisualization();
+                // Always recreate 3D visualization to ensure clean WebGL context
+                if (visualization3D) {
+                    visualization3D.dispose();
+                    visualization3D = null;
+                }
+                initialize3DVisualization();
             }
         }
 
@@ -2228,14 +2513,16 @@
             }
 
             // Status
+            const deviceConnectionCount = visualization2D ? visualization2D.getConnectionCount(fullDevice.ip) : 0;
+            const isCritical = deviceConnectionCount > 3 || fullDevice.critical;
             html += `
                 <div class="info-section">
                     <h3 class="info-section-title">Status</h3>
                     <div class="info-grid">
                         <div class="info-item">
                             <span class="info-label">Critical Device</span>
-                            <span class="info-value" style="color: ${fullDevice.critical ? 'var(--accent-red)' : 'var(--accent-green)'}">
-                                ${fullDevice.critical ? 'Yes' : 'No'}
+                            <span class="info-value" style="color: ${isCritical ? 'var(--accent-red)' : 'var(--accent-green)'}">
+                                ${isCritical ? `Yes (${deviceConnectionCount} connections)` : 'No'}
                             </span>
                         </div>
                         <div class="info-item">
@@ -2318,15 +2605,35 @@
                 html += `<div>Vendor: ${fullDevice.vendor}</div>`;
             }
 
-            if (fullDevice.critical) {
-                html += `<div style="color: var(--accent-red); font-weight: 600;">⚠ Critical Device</div>`;
+            // Check if device is critical based on connections or flag
+            const connectionCount = visualization2D ? visualization2D.getConnectionCount(fullDevice.ip) : 0;
+            if (connectionCount > 3 || fullDevice.critical) {
+                html += `<div style="color: var(--accent-red); font-weight: 600;">⚠ Critical Device (${connectionCount} connections)</div>`;
             }
 
             html += '</div>';
 
             tooltip.innerHTML = html;
-            tooltip.style.left = `${event.pageX + 10}px`;
-            tooltip.style.top = `${event.pageY + 10}px`;
+            
+            // Position tooltip near the cursor but keep it visible
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            // Calculate position - prefer above and to the right of cursor
+            let left = event.pageX + 10;
+            let top = event.pageY - tooltipRect.height - 10;
+            
+            // Adjust if tooltip would go off-screen
+            if (left + tooltipRect.width > windowWidth) {
+                left = event.pageX - tooltipRect.width - 10;
+            }
+            if (top < 0) {
+                top = event.pageY + 10;
+            }
+            
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
             tooltip.classList.add('visible');
         }
 
@@ -2406,6 +2713,22 @@
             loadingOverlay.style.display = show ? 'flex' : 'none';
         }
 
+        // Detect if running in VM
+        function detectVM() {
+            const renderer = document.createElement('canvas').getContext('webgl')?.getParameter(37446); // UNMASKED_RENDERER_WEBGL
+            const vendor = document.createElement('canvas').getContext('webgl')?.getParameter(37445); // UNMASKED_VENDOR_WEBGL
+            
+            // Common VM indicators
+            const vmIndicators = ['VMware', 'VirtualBox', 'Virtual', 'QEMU', 'Hyper-V', 'Parallels', 'Microsoft Basic Render Driver'];
+            const rendererString = String(renderer || '').toLowerCase();
+            const vendorString = String(vendor || '').toLowerCase();
+            
+            return vmIndicators.some(indicator => 
+                rendererString.includes(indicator.toLowerCase()) || 
+                vendorString.includes(indicator.toLowerCase())
+            );
+        }
+
         // Make functions available globally
         window.switchView = switchView;
         window.toggleSidebar = toggleSidebar;
@@ -2413,6 +2736,7 @@
         window.resetView = resetView;
         window.toggleAutoLayout = toggleAutoLayout;
         window.exportView = exportView;
+        window.detectVM = detectVM;
     </script>
 </body>
 </html>

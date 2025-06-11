@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Minimal Three.js Test</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #container { width: 100vw; height: 100vh; }
+        #info { position: absolute; top: 10px; left: 10px; color: white; font-family: Arial; }
+    </style>
+</head>
+<body>
+    <div id="info">Minimal Three.js Test - Check console for errors</div>
+    <div id="container"></div>
+
+    <!-- Only one Three.js import -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script>
+        console.log("Starting minimal Three.js test...");
+        
+        // Get container
+        const container = document.getElementById('container');
+        console.log("Container:", container);
+        console.log("Container dimensions:", {
+            width: container.clientWidth,
+            height: container.clientHeight
+        });
+        
+        try {
+            // Create scene
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x222222);
+            console.log("✅ Scene created");
+            
+            // Create camera
+            const camera = new THREE.PerspectiveCamera(
+                75, 
+                container.clientWidth / container.clientHeight,
+                0.1,
+                1000
+            );
+            camera.position.z = 5;
+            console.log("✅ Camera created");
+            
+            // Create renderer
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            console.log("✅ Renderer created and added to DOM");
+            
+            // Create a simple cube
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            const cube = new THREE.Mesh(geometry, material);
+            scene.add(cube);
+            console.log("✅ Cube added to scene");
+            
+            // Add OrbitControls
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            console.log("✅ OrbitControls created");
+            
+            // Animation loop
+            function animate() {
+                requestAnimationFrame(animate);
+                cube.rotation.x += 0.01;
+                cube.rotation.y += 0.01;
+                controls.update();
+                renderer.render(scene, camera);
+            }
+            
+            animate();
+            console.log("✅ Animation started");
+            
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+            
+        } catch (error) {
+            console.error("❌ Error:", error);
+            document.getElementById('info').innerHTML = `Error: ${error.message}`;
+        }
+    </script>
+</body>
+</html>

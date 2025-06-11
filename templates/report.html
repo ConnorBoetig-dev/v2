@@ -1226,7 +1226,7 @@
             {% set critical_devices = devices|selectattr('critical', 'defined')|selectattr('critical')|list %}
             {% set high_dependency_devices = [] %}
             {% for device in devices %}
-                {% if device.get('dependent_count', 0) > 20 %}
+                {% if device.get('dependent_count', 0) > 3 %}
                     {% if high_dependency_devices.append(device) %}{% endif %}
                 {% endif %}
             {% endfor %}
@@ -1247,7 +1247,7 @@
                 <div class="stat-card">
                     <h3>High Dependencies</h3>
                     <div class="stat-number" style="color: #ff9800;">{{ high_dependency_devices|length }}</div>
-                    <div class="stat-label">>20 dependents</div>
+                    <div class="stat-label">>3 dependents</div>
                 </div>
                 <div class="stat-card">
                     <h3>Always On</h3>
@@ -1291,7 +1291,7 @@
                             {% endif %}
                         </td>
                         <td style="text-align: center;">
-                            {% if device.get('dependent_count', 0) > 20 %}
+                            {% if device.get('dependent_count', 0) > 3 %}
                             <span style="color: #ff6b6b; font-weight: bold;">{{ device.get('dependent_count', 0) }}</span>
                             {% else %}
                             {{ device.get('dependent_count', 0) }}

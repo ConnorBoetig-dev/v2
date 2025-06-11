@@ -305,7 +305,7 @@ class RiskPropagationAnalyzer:
             suggestions.append("Implement real-time monitoring for this critical device")
             suggestions.append("Create automated failover procedures")
             
-        if len(self.dependency_graph[failed_device["ip"]]["dependents"]) > 20:
+        if len(self.dependency_graph[failed_device["ip"]]["dependents"]) > 3:
             suggestions.append("Consider distributing load across multiple devices")
             suggestions.append("Implement network segmentation to limit failure impact")
             
@@ -371,7 +371,7 @@ class RiskPropagationAnalyzer:
         
         # Find critical dependency chains
         for device_ip, deps in self.dependency_graph.items():
-            if len(deps["dependents"]) > 20:
+            if len(deps["dependents"]) > 3:
                 device = self.device_map[device_ip]
                 report["critical_dependencies"].append({
                     "ip": device_ip,

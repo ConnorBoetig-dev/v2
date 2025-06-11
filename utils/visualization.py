@@ -200,7 +200,7 @@ class MapGenerator:
         elif device_type in ["switch", "domain_controller", "dns_server", "ntp_server"]:
             return 2
         # Critical services with many dependents (group 3)
-        elif is_critical and dependent_count > 20:
+        elif is_critical and dependent_count > 3:
             return 3
         # Server infrastructure (group 4)
         elif "server" in device_type or device_type in ["web_server", "database", "backup_server", "monitoring_server"]:
