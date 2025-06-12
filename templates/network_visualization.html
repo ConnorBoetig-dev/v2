@@ -904,6 +904,16 @@
                     </div>
                 </div>
 
+                <!-- Interaction Instructions -->
+                <div style="position: absolute; top: 10px; right: 10px; background: var(--bg-secondary); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.5rem; padding: 0.75rem 1rem; z-index: 100; font-size: 0.875rem; color: var(--text-secondary);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg style="width: 16px; height: 16px; fill: var(--accent-blue);" viewBox="0 0 24 24">
+                            <path d="M13 7h-2v4H7v2h4v4h2v-4h4v-2h-4V7zm-1-5C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+                        </svg>
+                        <span><strong>Click any node</strong> to view device details</span>
+                    </div>
+                </div>
+
                 <!-- 2D Network View -->
                 <svg id="network-2d"></svg>
 
@@ -916,8 +926,6 @@
                     <div class="legend-items" id="legend-items"></div>
                 </div>
 
-                <!-- Tooltip -->
-                <div class="network-tooltip" id="network-tooltip"></div>
 
                 <!-- Loading Overlay -->
                 <div class="loading-overlay" id="loading-overlay" style="display: none;">
@@ -1038,7 +1046,7 @@
                 width,
                 height,
                 onNodeClick: showDeviceDetails,
-                onNodeHover: showTooltip
+                onNodeHover: () => {}
             });
 
             visualization2D.render();
@@ -1088,7 +1096,7 @@
                 // Create Three.js visualization
                 visualization3D = new NetworkVisualization3D(container, networkData, {
                     onNodeClick: showDeviceDetails,
-                    onNodeHover: showTooltip
+                    onNodeHover: () => {}
                 });
 
                 visualization3D.render();
@@ -1351,8 +1359,8 @@
                 // Add event listeners
                 nodeContainers
                     .on("click", (event, d) => this.options.onNodeClick(d))
-                    .on("mouseenter", (event, d) => this.options.onNodeHover(event, d, true))
-                    .on("mouseleave", (event, d) => this.options.onNodeHover(event, d, false));
+                    // Hover removed - click to see details
+                    .style("cursor", "pointer");
 
                 this.nodeElements = nodeContainers;
             }
@@ -2615,22 +2623,26 @@
 
             tooltip.innerHTML = html;
             
-            // Position tooltip near the cursor but keep it visible
+            // Position tooltip directly next to the cursor
             const tooltipRect = tooltip.getBoundingClientRect();
             const windowWidth = window.innerWidth;
             const windowHeight = window.innerHeight;
             
-            // Calculate position - prefer above and to the right of cursor
-            let left = event.pageX + 10;
-            let top = event.pageY - tooltipRect.height - 10;
+            // Position tooltip 5 pixels from cursor for closer proximity
+            let left = event.clientX + 5;
+            let top = event.clientY + 5;
             
             // Adjust if tooltip would go off-screen
             if (left + tooltipRect.width > windowWidth) {
-                left = event.pageX - tooltipRect.width - 10;
+                left = event.clientX - tooltipRect.width - 5;
             }
-            if (top < 0) {
-                top = event.pageY + 10;
+            if (top + tooltipRect.height > windowHeight) {
+                top = event.clientY - tooltipRect.height - 5;
             }
+            
+            // Ensure tooltip doesn't go off the left or top edges
+            if (left < 0) left = 5;
+            if (top < 0) top = 5;
             
             tooltip.style.left = `${left}px`;
             tooltip.style.top = `${top}px`;

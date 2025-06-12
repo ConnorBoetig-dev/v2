@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Tuple, Optional
 
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
@@ -49,9 +49,9 @@ class ModernInterface:
                 Layout(name="footer", size=3)
             )
             
-            # Split main into left and right panels
+            # Split main into left and right panels with more space for menu
             layout["main"].split_row(
-                Layout(name="menu", ratio=1),
+                Layout(name="menu", ratio=2),
                 Layout(name="info", ratio=1)
             )
             
@@ -106,12 +106,18 @@ class ModernInterface:
                     title_align="left",
                     border_style=color,
                     padding=(0, 1),
-                    width=35
+                    width=30
                 )
                 menu_panels.append(panel)
             
-            # Arrange menu in columns
-            menu_content = Columns(menu_panels, equal=True, expand=True)
+            # Arrange menu in 2 columns to show all options
+            menu_left = menu_panels[:5]
+            menu_right = menu_panels[5:]
+            
+            menu_content = Columns([
+                Padding(Group(*menu_left), (0, 1)),
+                Padding(Group(*menu_right), (0, 1))
+            ], equal=True, expand=True)
             
             # Create info panel with system status
             info_content = self._get_system_status()
@@ -120,7 +126,7 @@ class ModernInterface:
             footer_content = Align.center(
                 Text.assemble(
                     ("Press ", "dim"),
-                    ("1-9", "bold cyan"),
+                    ("1-10", "bold cyan"),
                     (" to select • ", "dim"),
                     ("Ctrl+C", "bold red"),
                     (" to exit", "dim")
