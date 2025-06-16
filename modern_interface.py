@@ -303,11 +303,7 @@ class ModernInterface:
         console.print(scan_panel)
         
         scan_options = [
-            ("discovery", "Discovery Scan", "Quick host discovery", "30 seconds", False),
-            ("inventory", "Inventory Scan", "Service detection and OS fingerprinting", "5 minutes", True),
-            ("deep", "Deep Scan", "Comprehensive analysis with scripts", "15 minutes", True),
-            ("arp", "ARP Scan", "Layer 2 discovery for local networks", "10 seconds", True),
-            ("fast", "Fast Scan", "Ultra-fast scan for large networks (65k+ hosts)", "2-5 minutes", True),
+            ("fast", "Deep Scan", "Ultra-fast scan for large networks (65k+ hosts)", "2-5 minutes", True),
         ]
         
         # Create scan option cards
@@ -335,68 +331,25 @@ class ModernInterface:
             
         console.print(Columns(scan_cards, equal=True))
         
-        while True:
-            try:
-                choice = Prompt.ask("\n[bold green]❯[/bold green] Select scan type", choices=["1", "2", "3", "4", "5"], default="1")
-                choice_idx = int(choice) - 1
-                scan_type, scan_name, _, _, needs_root = scan_options[choice_idx]
-                
-                # Handle masscan option for discovery scans
-                use_masscan = False
-                if scan_type == "fast":
-                    # Fast scan always uses masscan
-                    use_masscan = True
-                    console.print("\n[cyan]⚡ Fast scan mode selected[/cyan]")
-                    console.print("[cyan]📊 Will use masscan for discovery + light enrichment[/cyan]")
-                    console.print("[cyan]💡 Perfect for scanning large /16 networks and bigger[/cyan]")
-                elif scan_type == "discovery":
-                    # Check if this is a large network
-                    # We'll use the target from the previous step
-                    target = getattr(self, '_last_target', '192.168.1.0/24')
-                    from core.scanner import NetworkScanner
-                    scanner = NetworkScanner()
-                    estimated_hosts = scanner._estimate_total_hosts(target)
-                    
-                    if estimated_hosts > 10000:
-                        # Automatically suggest masscan for large networks
-                        console.print(f"\n[yellow]⚡ Large network detected ({estimated_hosts:,} hosts)[/yellow]")
-                        console.print("[cyan]Masscan is recommended for faster scanning of large networks[/cyan]")
-                        default_choice = "2"
-                    else:
-                        default_choice = "1"
-                    
-                    speed_panel = Panel(
-                        "Choose scanning engine for discovery mode",
-                        title="[bold white]Speed Configuration[/bold white]",
-                        border_style="magenta",
-                        padding=(0, 2)
-                    )
-                    console.print(speed_panel)
-                    
-                    console.print("1. [bold]Standard (nmap)[/bold] - Reliable and accurate")
-                    console.print("2. [bold]Fast (masscan)[/bold] - High-speed scanning")
-                    
-                    masscan_choice = Prompt.ask("\nUse fast scanning?", choices=["1", "2"], default=default_choice)
-                    
-                    if masscan_choice == "2":
-                        console.print("[green]⚡ Using masscan for faster discovery[/green]")
-                        use_masscan = True
-                    else:
-                        console.print("[blue]🔍 Using nmap for standard discovery[/blue]")
-                
-                # Show selection confirmation
-                confirm_text = Text.assemble(
-                    ("Selected: ", "white"),
-                    (scan_name, "bold green"),
-                    (f" {'with masscan' if use_masscan else ''}", "dim")
-                )
-                console.print(Panel(confirm_text, border_style="green"))
-                
-                return scan_type, scan_name, needs_root, use_masscan
-                
-            except (ValueError, KeyboardInterrupt):
-                console.print("[red]❌ Invalid selection. Please try again.[/red]")
-                
+        # Since there's only one option, auto-select it
+        console.print("\n[dim]Auto-selecting Deep Scan...[/dim]")
+        scan_type, scan_name, _, _, needs_root = scan_options[0]
+        
+        # Deep scan (formerly fast scan) always uses masscan
+        use_masscan = True
+        console.print("\n[cyan]⚡ Deep scan mode selected[/cyan]")
+        console.print("[cyan]📊 Will use masscan for discovery + light enrichment[/cyan]")
+        console.print("[cyan]💡 Perfect for scanning large /16 networks and bigger[/cyan]")
+        
+        # Show selection confirmation
+        confirm_text = Text.assemble(
+            ("Selected: ", "white"),
+            (scan_name, "bold green"),
+            (" with masscan", "dim")
+        )
+        console.print(Panel(confirm_text, border_style="green"))
+        
+        return scan_type, scan_name, needs_root, use_masscan
     def _show_scan_summary(self, target, scan_name, snmp_enabled, vuln_enabled, passive_enabled):
         """Show scan configuration summary"""
         console.clear()

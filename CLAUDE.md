@@ -31,9 +31,9 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 ## Key Features
 
 ### 1. Multi-Scanner Support
-- Intelligent scanner selection based on network size and scan type
+- Intelligent scanner selection based on network size
 - Real-time progress tracking with hang detection
-- Three scan profiles: Discovery (fast), Inventory (detailed), Deep (comprehensive)
+- Single optimized scan profile: Deep Scan (ultra-fast for large networks)
 
 ### 2. Device Classification
 - 16+ device types supported (routers, switches, servers, IoT, printers, etc.)
@@ -69,73 +69,26 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 - Critical infrastructure flagging
 - Custom tags and notes
 
-## Scan Types and Use Cases
+## Scan Type
 
-### 1. Discovery Scan
-- **Purpose**: Quick network reconnaissance to find active hosts
-- **Duration**: ~30 seconds
-- **Requires sudo**: No (unless using masscan option)
+### Deep Scan (Optimized for Large Networks)
+- **Purpose**: Ultra-fast scanning for large networks (65k+ hosts)
+- **Duration**: 2-5 minutes for /16 network
+- **Requires sudo**: Yes
 - **Techniques**:
-  - Standard mode: Multiple ICMP types, TCP SYN to common ports, UDP probes
-  - Masscan mode: Ultra-fast SYN scanning with ICMP
-  - Local subnet: Combines ARP + ICMP for maximum coverage
+  - Masscan at 100k packets/second for discovery
+  - Minimal port set for speed (80,443,22,445,3389,8080)
+  - Chunked enrichment (50 IPs at a time)
+  - Automatic interface detection
+  - Randomized host order to avoid rate limiting
 - **Use cases**:
+  - Large enterprise networks
+  - ISP ranges
+  - Data center inventories
   - Initial network discovery
   - Quick inventory updates
-  - Finding new devices on the network
-  - Pre-scan for larger assessments
-- **Command options**:
-  - Can use masscan for 10x faster scanning of large networks
-  - Automatically detects local vs remote subnets
-
-### 2. Inventory Scan
-- **Purpose**: Detailed device identification with services and OS detection
-- **Duration**: ~5 minutes (varies by network size)
-- **Requires sudo**: Yes
-- **Techniques**:
-  - Service version detection (-sV)
-  - OS fingerprinting (-O)
-  - Top 1000 ports scanned
-  - Script scanning for enhanced detection
-- **Use cases**:
-  - Asset management and documentation
-  - Security baseline creation
-  - Compliance auditing
-  - Network documentation
-  - Change management preparation
-
-### 3. Deep Scan
-- **Purpose**: Comprehensive security assessment
-- **Duration**: ~15 minutes (can be much longer)
-- **Requires sudo**: Yes
-- **Techniques**:
-  - Top 5000 ports scanned
-  - Aggressive service detection
-  - NSE script scanning
-  - Vulnerability detection scripts
-  - Full TCP connect scan options
-- **Use cases**:
   - Security assessments
-  - Vulnerability discovery
-  - Pre-penetration testing
-  - Detailed service enumeration
-  - Finding hidden services
-
-### 4. ARP Scan
-- **Purpose**: Layer 2 discovery for local networks only
-- **Duration**: ~10 seconds
-- **Requires sudo**: Yes
-- **Techniques**:
-  - ARP requests to all hosts
-  - MAC address resolution
-  - Vendor identification from OUI
-  - Finds devices with firewalls blocking ICMP/TCP
-- **Use cases**:
-  - Local subnet discovery
-  - Finding hidden/firewalled devices
-  - MAC address inventory
-  - Virtual machine detection
-  - IoT device discovery
+  - Asset management and documentation
 
 ### Additional Scan Features
 
@@ -167,63 +120,12 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 - No API keys required
 - Provides CVSS scores and risk levels
 
-### Scan Selection Guide
-
-| Network Size | First Scan | Regular Updates | Security Check |
-|-------------|------------|-----------------|----------------|
-| < 50 hosts | Discovery | Discovery | Deep |
-| 50-500 hosts | Discovery + Masscan | Discovery | Inventory → Deep |
-| 500-5000 hosts | Discovery + Masscan | Discovery + Masscan | Inventory (targeted) |
-| > 5000 hosts | Discovery + Masscan (staged) | ARP (local) + Discovery | Targeted Deep |
-
 ### Performance Tips
-1. **Large Networks**: Use masscan for discovery, then targeted nmap for details
-2. **Local Networks**: Always include ARP scan for complete coverage
-3. **Busy Networks**: Use inventory scan during off-hours
-4. **Security Scans**: Stage deep scans by subnet to avoid overwhelming the network
+1. **Large Networks**: Deep Scan automatically uses masscan for optimal performance
+2. **Local Networks**: Automatic ARP discovery is included for local subnets
+3. **Very Large Networks**: Scan is optimized for 65k+ hosts with chunked enrichment
+4. **Security**: Built-in vulnerability scanning with multiple API sources
 
-## Scan Types
-
-### 1. Discovery Scan
-- **Purpose**: Quick host discovery to find active devices
-- **Duration**: ~30 seconds for /24 network
-- **Method**: Multiple ICMP/TCP/UDP probes
-- **Use case**: Initial network reconnaissance
-
-### 2. Inventory Scan
-- **Purpose**: Service detection and OS fingerprinting
-- **Duration**: ~5 minutes for /24 network
-- **Method**: SYN scan of top 1000 ports with version detection
-- **Use case**: Asset inventory and service mapping
-- **Requires**: sudo/root
-
-### 3. Deep Scan
-- **Purpose**: Comprehensive analysis with NSE scripts
-- **Duration**: ~15 minutes for /24 network
-- **Method**: Top 5000 ports + ARP + scripts + OS detection
-- **Use case**: Security assessments, detailed analysis
-- **Requires**: sudo/root
-
-### 4. ARP Scan
-- **Purpose**: Layer 2 discovery for local networks
-- **Duration**: ~10 seconds
-- **Method**: ARP requests to find all devices on local segment
-- **Use case**: Finding devices that block ICMP
-- **Requires**: sudo/root
-
-### 5. Fast Scan (NEW)
-- **Purpose**: Ultra-fast scanning for large networks (65k+ hosts)
-- **Duration**: 2-5 minutes for /16 network
-- **Method**: Masscan at 100k pps + light nmap enrichment
-- **Features**:
-  - Optimized for 6+ /16 subnets (65,000+ IPs)
-  - Minimal port set for speed (80,443,22,445,3389,8080)
-  - Chunked enrichment (50 IPs at a time)
-  - No vulnerability scanning for speed
-  - Automatic interface detection
-  - Randomized host order to avoid rate limiting
-- **Use case**: Large enterprise networks, ISP ranges, data center inventories
-- **Requires**: sudo/root
 
 ## Common Commands
 
@@ -310,14 +212,6 @@ self.port_signatures['new_device'] = {
 }
 ```
 
-### Creating Custom Scan Profiles
-Edit `core/scanner.py`:
-```python
-self.scan_profiles['profile_name'] = {
-    'nmap': ['-sS', '-p', 'ports'],
-    'description': 'Profile description'
-}
-```
 
 ### Modifying Visualizations
 - 2D: Edit D3.js code in templates/report.html
@@ -419,15 +313,16 @@ These enhancements would transform NetworkMapper from a scanning tool into a com
 
 ### Latest Changes (January 2025)
 
-8. **Fast Scan Mode for Large Networks** ✅
-   - New scan type optimized for 65,000+ hosts
+8. **Simplified to Single Deep Scan Mode** ✅
+   - Removed all scan types except the Fast Scan (now renamed to Deep Scan)
+   - Deep Scan is optimized for all network sizes (especially 65,000+ hosts)
    - Uses masscan at 100k packets/second
    - Minimal port set (80,443,22,445,3389,8080)
    - Chunked enrichment - processes discovered hosts in groups of 50
    - Automatic interface detection for optimal routing
-   - No vulnerability scanning to maximize speed
    - Perfect for enterprise /16 networks and ISP ranges
    - Completes 65k host scan in 2-5 minutes
+   - Single scan type simplifies user experience while maintaining all functionality
 
 9. **Fixed Traffic Flow Visualization Jitter** ✅
    - Removed CSS transform scale on hover that conflicted with D3.js simulation
