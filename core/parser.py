@@ -143,7 +143,7 @@ class ScanParser:
         if isinstance(first, dict) and "ip" in first:
             logger.info("Returning raw results as they appear to be valid device data")
             return raw_results
-        
+
         return []
 
     def _standardize_devices(self, devices: List[Any]) -> List[Dict]:

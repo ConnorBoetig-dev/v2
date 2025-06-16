@@ -22,13 +22,13 @@ logger = logging.getLogger(__name__)
 class NetworkScanner(AsyncNetworkScanner):
     """
     NetworkScanner with parallel/async execution capabilities.
-    
+
     This class maintains full backward compatibility while providing
     5-10x performance improvements through parallel execution of:
     - Subnet scanning (large networks split automatically)
     - Device enrichment (parallel nmap enrichment)
     - SNMP queries (concurrent SNMP operations)
-    
+
     All existing functionality is preserved including:
     - All scan profiles (discovery, inventory, deep, fast, os_detect)
     - Progress tracking with Rich console
@@ -37,7 +37,7 @@ class NetworkScanner(AsyncNetworkScanner):
     - Temp file management
     - Result merging from different scanners
     """
-    
+
     def scan(
         self,
         target: str,
@@ -48,17 +48,17 @@ class NetworkScanner(AsyncNetworkScanner):
     ) -> List[Dict]:
         """
         Execute network scan with parallel execution for improved performance.
-        
+
         This method maintains the synchronous interface for backward compatibility
         while leveraging async operations internally for parallel execution.
-        
+
         Args:
             target: Network target (IP, CIDR, hostname)
             scan_type: Type of scan (discovery, inventory, deep, fast, os_detect)
             use_masscan: Use masscan for discovery (faster for large networks)
             needs_root: Whether scan requires root privileges
             snmp_config: SNMP configuration for device enrichment
-            
+
         Returns:
             List of discovered devices with enriched information
         """
@@ -77,33 +77,35 @@ class NetworkScanner(AsyncNetworkScanner):
             # No event loop, create one for sync execution
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            
+
             try:
                 logger.info(f"Starting parallel scan of {target} with type {scan_type}")
-                
+
                 # Run async scan
                 result = loop.run_until_complete(
                     super().scan(target, scan_type, use_masscan, needs_root, snmp_config)
                 )
-                
+
                 logger.info(f"Scan completed: {len(result)} devices discovered")
                 return result
-                
+
             finally:
                 # Clean up
                 self.cleanup_all_temp_files()
                 loop.close()
                 asyncio.set_event_loop(None)
-    
+
     def get_scan_progress(self) -> Dict[str, any]:
         """Get current scan progress information"""
         return {
             "total_hosts": self.total_hosts,
             "completed_hosts": self.hosts_completed,
-            "percentage": (self.hosts_completed / self.total_hosts * 100) if self.total_hosts > 0 else 0,
+            "percentage": (self.hosts_completed / self.total_hosts * 100)
+            if self.total_hosts > 0
+            else 0,
             "hang_detected": self.hang_detected,
         }
-    
+
     @property
     def parallel_performance_info(self) -> Dict[str, any]:
         """Get information about parallel execution capabilities"""
@@ -117,4 +119,4 @@ class NetworkScanner(AsyncNetworkScanner):
 
 
 # For backward compatibility, ensure the sync methods work as expected
-__all__ = ['NetworkScanner']
+__all__ = ["NetworkScanner"]

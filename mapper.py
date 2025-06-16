@@ -31,6 +31,13 @@ from utils.vulnerability_scanner import VulnerabilityScanner
 from utils.scan_status import ScanStatusIndicator
 from modern_interface import ModernInterface
 
+# Import friendly error handling
+try:
+    from utils.friendly_errors import FriendlyError, format_error_for_user
+except ImportError:
+    FriendlyError = Exception
+    format_error_for_user = str
+
 app = typer.Typer()
 console = Console()
 logger = logging.getLogger(__name__)
@@ -223,8 +230,10 @@ class NetworkMapper:
                 }
 
             except Exception as e:
-                console.print(f"[yellow]Warning: Passive analysis failed: {e}[/yellow]")
-                console.print("[yellow]This feature requires root/sudo privileges[/yellow]")
+                error_msg = format_error_for_user(e)
+                console.print(f"[yellow]⚠️  Passive analysis couldn't complete: {error_msg}[/yellow]")
+                if "permission" in str(e).lower():
+                    console.print("[yellow]💡 Tip: This feature requires administrator privileges (sudo)[/yellow]")
                 logger.error(f"Passive analysis error: {e}")
 
         # Vulnerability scanning if enabled
@@ -237,7 +246,10 @@ class NetworkMapper:
                 vuln_report = self.vuln_scanner.generate_vulnerability_report(devices)
                 self._display_vulnerability_summary(vuln_report)
             except Exception as e:
-                console.print(f"[yellow]Warning: Vulnerability scanning failed: {e}[/yellow]")
+                error_msg = format_error_for_user(e)
+                console.print(f"[yellow]⚠️  Vulnerability scanning couldn't complete: {error_msg}[/yellow]")
+                if "connection" in str(e).lower() or "timeout" in str(e).lower():
+                    console.print("[yellow]💡 Tip: Check your internet connection for API access[/yellow]")
                 logger.error(f"Vulnerability scanning error: {e}")
 
         # Save results

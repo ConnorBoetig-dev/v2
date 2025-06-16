@@ -41,11 +41,7 @@ with open(latest_flow) as f:
 devices = mapper.annotator.apply_annotations(devices)
 
 # Simulate passive analysis results
-mapper.passive_analysis_results = {
-    "flow_matrix": flow_matrix,
-    "service_usage": {},
-    "duration": 60
-}
+mapper.passive_analysis_results = {"flow_matrix": flow_matrix, "service_usage": {}, "duration": 60}
 
 # Calculate service usage
 for device in devices:
@@ -58,14 +54,16 @@ for device in devices:
 # Get timestamp
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-print(f"Generating reports for {len(devices)} devices with {sum(len(dests) for dests in flow_matrix.values())} traffic flows...")
+print(
+    f"Generating reports for {len(devices)} devices with {sum(len(dests) for dests in flow_matrix.values())} traffic flows..."
+)
 
 # Generate reports
 try:
     report_file, comparison_file = mapper.generate_html_report(devices, timestamp)
     print(f"\n✓ Reports generated successfully!")
     print(f"\nOpening in browser...")
-    
+
     # The reports should auto-open, but print the paths too
     print(f"\nGenerated files:")
     print(f"- Network Map: {report_file}")
@@ -73,8 +71,9 @@ try:
         traffic_report = Path("output/reports") / f"traffic_flow_{timestamp}.html"
         if traffic_report.exists():
             print(f"- Traffic Flow Analysis: {traffic_report}")
-    
+
 except Exception as e:
     print(f"Error generating reports: {e}")
     import traceback
+
     traceback.print_exc()

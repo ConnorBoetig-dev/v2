@@ -72,12 +72,19 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 ## Scan Types
 
 ### 1. Deep Scan (Fast Mode)
-- **Purpose**: Fast scanning for large networks with basic enrichment
+- **Purpose**: Fast scanning for large networks with comprehensive discovery
 - **Duration**: 2-5 minutes for /16 network
 - **Requires sudo**: Yes
 - **Techniques**:
   - Masscan at 100k packets/second for discovery
-  - Minimal port set for speed (80,443,22,445,3389,8080)
+  - Enhanced port coverage (35+ TCP ports, 10+ UDP ports) including:
+    - Standard services: SSH, HTTP/S, FTP, Telnet, DNS
+    - Email: SMTP, POP3, IMAP, secure variants
+    - File sharing: SMB, NetBIOS
+    - Databases: MySQL, PostgreSQL, MongoDB, MSSQL
+    - Remote access: RDP, VNC, VPN
+    - IoT/Printers: 9100, 631
+    - UDP services: DNS, DHCP, SNMP, NTP, UPNP
   - Light nmap enrichment with:
     - Version intensity 0 (fastest)
     - Top 100 ports
@@ -95,7 +102,16 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 - **Duration**: 5-15 minutes for /16 network
 - **Requires sudo**: Yes
 - **Techniques**:
-  - Masscan for discovery with extended port list
+  - Masscan for discovery with extensive port list (400+ ports)
+  - Covers all common services plus:
+    - Web services: 8000-8100, 8443-8445, 8888
+    - Alternative databases: Redis, Memcached, CouchDB
+    - IoT/Smart home: 1883, 1900, 5353
+    - Industrial: 502, 1911, 47808
+    - Gaming: 25565, 27015, 64738
+    - Enterprise apps: WebLogic, Tomcat, Jenkins
+    - Cloud services: Docker, Kubernetes APIs
+    - High ports: Various services up to 65535
   - Comprehensive nmap enrichment with:
     - Version intensity 5 (balanced)
     - Top 500 ports
