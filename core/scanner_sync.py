@@ -73,6 +73,24 @@ class NetworkScanner:
                 ],
                 "description": "Fast scan for large networks (65k+ hosts)",
             },
+            "deeper": {
+                # More thorough scan - uses masscan for discovery and comprehensive nmap enrichment
+                "masscan": ["-p80,443,22,445,3389,8080,8443,3306,5432,27017,21,23,25,53,110,111,135,139,143,161,389,636,1433,1521,3268,3269,3390,5900,5985,8000,8081,8443,9090"],
+                "nmap": [
+                    "-sS",
+                    "-sV",
+                    "-O",
+                    "--osscan-guess",
+                    "--version-intensity",
+                    "5",  # Medium intensity (0-9 scale, default is 7)
+                    "--top-ports",
+                    "500",  # Scan top 500 ports instead of 100
+                    "-T3",  # Normal timing (less aggressive than T5)
+                    "--script-timeout",
+                    "10s",  # Add script timeout for reliability
+                ],
+                "description": "Deeper scan for more accurate OS/service detection",
+            },
             "os_detect": {
                 # Dedicated OS detection scan
                 "nmap": ["-O", "--osscan-guess", "--osscan-limit", "-T4", "-n"],
@@ -127,6 +145,20 @@ class NetworkScanner:
                     "[cyan]🔍 This includes: OS detection, hostname resolution, and service detection[/cyan]"
                 )
                 devices = self._enrich_fast_scan(devices)
+            return devices
+
+        # Deeper scan for more accurate results
+        if scan_type == "deeper":
+            self.console.print("[cyan]🔬 Deeper scan mode for comprehensive analysis[/cyan]")
+            # Use masscan for discovery with more ports
+            devices = self._run_masscan_deeper(target)
+            if devices:
+                # Thorough enrichment with nmap on discovered hosts
+                self.console.print(f"[cyan]📊 Performing deep enrichment on {len(devices)} discovered hosts...[/cyan]")
+                self.console.print(
+                    "[cyan]🔍 This includes: Comprehensive OS detection, detailed service versions, and extended port scanning[/cyan]"
+                )
+                devices = self._enrich_deeper_scan(devices)
             return devices
 
         # For discovery scans, use hybrid approach for better coverage
@@ -2021,5 +2053,119 @@ class NetworkScanner:
                     enriched_devices.extend(devices[i : i + len(chunk)])
 
             progress.update(task, completed=len(devices), status="Enrichment complete")
+
+        return enriched_devices
+
+    def _run_masscan_deeper(self, target: str) -> List[Dict]:
+        """Run masscan with more ports for deeper scan
+
+        Args:
+            target: Network target
+
+        Returns:
+            List of discovered devices
+        """
+        # Use the same masscan logic but with more ports (defined in scan profile)
+        return self._run_masscan_fast(target)  # Reuse the same method, it will use the profile ports
+
+    def _enrich_deeper_scan(self, devices: List[Dict]) -> List[Dict]:
+        """Enrich devices with comprehensive nmap scanning
+
+        Args:
+            devices: List of devices from masscan
+
+        Returns:
+            Enriched device list with detailed service and OS info
+        """
+        if not devices:
+            return devices
+
+        # Create target list of just discovered IPs
+        ip_list = [d["ip"] for d in devices]
+
+        # For deeper scan, use smaller chunks for better accuracy
+        chunk_size = 10  # Smaller chunks for more thorough scanning
+        enriched_devices = []
+
+        total_chunks = (len(ip_list) + chunk_size - 1) // chunk_size
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold green]Deep Enrichment[/bold green]"),
+            BarColumn(complete_style="green", finished_style="green"),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("• {task.fields[status]}"),
+            console=self.console,
+            transient=False,
+        ) as progress:
+            task = progress.add_task(
+                "Enriching devices", total=len(devices), status="Starting deep enrichment..."
+            )
+
+            for chunk_idx in range(total_chunks):
+                start_idx = chunk_idx * chunk_size
+                end_idx = min(start_idx + chunk_size, len(ip_list))
+                chunk_ips = ip_list[start_idx:end_idx]
+
+                progress.update(
+                    task,
+                    completed=start_idx,
+                    status=f"Scanning chunk {chunk_idx + 1}/{total_chunks} ({len(chunk_ips)} IPs)"
+                )
+
+                # Use the deeper scan profile which has more comprehensive settings
+                temp_file = self._create_temp_file("nmap_deeper", ".xml")
+
+                try:
+                    # Build nmap command with deeper scan profile
+                    profile = self.scan_profiles["deeper"]
+                    cmd = ["sudo", "nmap"] + profile["nmap"] + ["-oX", temp_file] + chunk_ips
+
+                    # Run with longer timeout for deeper scanning
+                    result = subprocess.run(
+                        cmd, capture_output=True, text=True, timeout=300  # 5 minute timeout per chunk
+                    )
+
+                    if result.returncode == 0:
+                        # Parse results
+                        chunk_results = self._parse_nmap_xml(temp_file)
+                        
+                        # Merge with original device data
+                        device_map = {d["ip"]: d for d in devices[start_idx:end_idx]}
+                        for enriched in chunk_results:
+                            if enriched["ip"] in device_map:
+                                # Keep original open_ports from masscan
+                                original = device_map[enriched["ip"]]
+                                enriched["open_ports"] = list(set(original.get("open_ports", []) + enriched.get("open_ports", [])))
+                                enriched_devices.append(enriched)
+                            else:
+                                enriched_devices.append(enriched)
+                    else:
+                        # If enrichment fails, keep original devices
+                        enriched_devices.extend(devices[start_idx:end_idx])
+                        logger.warning(f"Deeper enrichment failed for chunk {chunk_idx + 1}: {result.stderr}")
+
+                except subprocess.TimeoutExpired:
+                    # On timeout, keep original devices
+                    enriched_devices.extend(devices[start_idx:end_idx])
+                    logger.warning(f"Deeper enrichment timeout for chunk {chunk_idx + 1}")
+                except Exception as e:
+                    enriched_devices.extend(devices[start_idx:end_idx])
+                    logger.error(f"Deeper enrichment error: {e}")
+                finally:
+                    self._cleanup_temp_file(temp_file, needs_sudo=True)
+
+            progress.update(task, completed=len(devices), status="Deep enrichment complete")
+
+        # Log enrichment summary
+        self.console.print(f"[green]✓ Deep enrichment complete for {len(enriched_devices)} devices[/green]")
+        
+        # Show sample of enriched data
+        if enriched_devices and self.config["scanners"].get("progress_details", False):
+            sample = enriched_devices[0]
+            if sample.get("os"):
+                self.console.print(f"[dim]Sample OS detection: {sample['ip']} -> {sample['os']}[/dim]")
+            if sample.get("services"):
+                self.console.print(f"[dim]Sample services: {len(sample['services'])} services detected[/dim]")
 
         return enriched_devices

@@ -69,26 +69,46 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 - Critical infrastructure flagging
 - Custom tags and notes
 
-## Scan Type
+## Scan Types
 
-### Deep Scan (Optimized for Large Networks)
-- **Purpose**: Ultra-fast scanning for large networks (65k+ hosts)
+### 1. Deep Scan (Fast Mode)
+- **Purpose**: Fast scanning for large networks with basic enrichment
 - **Duration**: 2-5 minutes for /16 network
 - **Requires sudo**: Yes
 - **Techniques**:
   - Masscan at 100k packets/second for discovery
   - Minimal port set for speed (80,443,22,445,3389,8080)
-  - Chunked enrichment (50 IPs at a time)
+  - Light nmap enrichment with:
+    - Version intensity 0 (fastest)
+    - Top 100 ports
+    - T5 timing (aggressive)
+  - Chunked enrichment (25 IPs at a time)
   - Automatic interface detection
-  - Randomized host order to avoid rate limiting
 - **Use cases**:
+  - Quick network inventory
   - Large enterprise networks
-  - ISP ranges
-  - Data center inventories
-  - Initial network discovery
-  - Quick inventory updates
+  - Initial discovery scans
+  - Time-sensitive assessments
+
+### 2. Deeper Scan (Accuracy Mode)
+- **Purpose**: More accurate scanning with comprehensive OS/service detection
+- **Duration**: 5-15 minutes for /16 network
+- **Requires sudo**: Yes
+- **Techniques**:
+  - Masscan for discovery with extended port list
+  - Comprehensive nmap enrichment with:
+    - Version intensity 5 (balanced)
+    - Top 500 ports
+    - T3 timing (normal)
+    - Script timeout for reliability
+  - Smaller chunks (10 IPs) for better accuracy
+  - 5-minute timeout per chunk
+- **Use cases**:
+  - Detailed asset inventory
   - Security assessments
-  - Asset management and documentation
+  - Compliance auditing
+  - When accurate OS detection is critical
+  - Service enumeration
 
 ### Additional Scan Features
 
@@ -121,10 +141,11 @@ NetworkMapper v2 is a comprehensive Python-based network discovery and asset man
 - Provides CVSS scores and risk levels
 
 ### Performance Tips
-1. **Large Networks**: Deep Scan automatically uses masscan for optimal performance
-2. **Local Networks**: Automatic ARP discovery is included for local subnets
-3. **Very Large Networks**: Scan is optimized for 65k+ hosts with chunked enrichment
-4. **Security**: Built-in vulnerability scanning with multiple API sources
+1. **Quick Inventory**: Use Deep Scan for fast results (2-5 minutes)
+2. **Accurate Results**: Use Deeper Scan when OS/service accuracy is important
+3. **Large Networks**: Both scans use masscan for discovery, optimized for 65k+ hosts
+4. **Local Networks**: Automatic ARP discovery is included for local subnets
+5. **Balance**: Deep Scan for daily monitoring, Deeper Scan for security assessments
 
 
 ## Common Commands
@@ -313,16 +334,18 @@ These enhancements would transform NetworkMapper from a scanning tool into a com
 
 ### Latest Changes (January 2025)
 
-8. **Simplified to Single Deep Scan Mode** ✅
-   - Removed all scan types except the Fast Scan (now renamed to Deep Scan)
-   - Deep Scan is optimized for all network sizes (especially 65,000+ hosts)
-   - Uses masscan at 100k packets/second
-   - Minimal port set (80,443,22,445,3389,8080)
-   - Chunked enrichment - processes discovered hosts in groups of 50
-   - Automatic interface detection for optimal routing
-   - Perfect for enterprise /16 networks and ISP ranges
-   - Completes 65k host scan in 2-5 minutes
-   - Single scan type simplifies user experience while maintaining all functionality
+8. **Simplified to Two Scan Modes** ✅
+   - Removed all scan types except Fast Scan (renamed to Deep Scan) and added Deeper Scan
+   - **Deep Scan**: Fast discovery with light enrichment (2-5 minutes)
+     - Uses masscan at 100k packets/second
+     - Light nmap enrichment (version intensity 0, top 100 ports, T5 timing)
+     - Perfect for quick network inventory
+   - **Deeper Scan**: Comprehensive analysis with better accuracy (5-15 minutes)
+     - Uses masscan for discovery with extended port list
+     - Thorough nmap enrichment (version intensity 5, top 500 ports, T3 timing)
+     - Better OS detection and service identification
+   - Both modes use the optimal masscan + nmap combination
+   - User can choose between speed (Deep) and accuracy (Deeper)
 
 9. **Fixed Traffic Flow Visualization Jitter** ✅
    - Removed CSS transform scale on hover that conflicted with D3.js simulation

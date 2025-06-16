@@ -77,6 +77,23 @@ class AsyncNetworkScanner:
                 ],
                 "description": "Fast scan for large networks (65k+ hosts)",
             },
+            "deeper": {
+                "masscan": ["-p80,443,22,445,3389,8080,8443,3306,5432,27017,21,23,25,53,110,111,135,139,143,161,389,636,1433,1521,3268,3269,3390,5900,5985,8000,8081,8443,9090"],
+                "nmap": [
+                    "-sS",
+                    "-sV",
+                    "-O",
+                    "--osscan-guess",
+                    "--version-intensity",
+                    "5",
+                    "--top-ports",
+                    "500",
+                    "-T3",
+                    "--script-timeout",
+                    "10s",
+                ],
+                "description": "Deeper scan for more accurate OS/service detection",
+            },
             "os_detect": {
                 "nmap": ["-O", "--osscan-guess", "--osscan-limit", "-T4", "-n"],
                 "description": "OS detection only (for enriching existing results)",
@@ -127,9 +144,12 @@ class AsyncNetworkScanner:
     ) -> List[Dict]:
         """Execute network scan with parallel execution"""
         
-        # Fast scan mode remains single-threaded for simplicity
+        # Fast and deeper scan modes use masscan + enrichment approach
         if scan_type == "fast":
             return await self._run_fast_scan_async(target)
+        
+        if scan_type == "deeper":
+            return await self._run_deeper_scan_async(target)
         
         # For large networks, split into subnets for parallel scanning
         subnets = self._split_target_into_subnets(target)
@@ -634,6 +654,140 @@ class AsyncNetworkScanner:
             progress.update(task, completed=len(devices), status="Enrichment complete")
         
         return enriched_devices
+    
+    async def _run_deeper_scan_async(self, target: str) -> List[Dict]:
+        """Run deeper scan mode for more accurate results"""
+        self.console.print("[cyan]🔬 Deeper scan mode for comprehensive analysis[/cyan]")
+        
+        # Use masscan for discovery with more ports
+        devices = await self._run_masscan_deeper_async(target)
+        
+        if devices:
+            # Thorough enrichment
+            self.console.print(f"[cyan]📊 Performing deep enrichment on {len(devices)} discovered hosts...[/cyan]")
+            self.console.print("[cyan]🔍 This includes: Comprehensive OS detection, detailed service versions, and extended port scanning[/cyan]")
+            devices = await self._enrich_deeper_scan_async(devices)
+        
+        return devices
+    
+    async def _run_masscan_deeper_async(self, target: str) -> List[Dict]:
+        """Run masscan with extended port list for deeper scan"""
+        # Just use the fast scan method - it will pick up the ports from the scan profile
+        return await self._run_masscan_fast_async(target)
+    
+    async def _enrich_deeper_scan_async(self, devices: List[Dict]) -> List[Dict]:
+        """Enrich devices with comprehensive nmap scanning"""
+        if not devices:
+            return devices
+        
+        # Use smaller chunks for more thorough scanning
+        chunk_size = 10
+        enriched_devices = []
+        
+        total_chunks = (len(devices) + chunk_size - 1) // chunk_size
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold green]Deep Enrichment[/bold green]"),
+            BarColumn(complete_style="green", finished_style="green"),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("• {task.fields[status]}"),
+            console=self.console,
+            transient=False,
+        ) as progress:
+            task = progress.add_task(
+                "Enriching devices", total=len(devices), status="Starting deep enrichment..."
+            )
+            
+            # Process chunks in parallel
+            tasks = []
+            for i in range(0, len(devices), chunk_size):
+                chunk = devices[i:i+chunk_size]
+                chunk_task = self._enrich_deeper_chunk_async(chunk, i//chunk_size, total_chunks)
+                tasks.append(chunk_task)
+            
+            # Run all enrichment tasks concurrently
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Collect results
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    logger.error(f"Deeper enrichment chunk {i} failed: {result}")
+                    # Add original devices if enrichment failed
+                    start_idx = i * chunk_size
+                    end_idx = min(start_idx + chunk_size, len(devices))
+                    enriched_devices.extend(devices[start_idx:end_idx])
+                else:
+                    enriched_devices.extend(result or [])
+                
+                progress.update(task, completed=min((i+1)*chunk_size, len(devices)))
+            
+            progress.update(task, completed=len(devices), status="Deep enrichment complete")
+        
+        self.console.print(f"[green]✓ Deep enrichment complete for {len(enriched_devices)} devices[/green]")
+        
+        return enriched_devices
+    
+    async def _enrich_deeper_chunk_async(self, chunk: List[Dict], chunk_idx: int, total_chunks: int) -> List[Dict]:
+        """Enrich a chunk with deeper scanning"""
+        async with self._enrich_semaphore:
+            ips = [d["ip"] for d in chunk]
+            
+            self.console.print(f"[dim]Deep scanning chunk {chunk_idx + 1}/{total_chunks} ({len(ips)} IPs)[/dim]")
+            
+            temp_file = self._create_temp_file("nmap_deeper", ".xml")
+            
+            try:
+                # Use deeper scan profile
+                profile = self.scan_profiles["deeper"]
+                cmd = ["sudo", "-n", "nmap"] + profile["nmap"] + ["-oX", temp_file] + ips
+                
+                # Run with longer timeout
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                
+                # Wait with timeout
+                try:
+                    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+                except asyncio.TimeoutError:
+                    proc.kill()
+                    logger.warning(f"Deeper enrichment timeout for chunk {chunk_idx + 1}")
+                    return chunk
+                
+                if proc.returncode == 0:
+                    # Parse results
+                    enriched = await asyncio.to_thread(self._parse_nmap_xml, temp_file)
+                    
+                    # Merge with original data
+                    device_map = {d["ip"]: d for d in chunk}
+                    merged = []
+                    for e in enriched:
+                        if e["ip"] in device_map:
+                            original = device_map[e["ip"]]
+                            e["open_ports"] = list(set(original.get("open_ports", []) + e.get("open_ports", [])))
+                            merged.append(e)
+                        else:
+                            merged.append(e)
+                    
+                    # Add any devices that weren't in enrichment results
+                    enriched_ips = {e["ip"] for e in enriched}
+                    for d in chunk:
+                        if d["ip"] not in enriched_ips:
+                            merged.append(d)
+                    
+                    return merged
+                else:
+                    logger.warning(f"Deeper enrichment failed for chunk {chunk_idx + 1}: {stderr.decode()}")
+                    return chunk
+                    
+            except Exception as e:
+                logger.error(f"Deeper enrichment error: {e}")
+                return chunk
+            finally:
+                self._cleanup_temp_file(temp_file, needs_sudo=True)
     
     async def _enrich_chunk_async(self, chunk: List[Dict]) -> List[Dict]:
         """Enrich a chunk of devices"""

@@ -303,7 +303,8 @@ class ModernInterface:
         console.print(scan_panel)
         
         scan_options = [
-            ("fast", "Deep Scan", "Ultra-fast scan for large networks (65k+ hosts)", "2-5 minutes", True),
+            ("fast", "Deep Scan", "Fast scan for large networks using masscan + light nmap", "2-5 minutes", True),
+            ("deeper", "Deeper Scan", "More accurate scan with comprehensive OS/service detection", "5-15 minutes", True),
         ]
         
         # Create scan option cards
@@ -331,25 +332,38 @@ class ModernInterface:
             
         console.print(Columns(scan_cards, equal=True))
         
-        # Since there's only one option, auto-select it
-        console.print("\n[dim]Auto-selecting Deep Scan...[/dim]")
-        scan_type, scan_name, _, _, needs_root = scan_options[0]
-        
-        # Deep scan (formerly fast scan) always uses masscan
-        use_masscan = True
-        console.print("\n[cyan]⚡ Deep scan mode selected[/cyan]")
-        console.print("[cyan]📊 Will use masscan for discovery + light enrichment[/cyan]")
-        console.print("[cyan]💡 Perfect for scanning large /16 networks and bigger[/cyan]")
-        
-        # Show selection confirmation
-        confirm_text = Text.assemble(
-            ("Selected: ", "white"),
-            (scan_name, "bold green"),
-            (" with masscan", "dim")
-        )
-        console.print(Panel(confirm_text, border_style="green"))
-        
-        return scan_type, scan_name, needs_root, use_masscan
+        # Let user choose between the two options
+        while True:
+            try:
+                choice = Prompt.ask("\n[bold green]❯[/bold green] Select scan type", choices=["1", "2"], default="1")
+                choice_idx = int(choice) - 1
+                scan_type, scan_name, _, _, needs_root = scan_options[choice_idx]
+                
+                # Both scan types use masscan for discovery
+                use_masscan = True
+                
+                if scan_type == "fast":
+                    console.print("\n[cyan]⚡ Deep scan mode selected[/cyan]")
+                    console.print("[cyan]📊 Will use masscan for discovery + light enrichment[/cyan]")
+                    console.print("[cyan]💡 Perfect for quick scans of large networks[/cyan]")
+                else:  # deeper
+                    console.print("\n[cyan]🔬 Deeper scan mode selected[/cyan]")
+                    console.print("[cyan]📊 Will use masscan for discovery + comprehensive enrichment[/cyan]")
+                    console.print("[cyan]🎯 More accurate OS detection and service identification[/cyan]")
+                    console.print("[cyan]⏱️  Takes longer but provides better results[/cyan]")
+                
+                # Show selection confirmation
+                confirm_text = Text.assemble(
+                    ("Selected: ", "white"),
+                    (scan_name, "bold green"),
+                    (" with masscan", "dim")
+                )
+                console.print(Panel(confirm_text, border_style="green"))
+                
+                return scan_type, scan_name, needs_root, use_masscan
+                
+            except (ValueError, KeyboardInterrupt):
+                console.print("[red]❌ Invalid selection. Please try again.[/red]")
     def _show_scan_summary(self, target, scan_name, snmp_enabled, vuln_enabled, passive_enabled):
         """Show scan configuration summary"""
         console.clear()

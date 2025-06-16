@@ -1605,13 +1605,20 @@ class NetworkMapper:
         """Select scan type with improved UX"""
         console.print("\n[bold]Scan Type[/bold]")
 
-        # Only Deep Scan (formerly Fast Scan) option
+        # Two scan options: Deep (fast) and Deeper (more accurate)
         scan_options = [
             (
                 "fast",
                 "Deep Scan",
-                "Ultra-fast scan for large networks (65k+ hosts)",
+                "Fast scan for large networks using masscan + light nmap enrichment",
                 "2-5 minutes",
+                True,
+            ),
+            (
+                "deeper",
+                "Deeper Scan",
+                "More accurate scan with comprehensive OS/service detection",
+                "5-15 minutes",
                 True,
             ),
         ]
@@ -1621,19 +1628,31 @@ class NetworkMapper:
             console.print(f"{i}. [bold]{name}[/bold] – {desc}")
             console.print(f"   [dim]Duration: ~{time}{sudo_text}[/dim]")
 
-        # Since there's only one option, auto-select it
-        console.print("\n[dim]Auto-selecting Deep Scan...[/dim]")
-        scan_type, scan_name, _, _, needs_root = scan_options[0]
+        while True:
+            try:
+                choice = Prompt.ask(
+                    "\nSelect scan type", choices=["1", "2"], default="1"
+                )
+                choice_idx = int(choice) - 1
+                scan_type, scan_name, _, _, needs_root = scan_options[choice_idx]
 
-        # Fast scan (now Deep Scan) always uses masscan
-        use_masscan = True
-        console.print("\n[cyan]⚡ Deep Scan automatically uses masscan for speed[/cyan]")
-        console.print(
-            "[cyan]📊 Will discover hosts first, then perform light enrichment[/cyan]"
-        )
-        console.print("[cyan]💡 Perfect for /16 networks and larger[/cyan]")
+                # Both scan types use masscan for discovery
+                use_masscan = True
+                
+                if scan_type == "fast":
+                    console.print("\n[cyan]⚡ Deep Scan selected[/cyan]")
+                    console.print("[cyan]📊 Will use masscan for discovery + light nmap enrichment[/cyan]")
+                    console.print("[cyan]💡 Perfect for quick scans of large networks[/cyan]")
+                else:  # deeper
+                    console.print("\n[cyan]🔬 Deeper Scan selected[/cyan]")
+                    console.print("[cyan]📊 Will use masscan for discovery + comprehensive nmap enrichment[/cyan]")
+                    console.print("[cyan]🎯 More accurate OS detection and service identification[/cyan]")
+                    console.print("[cyan]⏱️  Takes longer but provides better results[/cyan]")
 
-        return scan_type, scan_name, needs_root, use_masscan
+                return scan_type, scan_name, needs_root, use_masscan
+
+            except (ValueError, IndexError):
+                console.print("[red]Please select a valid option (1 or 2)[/red]")
 
     def _handle_vulnerability_setup(self) -> bool:
         """Handle vulnerability scanning setup"""
