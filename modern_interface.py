@@ -88,7 +88,8 @@ class ModernInterface:
                 ("7", "🗺️", "Network Visualization", "Interactive network maps", "#ff5f87"),
                 ("8", "📤", "Data Export", "Export to various formats", "#00ffff"),
                 ("9", "🧹", "Clear Scan History", "Remove all scan data", "#ffd700"),
-                ("10", "❌", "Exit", "Close NetworkMapper", "#ff6b6b")
+                ("10", "🔧", "Update OUI Database", "Update MAC vendor database", "#87ceeb"),
+                ("11", "❌", "Exit", "Close NetworkMapper", "#ff6b6b")
             ]
             
             menu_panels = []
@@ -168,6 +169,8 @@ class ModernInterface:
             elif choice == "9":
                 self.clear_scan_history()
             elif choice == "10":
+                self.update_oui_database()
+            elif choice == "11":
                 if self._confirm_exit():
                     break
                     
@@ -931,5 +934,97 @@ class ModernInterface:
                 
         except Exception as e:
             console.print(f"\n[red]Failed to clear scan history: {e}[/red]")
+        
+        input("\nPress Enter to continue...")
+    
+    def update_oui_database(self):
+        """Update the MAC vendor OUI database"""
+        console.clear()
+        
+        # Create header
+        header_panel = Panel(
+            Align.center(
+                Text.assemble(
+                    ("🔧 MAC Vendor Database Update", "bold white")
+                )
+            ),
+            style="cyan",
+            box=box.ROUNDED,
+            padding=(1, 2)
+        )
+        console.print(header_panel)
+        console.print()
+        
+        # Show current database status
+        from utils.mac_lookup import MACLookup
+        mac_lookup = MACLookup()
+        stats = mac_lookup.get_stats()
+        
+        status_table = Table(title="Current Database Status", box=box.ROUNDED)
+        status_table.add_column("Property", style="cyan")
+        status_table.add_column("Value", style="white")
+        
+        status_table.add_row("Database Location", stats["database_file"])
+        status_table.add_row("Database Exists", "✅ Yes" if stats["database_exists"] else "❌ No")
+        status_table.add_row("Vendor Entries", f"{stats['vendor_count']:,}")
+        status_table.add_row("Database Size", f"{stats['database_size'] / 1024 / 1024:.1f} MB" if stats['database_size'] > 0 else "N/A")
+        status_table.add_row("Last Modified", stats["database_modified"])
+        
+        console.print(status_table)
+        console.print()
+        
+        # Explain what will happen
+        info_panel = Panel(
+            Text.assemble(
+                ("This will download the latest IEEE OUI database from:\n", "yellow"),
+                ("• Primary: standards-oui.ieee.org\n", "white"),
+                ("• Fallback: Wireshark's curated database\n\n", "white"),
+                ("The database contains MAC address vendor mappings for ", "dim"),
+                ("device manufacturer identification.", "dim")
+            ),
+            title="[bold]Update Information[/bold]",
+            border_style="yellow",
+            padding=(1, 2)
+        )
+        console.print(info_panel)
+        console.print()
+        
+        # Ask for confirmation
+        if not Confirm.ask("Do you want to update the MAC vendor database?", default=True):
+            console.print("\n[yellow]Update cancelled.[/yellow]")
+            input("\nPress Enter to continue...")
+            return
+        
+        # Perform the update
+        console.print("\n[cyan]Updating MAC vendor database...[/cyan]")
+        
+        try:
+            with console.status("[bold cyan]Downloading OUI database...", spinner="dots"):
+                mac_lookup.update_database()
+            
+            # Show updated stats
+            new_stats = mac_lookup.get_stats()
+            
+            success_panel = Panel(
+                Text.assemble(
+                    ("✅ Database updated successfully!\n\n", "bold green"),
+                    (f"• Vendor entries: {new_stats['vendor_count']:,}\n", "white"),
+                    (f"• Database size: {new_stats['database_size'] / 1024 / 1024:.1f} MB", "white")
+                ),
+                style="green",
+                padding=(1, 2)
+            )
+            console.print(success_panel)
+            
+        except Exception as e:
+            error_panel = Panel(
+                Text.assemble(
+                    ("❌ Failed to update database\n\n", "bold red"),
+                    (f"Error: {str(e)}", "white")
+                ),
+                style="red",
+                padding=(1, 2)
+            )
+            console.print(error_panel)
         
         input("\nPress Enter to continue...")

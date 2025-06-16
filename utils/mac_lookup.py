@@ -2,7 +2,7 @@ import os
 import platform
 import re
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -20,7 +20,7 @@ class MACLookup:
         self.oui_file = self.cache_dir / "oui.txt"
         self.vendor_cache = {}
 
-        # Load OUI database
+        # Load OUI database from local file only
         self._load_oui_database()
 
         # Virtual machine patterns
@@ -37,17 +37,12 @@ class MACLookup:
         ]
 
     def _load_oui_database(self):
-        """Load IEEE OUI database from cache or download if needed"""
-        # Check if we need to download/update
-        if self._should_update_oui():
-            print("[INFO] Updating IEEE OUI database...")
-            self._download_oui_database()
-
+        """Load IEEE OUI database from local cache file"""
         # Parse the OUI file
         if self.oui_file.exists():
             self._parse_oui_file()
         else:
-            print("[WARNING] No OUI database found. Using online lookups only.")
+            print("[WARNING] OUI database not found at cache/oui.txt. MAC vendor lookups will be limited.")
             # Fallback to minimal hardcoded database for critical vendors
             self.vendor_cache = {
                 "00:00:0c": "Cisco Systems, Inc",
@@ -59,74 +54,8 @@ class MACLookup:
                 "00:1b:21": "Intel Corporate",
             }
 
-    def _should_update_oui(self) -> bool:
-        """Check if OUI database needs updating (older than 30 days)"""
-        if not self.oui_file.exists():
-            return True
 
-        # Check file age
-        file_time = datetime.fromtimestamp(self.oui_file.stat().st_mtime)
-        age = datetime.now() - file_time
 
-        return age > timedelta(days=30)
-
-    def _download_oui_database(self):
-        """Download the IEEE OUI database"""
-        try:
-            import requests
-
-            # IEEE OUI database URL
-            url = "http://standards-oui.ieee.org/oui/oui.txt"
-
-            # Download with timeout
-            response = requests.get(url, timeout=30, stream=True)
-            response.raise_for_status()
-
-            # Write to temporary file first
-            temp_file = self.oui_file.with_suffix(".tmp")
-            with open(temp_file, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-
-            # Move to final location
-            temp_file.replace(self.oui_file)
-            print(
-                f"[INFO] OUI database updated successfully ({self.oui_file.stat().st_size // 1024} KB)"
-            )
-
-        except Exception as e:
-            print(f"[WARNING] Failed to download OUI database: {e}")
-            # Try alternative source
-            self._download_oui_alternative()
-
-    def _download_oui_alternative(self):
-        """Try alternative OUI database source"""
-        try:
-            import requests
-
-            # Alternative: Wireshark's manuf database (smaller, curated)
-            url = "https://gitlab.com/wireshark/wireshark/-/raw/master/manuf"
-
-            response = requests.get(url, timeout=30)
-            response.raise_for_status()
-
-            # Convert to OUI format and save
-            temp_file = self.oui_file.with_suffix(".tmp")
-            with open(temp_file, "w") as f:
-                for line in response.text.split("\n"):
-                    if line and not line.startswith("#"):
-                        parts = line.split("\t")
-                        if len(parts) >= 2:
-                            mac = parts[0].replace(":", "-").upper()
-                            vendor = parts[1]
-                            f.write(f"{mac}\t{vendor}\n")
-
-            temp_file.replace(self.oui_file)
-            print("[INFO] Alternative OUI database downloaded successfully")
-
-        except Exception as e:
-            print(f"[WARNING] Failed to download alternative OUI database: {e}")
 
     def _parse_oui_file(self):
         """Parse the OUI database file"""
@@ -252,57 +181,9 @@ class MACLookup:
         except Exception:
             return {}
 
-    def lookup_vendor_online(self, mac: str) -> Optional[str]:
-        """Lookup vendor using online API (requires internet)"""
-        try:
-            import requests
-
-            # Clean MAC for API
-            clean_mac = mac.replace(":", "").replace("-", "").upper()
-
-            # Try macvendors.co API (free, no key required)
-            try:
-                response = requests.get(
-                    f"https://api.macvendors.com/{clean_mac[:6]}",
-                    timeout=3,
-                    headers={"User-Agent": "NetworkMapper/2.0"},
-                )
-                if response.status_code == 200:
-                    vendor = response.text.strip()
-                    if vendor and "Not Found" not in vendor:
-                        # Cache the result
-                        oui = mac[:8].lower()
-                        self.vendor_cache[oui] = vendor
-                        return vendor
-            except Exception:
-                pass
-
-            # Alternative: maclookup.app (also free)
-            try:
-                response = requests.get(
-                    f"https://api.maclookup.app/v2/macs/{clean_mac[:6]}", timeout=3
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get("company"):
-                        vendor = data["company"]
-                        # Cache the result
-                        oui = mac[:8].lower()
-                        self.vendor_cache[oui] = vendor
-                        return vendor
-            except Exception:
-                pass
-
-        except ImportError:
-            # requests not available
-            pass
-        except Exception:
-            pass
-
-        return None
 
     def lookup(self, mac: str) -> Optional[str]:
-        """Lookup vendor by MAC address"""
+        """Lookup vendor by MAC address using local database only"""
         if not mac:
             return None
 
@@ -321,11 +202,6 @@ class MACLookup:
         # Check for virtual machine patterns
         if self._is_virtual_mac(mac):
             return "Virtual Machine"
-
-        # Try online lookup as fallback
-        vendor = self.lookup_vendor_online(mac)
-        if vendor:
-            return vendor
 
         return None
 
@@ -389,11 +265,74 @@ class MACLookup:
 
         return device
 
+    def _download_oui_database(self):
+        """Download the IEEE OUI database (manual update only)"""
+        try:
+            import requests
+
+            # IEEE OUI database URL
+            url = "http://standards-oui.ieee.org/oui/oui.txt"
+            
+            print("[INFO] Downloading IEEE OUI database from standards-oui.ieee.org...")
+            
+            # Download with timeout
+            response = requests.get(url, timeout=30, stream=True)
+            response.raise_for_status()
+
+            # Write to temporary file first
+            temp_file = self.oui_file.with_suffix(".tmp")
+            with open(temp_file, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+
+            # Move to final location
+            temp_file.replace(self.oui_file)
+            print(
+                f"[INFO] OUI database updated successfully ({self.oui_file.stat().st_size // 1024} KB)"
+            )
+
+        except Exception as e:
+            print(f"[WARNING] Failed to download OUI database: {e}")
+            # Try alternative source
+            self._download_oui_alternative()
+
+    def _download_oui_alternative(self):
+        """Try alternative OUI database source"""
+        try:
+            import requests
+
+            # Alternative: Wireshark's manuf database (smaller, curated)
+            url = "https://gitlab.com/wireshark/wireshark/-/raw/master/manuf"
+            
+            print("[INFO] Trying alternative source (Wireshark manuf database)...")
+
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            # Convert to OUI format and save
+            temp_file = self.oui_file.with_suffix(".tmp")
+            with open(temp_file, "w") as f:
+                for line in response.text.split("\n"):
+                    if line and not line.startswith("#"):
+                        parts = line.split("\t")
+                        if len(parts) >= 2:
+                            mac = parts[0].replace(":", "-").upper()
+                            vendor = parts[1]
+                            f.write(f"{mac}\t{vendor}\n")
+
+            temp_file.replace(self.oui_file)
+            print("[INFO] Alternative OUI database downloaded successfully")
+
+        except Exception as e:
+            print(f"[WARNING] Failed to download alternative OUI database: {e}")
+
     def update_database(self):
         """Manually trigger OUI database update"""
-        print("[INFO] Forcing OUI database update...")
+        print("[INFO] Manually updating OUI database...")
         self._download_oui_database()
         self._parse_oui_file()
+        print(f"[INFO] Database now contains {len(self.vendor_cache)} vendor entries")
 
     def get_stats(self) -> Dict:
         """Get statistics about the MAC lookup database"""
@@ -402,9 +341,9 @@ class MACLookup:
             "database_file": str(self.oui_file),
             "database_exists": self.oui_file.exists(),
             "database_size": self.oui_file.stat().st_size if self.oui_file.exists() else 0,
-            "database_age_days": (
-                datetime.now() - datetime.fromtimestamp(self.oui_file.stat().st_mtime)
-            ).days
+            "database_modified": (
+                datetime.fromtimestamp(self.oui_file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+            )
             if self.oui_file.exists()
-            else -1,
+            else "N/A",
         }

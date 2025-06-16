@@ -42,12 +42,13 @@ class NetworkMapper:
         self.output_path = self.base_path / "output"
         self.ensure_directories()
         self.scanner = NetworkScanner()
-        self.parser = ScanParser()
+        self.parser = ScanParser()  # Will be reconfigured based on CLI args
         self.classifier = DeviceClassifier()
         self.tracker = ChangeTracker()
         self.annotator = DeviceAnnotator()
         self.map_gen = MapGenerator()
         self.export_mgr = ExportManager(self.output_path)
+        self.cli_overrides = {}  # Will be set from main()
         self.snmp_config = SNMPConfig(self.output_path / "config")
         self.vuln_scanner = VulnerabilityScanner(self.output_path / "cache")
         self.modern_ui = ModernInterface(self)
