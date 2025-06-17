@@ -78,14 +78,14 @@ spinner() {
     local message=$2
     local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
     local i=0
-    tput civis # Hide cursor
+    tput civis
     while kill -0 $pid 2>/dev/null; do
         i=$(( (i+1) % ${#spin} ))
         printf "\r${CYAN}${BOLD} %c ${NC} %s" "${spin:$i:1}" "$message"
         sleep 0.1
     done
-    tput cnorm # Show cursor
-    printf "\r%s\n" "$(tput el)" # Clear the spinner line
+    tput cnorm
+    printf "\r%s\n" "$(tput el)"
 }
 
 check_os() {
@@ -115,21 +115,49 @@ install_system_deps() {
     log_step "📡 Checking system-wide scanning tools..."
     deps=("nmap" "masscan" "arp-scan")
     missing_deps=()
+
     for dep in "${deps[@]}"; do
-        if command_exists "$dep"; then log_info "$dep is installed."; else log_warn "$dep is NOT installed."; missing_deps+=("$dep"); fi
+        if command_exists "$dep"; then
+            log_info "$dep is installed."
+        else
+            log_warn "$dep is NOT installed."
+            missing_deps+=("$dep")
+        fi
     done
+
     if [ ${#missing_deps[@]} -ne 0 ]; then
         log_error "Missing required tools: ${missing_deps[*]}"
+        echo ""
         read -p "Attempt to install them now? (Requires sudo) (y/N) " -n 1 -r; echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then log_error "Aborting. Please install missing tools manually."; exit 1; fi
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            log_error "Aborting. Please install missing tools manually."
+            exit 1
+        fi
+
+        log_step "Requesting administrator privileges for installation..."
+        if ! sudo -v; then
+            log_error "Sudo authentication failed. Cannot proceed with installation."
+            exit 1
+        fi
+        log_info "Sudo access granted."
+
         if [[ "$OS_TYPE" == "linux" ]]; then
-            log_step "Attempting to install with apt..."; sudo apt-get update; sudo apt-get install -y "${missing_deps[@]}"
+            log_step "Installing with apt..."
+            (sudo apt-get update > /dev/null 2>&1) &
+            spinner $! "Updating package lists..."
+            (sudo apt-get install -y "${missing_deps[@]}" > /dev/null 2>&1) &
+            spinner $! "Installing ${missing_deps[*]}..."
+
         elif [[ "$OS_TYPE" == "darwin" ]]; then
             if ! command_exists brew; then log_error "Homebrew not found. Please install it: https://brew.sh/"; exit 1; fi
             log_step "Attempting to install with Homebrew..."; brew install "${missing_deps[@]}"
         fi
+
         for dep in "${missing_deps[@]}"; do
-            if ! command_exists "$dep"; then log_error "Failed to install $dep. Please install manually."; exit 1; fi
+            if ! command_exists "$dep"; then
+                log_error "Failed to install $dep. Please install it manually and re-run setup."
+                exit 1
+            fi
         done
         log_info "All system dependencies are now installed!"
     else
