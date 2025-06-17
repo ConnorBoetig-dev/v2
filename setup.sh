@@ -4,16 +4,15 @@
 #
 # A visually-enhanced, user-friendly setup experience.
 #
+# ©AngelaMos | ©CertGames.com
 
-# Exit immediately if a command exits with a non-zero status.
+
 set -e
 
-# --- Configuration ---
 PYTHON_VERSION_MAJOR=3
 PYTHON_VERSION_MINOR=8
 VENV_DIR="venv"
 
-# --- Colors for ANSI escape codes ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -21,7 +20,7 @@ BLUE='\033[0;34m'
 MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 
 log_info() { echo -e "${GREEN}${BOLD}[✓]${NC} $1"; }
@@ -70,7 +69,6 @@ EOF
     echo -e "${CYAN}======================================================================${NC}"
 }
 
-# --- Helper Functions ---
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
 spinner() {
@@ -111,23 +109,60 @@ check_python() {
     log_info "Python ${PY_VERSION_MAJOR}.${PY_VERSION_MINOR} is ready."
 }
 
+# --- New Helper Function to check path ---
+check_command_in_path() {
+    local cmd_path
+    cmd_path=$(command -v "$1")
+    if [ -z "$cmd_path" ]; then
+        return 1 # Command not found at all
+    fi
+
+    # Check if the command is in a standard system path
+    # This helps catch issues where it's installed in a non-standard location
+    # not included in the default PATH for all users.
+    case "$cmd_path" in
+        /usr/bin/*|/usr/sbin/*|/bin/*|/sbin/*|/usr/local/bin/*|/usr/local/sbin/*)
+            return 0 # It's in a standard path
+            ;;
+        *)
+            # Found, but in a weird place. This is a problem.
+            log_warn "Tool '$1' was found at '$cmd_path', which is not a standard system path."
+            log_warn "This may cause issues. Please ensure it is in /usr/bin, /usr/sbin, or a similar directory."
+            return 2 # Found, but path is suspicious
+            ;;
+    esac
+}
+
 install_system_deps() {
-    log_step "📡 Checking system-wide scanning tools..."
+    log_step "📡 Verifying system-wide scanning tools..."
     deps=("nmap" "masscan" "arp-scan")
     missing_deps=()
+    path_issue_deps=()
 
     for dep in "${deps[@]}"; do
-        if command_exists "$dep"; then
-            log_info "$dep is installed."
-        else
+        check_command_in_path "$dep"
+        local exit_code=$?
+        
+        if [ $exit_code -eq 0 ]; then
+            log_info "$dep is installed and in PATH."
+        elif [ $exit_code -eq 1 ]; then
             log_warn "$dep is NOT installed."
             missing_deps+=("$dep")
+        elif [ $exit_code -eq 2 ]; then
+            path_issue_deps+=("$dep")
         fi
     done
 
+    if [ ${#path_issue_deps[@]} -ne 0 ]; then
+        log_error "Path Issue Detected for: ${path_issue_deps[*]}"
+        echo -e "These tools are installed but not in a standard location."
+        echo -e "This can happen with manual installations or some package managers."
+        echo -e "${YELLOW}Recommendation:${NC} Please uninstall these versions and let this script (or your system's package manager) install them to a standard location like /usr/bin/."
+        exit 1
+    fi
+
     if [ ${#missing_deps[@]} -ne 0 ]; then
         log_error "Missing required tools: ${missing_deps[*]}"
-        echo ""
         read -p "Attempt to install them now? (Requires sudo) (y/N) " -n 1 -r; echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             log_error "Aborting. Please install missing tools manually."
@@ -136,7 +171,7 @@ install_system_deps() {
 
         log_step "Requesting administrator privileges for installation..."
         if ! sudo -v; then
-            log_error "Sudo authentication failed. Cannot proceed with installation."
+            log_error "Sudo authentication failed. Cannot proceed."
             exit 1
         fi
         log_info "Sudo access granted."
@@ -145,26 +180,26 @@ install_system_deps() {
             log_step "Installing with apt..."
             (sudo apt-get update > /dev/null 2>&1) &
             spinner $! "Updating package lists..."
-            log_info "Package lists updated successfully."
             (sudo apt-get install -y "${missing_deps[@]}" > /dev/null 2>&1) &
             spinner $! "Installing ${missing_deps[*]}..."
-            log_info "Packages installed successfully."
-
-
         elif [[ "$OS_TYPE" == "darwin" ]]; then
             if ! command_exists brew; then log_error "Homebrew not found. Please install it: https://brew.sh/"; exit 1; fi
             log_step "Attempting to install with Homebrew..."; brew install "${missing_deps[@]}"
         fi
 
+        log_step "Final verification of tools..."
         for dep in "${missing_deps[@]}"; do
             if ! command_exists "$dep"; then
-                log_error "Failed to install $dep. Please install it manually and re-run setup."
+                log_error "Failed to install or find '$dep' after installation attempt."
+                log_error "Please install it manually and ensure it's in your system's PATH, then re-run setup."
                 exit 1
+            else
+                log_info "$dep is now installed."
             fi
         done
-        log_info "All system dependencies are now installed!"
+        log_info "All system dependencies are now correctly installed!"
     else
-        log_info "All system dependencies are present."
+        log_info "All system dependencies are present and correctly configured."
     fi
 }
 
