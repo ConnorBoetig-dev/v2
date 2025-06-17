@@ -41,27 +41,6 @@ class AsyncNetworkScanner:
     def __init__(self):
         # Preserve all existing initialization
         self.scan_profiles = {
-            "discovery": {
-                "nmap": [
-                    "-sn",
-                    "-PE",
-                    "-PP",
-                    "-PM",
-                    "-PS80,443,22,445",
-                    "-PA80,443,22,445",
-                    "-PU53,161,123",
-                ],
-                "masscan": ["-p80,443,22,445,3389,8080,21,23,25,53,135,139,161"],
-                "description": "Multi-technique host discovery",
-            },
-            "inventory": {
-                "nmap": ["-sS", "-sV", "-O", "--top-ports", "1000"],
-                "description": "Service and OS detection",
-            },
-            "deep": {
-                "nmap": ["-PR", "-sS", "-sV", "-O", "--top-ports", "5000", "--script", "default"],
-                "description": "Deep scan with top 5000 ports + ARP discovery",
-            },
             "fast": {
                 "masscan": ["-p21,22,23,25,53,80,110,111,135,139,143,161,443,445,465,587,631,993,995,1433,1521,1723,3306,3389,5432,5900,8080,8443,9100,27017,U:53,U:67,U:68,U:69,U:123,U:161,U:500,U:514,U:520,U:1900"],
                 "nmap": [
@@ -93,10 +72,6 @@ class AsyncNetworkScanner:
                     "10s",
                 ],
                 "description": "Deeper scan for more accurate OS/service detection",
-            },
-            "os_detect": {
-                "nmap": ["-O", "--osscan-guess", "--osscan-limit", "-T4", "-n"],
-                "description": "OS detection only (for enriching existing results)",
             },
         }
         self.console = Console()

@@ -1,11 +1,31 @@
 """
-Passive Traffic Analysis Module for NetworkMapper v2
+Passive Traffic Analysis Module - Non-intrusive network monitoring and discovery
 
-This module provides passive network monitoring capabilities to:
-- Discover stealth/hidden devices
-- Map real-time traffic flows
-- Correlate services with actual usage
-- Build communication patterns
+This module provides passive network monitoring capabilities that complement
+active scanning by discovering devices and services through traffic observation.
+It captures and analyzes network packets to build a comprehensive picture of
+network activity without sending any probe packets.
+
+Key capabilities:
+- Discover stealth/hidden devices that don't respond to scans
+- Map real-time traffic flows between devices
+- Correlate services with actual usage patterns
+- Build device communication profiles
+- Detect anomalous traffic patterns
+- Identify service dependencies
+
+Design Philosophy:
+- Zero network impact (passive only)
+- Privacy conscious (no payload inspection)
+- Real-time analysis with low memory footprint
+- Complementary to active scanning
+
+The analyzer works by:
+1. Capturing packets from network interface
+2. Extracting metadata (IPs, ports, protocols)
+3. Building flow records and device profiles
+4. Correlating with DNS and ARP data
+5. Generating traffic flow matrices
 """
 
 import ipaddress
@@ -48,7 +68,26 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TrafficFlow:
-    """Represents a traffic flow between two endpoints"""
+    """
+    Represents a traffic flow between two endpoints.
+    
+    A flow is defined by the 5-tuple: (src_ip, dst_ip, src_port, dst_port, protocol)
+    and accumulates statistics about packets and bytes transferred. This data
+    structure enables flow-based analysis similar to NetFlow/IPFIX.
+    
+    Attributes:
+        src_ip: Source IP address
+        dst_ip: Destination IP address
+        src_port: Source port (0 for non-TCP/UDP)
+        dst_port: Destination port (0 for non-TCP/UDP)
+        protocol: Protocol name (TCP, UDP, ICMP, etc.)
+        service: Identified service name
+        packets: Total packet count
+        bytes: Total byte count
+        start_time: When flow was first seen
+        last_seen: When flow was last active
+        dns_names: Associated DNS names for IPs
+    """
 
     src_ip: str
     dst_ip: str
@@ -63,10 +102,19 @@ class TrafficFlow:
     dns_names: Set[str] = field(default_factory=set)
 
     def __hash__(self):
+        """Make flows hashable for use in sets/dicts based on 5-tuple."""
         return hash((self.src_ip, self.dst_ip, self.src_port, self.dst_port, self.protocol))
 
     def to_dict(self) -> Dict:
-        """Convert to dictionary for serialization"""
+        """
+        Convert flow to dictionary for JSON serialization.
+        
+        Converts datetime objects to ISO format strings and sets to lists
+        for JSON compatibility.
+        
+        Returns:
+            Dictionary representation of the flow
+        """
         return {
             "src_ip": self.src_ip,
             "dst_ip": self.dst_ip,
@@ -84,7 +132,33 @@ class TrafficFlow:
 
 @dataclass
 class StealthDevice:
-    """Represents a device discovered through passive monitoring"""
+    """
+    Represents a device discovered through passive monitoring.
+    
+    Stealth devices are those not found by active scanning but observed
+    in network traffic. They might be:
+    - Firewalled devices dropping scan packets
+    - Devices with stealth mode enabled
+    - Temporary devices (DHCP clients)
+    - Devices on different VLANs observable through routing
+    
+    The profile built includes communication patterns and service usage
+    to help classify and understand these hidden devices.
+    
+    Attributes:
+        ip: IP address of the device
+        mac: MAC address if available from ARP
+        hostname: Hostname from DNS if observed
+        vendor: MAC vendor lookup result
+        first_seen: When device was first observed
+        last_seen: Most recent activity
+        services_used: Set of services this device uses
+        communication_peers: IPs this device talks to
+        total_flows: Total number of flows
+        inbound_flows: Flows initiated to this device
+        outbound_flows: Flows initiated by this device
+        ports_used: Set of ports used by this device
+    """
 
     ip: str
     mac: str = ""
@@ -102,7 +176,16 @@ class StealthDevice:
     api_intelligence: Optional[Dict] = None
 
     def to_dict(self) -> Dict:
-        """Convert to dictionary for serialization"""
+        """
+        Convert stealth device to dictionary for serialization.
+        
+        Includes all device attributes plus inferred device type based
+        on traffic patterns. Handles datetime and set conversions for
+        JSON compatibility.
+        
+        Returns:
+            Dictionary representation including guessed device type
+        """
         device_dict = {
             "ip": self.ip,
             "mac": self.mac,
@@ -127,7 +210,21 @@ class StealthDevice:
         return device_dict
 
     def guess_device_type(self) -> str:
-        """Guess device type based on traffic patterns"""
+        """
+        Guess device type based on observed traffic patterns.
+        
+        Uses heuristics based on:
+        - Flow direction ratios (inbound vs outbound)
+        - Services observed
+        - Number of communication peers
+        - Specific service indicators
+        
+        This is less accurate than active scanning but provides hints
+        for devices that can't be actively probed.
+        
+        Returns:
+            Likely device type string
+        """
         # High outbound flows suggest client/workstation
         if self.outbound_flows > self.inbound_flows * 2:
             return "workstation"
@@ -154,14 +251,40 @@ class StealthDevice:
 
 
 class PassiveTrafficAnalyzer:
-    """Passive traffic analysis for device discovery and flow mapping"""
+    """
+    Passive traffic analysis for device discovery and flow mapping.
+    
+    This analyzer captures network traffic to discover devices and map
+    communication patterns without sending any packets. It's particularly
+    useful for:
+    - Finding devices that don't respond to scans
+    - Understanding actual network usage vs configured services
+    - Detecting shadow IT and rogue devices
+    - Mapping application dependencies
+    
+    The analyzer uses multi-threading:
+    - Capture thread: Sniffs packets from network interface
+    - Processing thread: Analyzes packets and updates data structures
+    
+    Privacy is maintained by analyzing only packet headers, not payloads.
+    """
 
     def __init__(self, interface: str = None, output_path: Path = Path("output")):
-        """Initialize the traffic analyzer
-
+        """
+        Initialize the traffic analyzer.
+        
+        Sets up data structures for tracking devices and flows, initializes
+        the packet processing pipeline, and prepares the capture interface.
+        
+        The analyzer maintains several caches:
+        - Device profiles for all observed IPs
+        - Flow records for traffic analysis  
+        - ARP cache for MAC address correlation
+        - DNS cache for hostname resolution
+        
         Args:
             interface: Network interface to monitor (None for auto-detect)
-            output_path: Base output directory
+            output_path: Base output directory for results
         """
         self.interface = interface or self._detect_interface()
         self.output_path = output_path
@@ -201,7 +324,17 @@ class PassiveTrafficAnalyzer:
         }
 
     def _detect_interface(self) -> str:
-        """Auto-detect suitable network interface"""
+        """
+        Auto-detect suitable network interface for packet capture.
+        
+        Tries multiple methods:
+        1. Default route interface (most likely correct)
+        2. First non-loopback interface
+        3. Fallback to 'eth0' if all else fails
+        
+        Returns:
+            Interface name suitable for packet capture
+        """
         try:
             # Try to find default interface
             result = subprocess.run(
@@ -265,7 +398,16 @@ class PassiveTrafficAnalyzer:
         return "eth0"
 
     def _init_service_patterns(self) -> Dict[int, str]:
-        """Initialize port to service mapping"""
+        """
+        Initialize port to service mapping for traffic classification.
+        
+        Maps well-known port numbers to service names for identifying
+        traffic types. This helps classify observed flows and understand
+        what services devices are using.
+        
+        Returns:
+            Dictionary mapping port numbers to service names
+        """
         return {
             20: "ftp-data",
             21: "ftp",
@@ -310,8 +452,15 @@ class PassiveTrafficAnalyzer:
         }
 
     def start_capture(self, duration: int = 0, packet_count: int = 0) -> None:
-        """Start passive traffic capture
-
+        """
+        Start passive traffic capture.
+        
+        Initiates packet capture on the specified interface using two threads:
+        - Capture thread: Uses scapy to sniff packets from the network
+        - Processing thread: Analyzes packets and updates data structures
+        
+        This design prevents packet loss by decoupling capture from analysis.
+        
         Args:
             duration: Capture duration in seconds (0 for continuous)
             packet_count: Max packets to capture (0 for unlimited)
@@ -347,7 +496,14 @@ class PassiveTrafficAnalyzer:
         logger.info(f"Started passive traffic capture on {self.interface}")
 
     def stop_capture(self) -> None:
-        """Stop passive traffic capture"""
+        """
+        Stop passive traffic capture and enrich results.
+        
+        Gracefully shuts down capture and processing threads, then
+        enriches discovered devices with API intelligence data if
+        available. Ensures all queued packets are processed before
+        returning.
+        """
         self.running = False
         if self.capture_thread:
             self.capture_thread.join(timeout=5)
@@ -362,7 +518,18 @@ class PassiveTrafficAnalyzer:
         logger.info(f"Stopped passive traffic capture. Stats: {self.stats}")
 
     def _capture_packets(self, duration: int, packet_count: int) -> None:
-        """Capture packets using scapy with sudo wrapper"""
+        """
+        Capture packets using scapy with privilege elevation.
+        
+        Runs packet capture in a separate process with sudo to access
+        raw sockets. Captured packets are written to a temporary file
+        which is then read and processed. This approach handles the
+        privilege requirements while keeping the main process unprivileged.
+        
+        Args:
+            duration: How long to capture (0 = until stopped)
+            packet_count: Maximum packets to capture (0 = unlimited)
+        """
         import tempfile
         import subprocess
         import os

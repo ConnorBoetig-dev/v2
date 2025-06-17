@@ -44,28 +44,6 @@ except ImportError:
 class NetworkScanner:
     def __init__(self):
         self.scan_profiles = {
-            "discovery": {
-                "nmap": [
-                    "-sn",
-                    "-PE",
-                    "-PP",
-                    "-PM",
-                    "-PS80,443,22,445",
-                    "-PA80,443,22,445",
-                    "-PU53,161,123",
-                ],
-                "masscan": ["-p80,443,22,445,3389,8080,21,23,25,53,135,139,161"],
-                "description": "Multi-technique host discovery",
-            },
-            "inventory": {
-                "nmap": ["-sS", "-sV", "-O", "--top-ports", "1000"],
-                "description": "Service and OS detection",
-            },
-            "deep": {
-                # Added -PR for ARP discovery to ensure all hosts are found
-                "nmap": ["-PR", "-sS", "-sV", "-O", "--top-ports", "5000", "--script", "default"],
-                "description": "Deep scan with top 5000 ports + ARP discovery",
-            },
             "fast": {
                 # Optimized for large networks - uses masscan for discovery and limited enrichment
                 "masscan": ["-p21,22,23,25,53,80,110,111,135,139,143,161,443,445,465,587,631,993,995,1433,1521,1723,3306,3389,5432,5900,8080,8443,9100,27017,U:53,U:67,U:68,U:69,U:123,U:161,U:500,U:514,U:520,U:1900"],
@@ -99,11 +77,6 @@ class NetworkScanner:
                     "10s",  # Add script timeout for reliability
                 ],
                 "description": "Deeper scan for more accurate OS/service detection",
-            },
-            "os_detect": {
-                # Dedicated OS detection scan
-                "nmap": ["-O", "--osscan-guess", "--osscan-limit", "-T4", "-n"],
-                "description": "OS detection only (for enriching existing results)",
             },
         }
         self.console = Console()
@@ -324,25 +297,9 @@ class NetworkScanner:
 
             # Add scan type description to progress
             scan_desc = {
-                "discovery": "Quick host discovery",
-                "inventory": "Service detection (1000 ports)",
-                "deep": "Deep scan (5000 ports + scripts)",
+                "fast": "Fast scan for large networks",
+                "deeper": "Deeper scan with accurate OS/service detection",
             }.get(scan_type, scan_type.capitalize())
-
-            # Show initial scan information
-            if scan_type == "deep":
-                self.console.print(f"[yellow]Deep Scan Information:[/yellow]")
-                self.console.print(f"  • Target: {target}")
-                self.console.print(f"  • Estimated hosts: {self.total_hosts}")
-                self.console.print(
-                    f"  • Ports to scan: {'All 65535' if '-p-' in cmd else 'Top 5000'}"
-                )
-                self.console.print(f"  • Scripts enabled: Yes")
-                self.console.print(f"  • ARP discovery: Yes")
-                self.console.print(f"  • DNS resolution: Yes")
-                self.console.print(
-                    f"  • This scan will take time, progress will update as hosts complete\n"
-                )
 
             # Create progress display
             with Progress(
@@ -587,7 +544,7 @@ class NetworkScanner:
                             )
                             progress.update(task, completed=estimated_progress)
 
-                        if scan_type == "deep":
+                        if scan_type == "deeper":
                             status_msg = f"Completed: {devices_found} hosts • {ports_found} ports • {elapsed:.0f}s"
                         else:
                             status_msg = f"Found {devices_found} devices • {elapsed:.0f}s"

@@ -1,3 +1,25 @@
+"""
+Visualization Module - Network topology and traffic flow visualization data generation
+
+This module generates structured data for D3.js and Three.js network visualizations.
+It creates intelligent network topologies based on device types, relationships, and
+observed traffic patterns. The generated data supports both static topology views
+and dynamic traffic flow visualizations.
+
+Key Features:
+- Hierarchical network layout generation
+- Intelligent link creation based on device types
+- Traffic flow visualization support
+- Change tracking visualization
+- 3D coordinate generation for Three.js
+
+Design Philosophy:
+- Generate realistic network topologies
+- Minimize link overlap for clarity
+- Support both 2D and 3D visualizations
+- Enable interactive exploration
+"""
+
 import math
 import random
 from collections import defaultdict
@@ -5,9 +27,39 @@ from typing import Dict, List, Optional, Tuple
 
 
 class MapGenerator:
+    """
+    Generates visualization data for network topology displays.
+    
+    This class creates structured data suitable for rendering with D3.js
+    (2D visualization) and Three.js (3D visualization). It analyzes device
+    relationships and creates logical network topologies that reflect
+    real-world network architectures.
+    """
+    
     def generate_d3_data(self, devices: List[Dict]) -> Dict:
-        """Generate D3.js compatible network data with enhanced topology"""
-        # Group devices by subnet
+        """
+        Generate D3.js compatible network data with enhanced topology.
+        
+        Creates a force-directed graph structure with:
+        - Nodes representing devices with rich metadata
+        - Links representing logical network connections
+        - Hierarchical layout hints for better visualization
+        - Device grouping by type and criticality
+        
+        The topology generation follows networking best practices:
+        - Routers form the network backbone
+        - Switches connect to routers
+        - End devices connect to switches
+        - Application-layer connections for servers
+        
+        Args:
+            devices: List of device dictionaries from scanner
+        
+        Returns:
+            Dictionary with nodes, links, and metadata for D3.js
+        """
+        # Group devices by subnet for topology generation
+        # Subnet grouping helps create realistic network segments
         subnets = {}
         for device in devices:
             ip_parts = device["ip"].split(".")
@@ -22,29 +74,31 @@ class MapGenerator:
         links = []
         node_map = {}
 
-        # Create device nodes with enhanced metadata
+        # Create device nodes with rich metadata for visualization
+        # Each node contains all necessary data for interactive displays
         for device in devices:
             device_node = {
-                "id": device["ip"],
-                "name": device.get("hostname", device["ip"]),
-                "type": device.get("type", "unknown"),
-                "subtype": device.get("subtype", ""),
-                "critical": device.get("critical", False),
-                "services": device.get("services", []),
-                "vendor": device.get("vendor", ""),
-                "group": self._get_device_group(device),
-                "tags": device.get("tags", []),
-                "dependent_count": device.get("dependent_count", 0),
-                "uptime_days": device.get("uptime_days", 0),
-                "always_on": device.get("always_on", False),
+                "id": device["ip"],  # Unique identifier
+                "name": device.get("hostname", device["ip"]),  # Display name
+                "type": device.get("type", "unknown"),  # Device classification
+                "subtype": device.get("subtype", ""),  # Additional categorization
+                "critical": device.get("critical", False),  # Critical infrastructure flag
+                "services": device.get("services", []),  # Running services
+                "vendor": device.get("vendor", ""),  # Manufacturer
+                "group": self._get_device_group(device),  # Visual grouping
+                "tags": device.get("tags", []),  # User-defined tags
+                "dependent_count": device.get("dependent_count", 0),  # Dependency metric
+                "uptime_days": device.get("uptime_days", 0),  # Availability metric
+                "always_on": device.get("always_on", False),  # 24/7 requirement flag
             }
             nodes.append(device_node)
             node_map[device["ip"]] = device_node
 
         # Create intelligent connections based on network topology
+        # Links represent logical network relationships, not just physical connections
         self._create_network_links(devices, links, node_map)
 
-        # Calculate critical asset statistics
+        # Calculate critical asset statistics for dashboard display
         critical_stats = self._calculate_critical_stats(devices)
 
         return {
@@ -61,20 +115,33 @@ class MapGenerator:
     def generate_traffic_flow_data(
         self, devices: List[Dict], flow_matrix: Optional[Dict] = None
     ) -> Dict:
-        """Generate D3.js data with traffic flow information
-
+        """
+        Generate D3.js data with traffic flow information.
+        
+        Creates visualization data that shows actual network traffic patterns
+        discovered through passive analysis. This differs from the topology
+        view by showing real communication paths rather than logical structure.
+        
+        Flow visualization helps identify:
+        - Active communication patterns
+        - Service dependencies
+        - Unusual traffic flows
+        - Network bottlenecks
+        
         Args:
             devices: List of devices including passive discoveries
             flow_matrix: Optional traffic flow matrix from passive analysis
+                        Format: {source_ip: {dest_ip: flow_count}}
 
         Returns:
-            Enhanced D3.js data with traffic flows
+            Enhanced D3.js data with traffic flow links and metrics
         """
-        # For traffic flow visualization, we start fresh and only show real connections
+        # For traffic flow visualization, we show only observed connections
+        # This provides a true picture of network communication patterns
         nodes = []
         node_map = {}
 
-        # Create nodes with enhanced metadata
+        # Create nodes with traffic-specific metadata
         for device in devices:
             device_node = {
                 "id": device["ip"],
@@ -166,9 +233,20 @@ class MapGenerator:
         }
 
     def _merge_links(self, traffic_links: List[Dict], topology_links: List[Dict]) -> List[Dict]:
-        """Merge traffic flow links with topology links
-
-        Prefers traffic flow links when both exist between same nodes
+        """
+        Merge traffic flow links with topology links.
+        
+        Combines actual observed traffic flows with inferred topology connections,
+        preferring real traffic data when both exist between the same nodes.
+        This creates a comprehensive view showing both actual usage and logical
+        network structure.
+        
+        Args:
+            traffic_links: Links from passive traffic analysis
+            topology_links: Links from topology inference
+        
+        Returns:
+            Merged list with duplicates removed, traffic flows prioritized
         """
         # Create a set of node pairs that have traffic flows
         traffic_pairs = set()
@@ -187,7 +265,31 @@ class MapGenerator:
         return merged
 
     def _get_device_group(self, device: Dict) -> int:
-        """Assign group based on device characteristics and criticality"""
+        """
+        Assign visual group based on device characteristics and criticality.
+        
+        Groups are used for:
+        - Visual clustering in force-directed layouts
+        - Color coding in visualizations
+        - Determining node importance/size
+        - Layout positioning hints
+        
+        Group hierarchy:
+        1. Critical infrastructure (routers, firewalls)
+        2. Core services (switches, domain controllers)
+        3. Critical services with dependencies
+        4. Server infrastructure
+        5. Industrial/OT systems
+        6. End user devices
+        7. IoT devices
+        8. Unknown/other
+        
+        Args:
+            device: Device dictionary with type and metadata
+        
+        Returns:
+            Group number (1-8) for visualization grouping
+        """
         device_type = device.get("type", "unknown")
         subtype = device.get("subtype", "")
         is_critical = device.get("critical", False)
@@ -228,7 +330,8 @@ class MapGenerator:
         For small networks without infrastructure devices, no connections are created
         unless there's actual traffic flow data available.
         """
-        # Categorize devices
+        # Categorize devices by type for topology generation
+        # This classification drives the connection logic
         routers = [d for d in devices if d.get("type") == "router"]
         switches = [d for d in devices if d.get("type") == "switch"]
         servers = [
@@ -377,7 +480,24 @@ class MapGenerator:
                     )
 
     def generate_threejs_data(self, devices: List[Dict]) -> Dict:
-        """Generate Three.js 3D visualization data with improved positioning"""
+        """
+        Generate Three.js 3D visualization data with layered positioning.
+        
+        Creates a 3D network topology with:
+        - Vertical layers by device type (routers at top, workstations at bottom)
+        - Circular arrangement within each layer
+        - Color coding by device type
+        - Curved connections between layers
+        
+        The 3D view provides better separation of device types and reduces
+        visual clutter compared to 2D layouts.
+        
+        Args:
+            devices: List of device dictionaries
+        
+        Returns:
+            Dictionary with positions, colors, labels, and connections for Three.js
+        """
         if not devices:
             return {
                 "positions": [],
@@ -507,7 +627,23 @@ class MapGenerator:
         }
 
     def _create_3d_connections(self, devices: List[Dict], positions: Dict, connections: List[Dict]):
-        """Create 3D connections with visual variety"""
+        """
+        Create 3D connections with visual variety and network hierarchy.
+        
+        Generates curved connections between devices with different styles:
+        - Backbone: Thick red lines between routers
+        - Uplinks: Medium cyan lines from switches to routers
+        - Server: Blue lines for server connections
+        - Access: Green lines for workstation connections
+        - Peripheral: Yellow lines for IoT/printer connections
+        
+        Connection thickness and opacity indicate importance and traffic volume.
+        
+        Args:
+            devices: List of all devices
+            positions: Dictionary mapping IPs to 3D positions
+            connections: List to append connection data to
+        """
         # Categorize devices
         routers = [d for d in devices if d.get("type") == "router"]
         switches = [d for d in devices if d.get("type") == "switch"]
@@ -593,7 +729,23 @@ class MapGenerator:
                     add_connection(web_server, db_server, "server")
 
     def _ip_distance(self, ip1: str, ip2: str) -> int:
-        """Calculate Manhattan distance between IPs for logical proximity"""
+        """
+        Calculate weighted Manhattan distance between IPs for logical proximity.
+        
+        Uses weighted octets to prioritize subnet locality:
+        - Same subnet (first 3 octets) = very close
+        - Different subnets = progressively farther
+        
+        This helps create realistic topologies where devices in the same
+        subnet tend to connect to the same infrastructure.
+        
+        Args:
+            ip1: First IP address
+            ip2: Second IP address
+        
+        Returns:
+            Integer distance value (lower = closer)
+        """
         try:
             parts1 = [int(p) for p in ip1.split(".")]
             parts2 = [int(p) for p in ip2.split(".")]
@@ -606,7 +758,18 @@ class MapGenerator:
             return 999999  # Large distance for invalid IPs
 
     def _count_types(self, devices: List[Dict]) -> Dict[str, int]:
-        """Count devices by type"""
+        """
+        Count devices by type for summary statistics.
+        
+        Simple aggregation used in metadata generation to show
+        network composition at a glance.
+        
+        Args:
+            devices: List of device dictionaries
+        
+        Returns:
+            Dictionary mapping device types to counts
+        """
         counts = {}
         for device in devices:
             dtype = device.get("type", "unknown")
@@ -614,7 +777,24 @@ class MapGenerator:
         return counts
     
     def _calculate_critical_stats(self, devices: List[Dict]) -> Dict:
-        """Calculate statistics about critical assets"""
+        """
+        Calculate comprehensive statistics about critical assets.
+        
+        Analyzes critical infrastructure to provide insights on:
+        - Total critical device count
+        - High-dependency devices (many dependents)
+        - Always-on requirements
+        - Long uptime devices (stability indicators)
+        - Distribution by device type
+        
+        These metrics help prioritize security efforts and maintenance windows.
+        
+        Args:
+            devices: List of device dictionaries
+        
+        Returns:
+            Dictionary with critical asset statistics
+        """
         stats = {
             "total_critical": 0,
             "high_dependency": 0,  # >20 dependents
@@ -652,7 +832,26 @@ class MapGenerator:
         return stats
 
     def generate_subnet_topology(self, devices: List[Dict]) -> Dict:
-        """Generate subnet-level topology view"""
+        """
+        Generate subnet-level topology view for network segmentation analysis.
+        
+        Aggregates devices by /24 subnets to show:
+        - Device distribution across subnets
+        - Device type composition per subnet
+        - Critical asset distribution
+        - Subnet utilization
+        
+        This high-level view helps identify:
+        - Network segmentation effectiveness
+        - Subnet purposes (server farm, user segment, etc.)
+        - Critical asset concentration risks
+        
+        Args:
+            devices: List of device dictionaries
+        
+        Returns:
+            Dictionary with subnet analysis data
+        """
         subnets = {}
 
         for device in devices:

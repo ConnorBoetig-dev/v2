@@ -1,7 +1,19 @@
-"""Device classification module for identifying network device types.
+"""
+Device Classification Module - AI-powered device type identification
 
-This module analyzes device characteristics (ports, services, OS, vendor)
-to determine the most likely device type.
+This module implements a sophisticated pattern-matching engine that analyzes multiple
+device characteristics to determine the most likely device type. The classification
+process uses a weighted scoring system based on port signatures, running services,
+vendor information, and OS fingerprints.
+
+Key Design Principles:
+- Signature-based matching with confidence scoring
+- Priority-ordered evaluation (routers before switches, etc.)
+- Fallback classification for unknown devices
+- Extensible signature system for new device types
+
+The classifier is designed to handle ambiguous cases where devices may match
+multiple signatures, using priority and confidence scores to make the best decision.
 """
 
 import logging
@@ -15,37 +27,71 @@ logger = logging.getLogger(__name__)
 
 
 class DeviceType(Enum):
-    """Enumeration of supported device types."""
-
-    ROUTER = "router"
-    SWITCH = "switch"
-    FIREWALL = "firewall"
-    DATABASE = "database"
-    WEB_SERVER = "web_server"
-    MAIL_SERVER = "mail_server"
-    DNS_SERVER = "dns_server"
-    DOMAIN_CONTROLLER = "domain_controller"
-    WINDOWS_SERVER = "windows_server"
-    LINUX_SERVER = "linux_server"
-    PRINTER = "printer"
-    NAS = "nas"
-    HYPERVISOR = "hypervisor"
-    WORKSTATION = "workstation"
-    IOT = "iot"
-    VOIP = "voip"
-    MEDIA_SERVER = "media_server"
-    UPS = "ups"
-    PLC = "plc"
-    SCADA = "scada"
-    NTP_SERVER = "ntp_server"
-    MONITORING_SERVER = "monitoring_server"
-    BACKUP_SERVER = "backup_server"
-    UNKNOWN = "unknown"
+    """
+    Enumeration of supported device types.
+    
+    Each type represents a distinct category of network device with unique
+    characteristics and security implications. The order here doesn't affect
+    classification priority - that's controlled by DeviceSignature.priority.
+    """
+    
+    # Network Infrastructure (typically high-priority, critical devices)
+    ROUTER = "router"              # Layer 3 routing devices, gateways
+    SWITCH = "switch"              # Layer 2 switching devices
+    FIREWALL = "firewall"          # Security appliances, UTM devices
+    
+    # Server Types (application and service hosts)
+    DATABASE = "database"          # MySQL, PostgreSQL, Oracle, etc.
+    WEB_SERVER = "web_server"      # Apache, nginx, IIS web servers
+    MAIL_SERVER = "mail_server"    # SMTP, POP3, IMAP servers
+    DNS_SERVER = "dns_server"      # Domain name resolution servers
+    DOMAIN_CONTROLLER = "domain_controller"  # Active Directory, LDAP
+    WINDOWS_SERVER = "windows_server"        # General Windows servers
+    LINUX_SERVER = "linux_server"            # General Linux servers
+    
+    # Specialized Devices
+    PRINTER = "printer"            # Network printers, MFPs
+    NAS = "nas"                    # Network Attached Storage
+    HYPERVISOR = "hypervisor"      # VMware, Hyper-V, Proxmox hosts
+    WORKSTATION = "workstation"    # End-user computers
+    IOT = "iot"                    # Internet of Things devices
+    VOIP = "voip"                  # VoIP phones, PBX systems
+    MEDIA_SERVER = "media_server"  # Streaming, media services
+    
+    # Industrial/Utility Systems
+    UPS = "ups"                    # Uninterruptible Power Supplies
+    PLC = "plc"                    # Programmable Logic Controllers
+    SCADA = "scada"                # Supervisory Control systems
+    
+    # Support Services
+    NTP_SERVER = "ntp_server"      # Time synchronization servers
+    MONITORING_SERVER = "monitoring_server"  # Nagios, Zabbix, etc.
+    BACKUP_SERVER = "backup_server"          # Backup systems
+    
+    # Fallback category
+    UNKNOWN = "unknown"            # Unclassified devices
 
 
 @dataclass
 class DeviceSignature:
-    """Device type signature definition."""
+    """
+    Device type signature definition.
+    
+    A signature represents the characteristic pattern of a device type,
+    used for matching against discovered devices. Higher priority signatures
+    are evaluated first, and confidence scores determine match quality.
+    
+    Attributes:
+        device_type: The DeviceType this signature identifies
+        ports: List of characteristic open ports (any match counts)
+        services: List of expected service names (any match counts)
+        keywords: Keywords to search in hostname, OS, or vendor strings
+        exclude_ports: Ports that should NOT be present (e.g., 3389 excludes servers from workstation classification)
+        vendor_patterns: List of vendor names that strongly indicate this type
+        priority: Higher priority signatures are checked first (0-100)
+        max_ports: Maximum number of open ports expected (helps identify simple devices)
+        min_confidence: Minimum confidence score required for classification
+    """
 
     device_type: DeviceType
     ports: List[int] = field(default_factory=list)
@@ -53,9 +99,9 @@ class DeviceSignature:
     keywords: List[str] = field(default_factory=list)
     exclude_ports: List[int] = field(default_factory=list)
     vendor_patterns: List[str] = field(default_factory=list)
-    priority: int = 50
-    max_ports: Optional[int] = None
-    min_confidence: float = 0.3
+    priority: int = 50  # Default middle priority
+    max_ports: Optional[int] = None  # No limit by default
+    min_confidence: float = 0.3  # 30% minimum confidence required
 
 
 class DeviceClassifier:
@@ -409,18 +455,44 @@ class DeviceClassifier:
         }
 
     def classify_devices(self, devices: List[Dict]) -> List[Dict]:
-        """Classify a list of devices.
+        """
+        Classify a list of devices based on their network characteristics.
+        
+        This is the main entry point for device classification. Each device is
+        analyzed independently using signature matching, and the results include
+        both the device type and a confidence score.
+        
+        The classification process:
+        1. Extract device characteristics (ports, services, OS, vendor)
+        2. Score against all signatures
+        3. Apply service hints for quick wins
+        4. Select highest scoring classification
+        5. Add metadata about classification method
 
         Args:
-            devices: List of device dictionaries
+            devices: List of device dictionaries from scanner containing:
+                - ip: IP address
+                - open_ports: List of open port numbers
+                - services: List of service names
+                - os: Operating system string (optional)
+                - vendor: Vendor from MAC lookup (optional)
+                - hostname: Device hostname (optional)
 
         Returns:
-            Updated device list with type and confidence fields
+            Updated device list with additional fields:
+                - type: Device type string (e.g., "router", "web_server")
+                - confidence: Classification confidence (0.0-1.0)
+                - classification_method: How the device was classified
         """
         classified = []
         for device in devices:
+            # Create a copy to avoid modifying the original
             classified_device = device.copy()
+            
+            # Perform classification
             device_type, confidence = self._classify_single_device(device)
+            
+            # Add classification results
             classified_device["type"] = device_type.value
             classified_device["confidence"] = confidence
             classified_device["classification_method"] = self._get_classification_method(

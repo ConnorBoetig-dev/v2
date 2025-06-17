@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  networkmapper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: networkmapper:v2
+    container_name: networkmapper
+    
+    # Network mode - host is required for network scanning
+    network_mode: host
+    
+    # Privileges needed for raw socket access
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_PTRACE
+    
+    # Environment variables
+    environment:
+      # Network interface (auto-detected if not set)
+      - INTERFACE=${INTERFACE:-}
+      # Timezone
+      - TZ=${TZ:-UTC}
+      # Python settings
+      - PYTHONUNBUFFERED=1
+      # NetworkMapper settings
+      - NETWORKMAPPER_LOGLEVEL=${LOGLEVEL:-INFO}
+    
+    # Volumes
+    volumes:
+      # Output directory - persists scan results
+      - ./output:/app/output
+      # Optional: Mount custom config
+      - ./config.yaml:/app/config.yaml:ro
+      # Optional: For debugging
+      # - ./logs:/app/logs
+    
+    # Interactive terminal
+    stdin_open: true
+    tty: true
+    
+    # Resource limits (optional)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Optional: Web UI service for viewing reports
+  networkmapper-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: networkmapper:v2
+    container_name: networkmapper-web
+    
+    # Run Flask server for web reports
+    command: ["python3", "-m", "flask", "run", "--host=0.0.0.0"]
+    
+    # Environment for Flask
+    environment:
+      - FLASK_APP=mapper.py
+      - FLASK_ENV=production
+    
+    # Port mapping
+    ports:
+      - "5000:5000"
+    
+    # Volumes
+    volumes:
+      - ./output:/app/output:ro
+    
+    # Only start if explicitly requested
+    profiles:
+      - web
+
+# Optional: Named volumes for persistence
+volumes:
+  output:
+    driver: local

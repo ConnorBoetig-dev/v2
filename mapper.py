@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """
-NetworkMapper 2.0 - Network Discovery and Mapping Tool
+NetworkMapper 2.0 - Main Application Entry Point
+
+This is the primary CLI interface for NetworkMapper, a comprehensive network discovery
+and asset management tool. It orchestrates all major components including scanning,
+classification, change tracking, and visualization.
+
+Architecture Overview:
+- Uses Typer for CLI argument parsing and command structure
+- Rich library for beautiful terminal output and interactive menus
+- Modular design with separate components for each major function
+- All data persisted as JSON for portability and debugging
+
+Key Design Decisions:
+- Interactive menu-driven interface for ease of use
+- Wizard-style workflows guide users through complex operations
+- Automatic report generation and browser opening for results
+- CLI arguments can override interactive prompts for automation
 """
 
 import csv
@@ -18,60 +34,100 @@ from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
-from core.annotator import DeviceAnnotator
-from core.classifier import DeviceClassifier
-from core.parser import ScanParser
-from core.scanner import NetworkScanner
-from core.tracker import ChangeTracker
-from utils.export_manager import ExportManager
-from utils.snmp_config import SNMPConfig
-from utils.traffic_analyzer import PassiveTrafficAnalyzer
-from utils.visualization import MapGenerator
-from utils.vulnerability_scanner import VulnerabilityScanner
-from utils.scan_status import ScanStatusIndicator
-from modern_interface import ModernInterface
+# Core functionality imports
+from core.annotator import DeviceAnnotator      # Device annotation and tagging
+from core.classifier import DeviceClassifier    # AI device type identification
+from core.parser import ScanParser              # Parse scanner outputs
+from core.scanner import NetworkScanner         # Multi-tool scan orchestration
+from core.tracker import ChangeTracker          # Network change detection
 
-# Import friendly error handling
+# Utility imports
+from utils.export_manager import ExportManager  # Multi-format data export
+from utils.snmp_config import SNMPConfig        # SNMP credential management
+from utils.traffic_analyzer import PassiveTrafficAnalyzer  # Packet capture analysis
+from utils.visualization import MapGenerator    # D3.js/Three.js visualizations
+from utils.vulnerability_scanner import VulnerabilityScanner  # CVE correlation
+from utils.scan_status import ScanStatusIndicator  # Visual scan progress
+from modern_interface import ModernInterface    # Alternative UI (experimental)
+
+# Import friendly error handling with fallback
 try:
     from utils.friendly_errors import FriendlyError, format_error_for_user
 except ImportError:
+    # Graceful fallback if error handling module is missing
     FriendlyError = Exception
     format_error_for_user = str
 
+# Initialize CLI app and console
 app = typer.Typer()
 console = Console()
 logger = logging.getLogger(__name__)
 
 
 class NetworkMapper:
+    """
+    Main application class that coordinates all NetworkMapper functionality.
+    
+    This class serves as the central hub, instantiating all necessary components
+    and providing the interactive menu system. It manages the application lifecycle
+    and ensures proper initialization of all subsystems.
+    """
+    
     def __init__(self):
+        """
+        Initialize NetworkMapper with all required components.
+        
+        Sets up:
+        - Directory structure for outputs
+        - Core scanning and analysis components
+        - Utility services (export, visualization, etc.)
+        - Configuration management
+        """
+        # Establish base paths
         self.base_path = Path(__file__).parent
         self.output_path = self.base_path / "output"
         self.ensure_directories()
-        self.scanner = NetworkScanner()
-        self.parser = ScanParser()  # Will be reconfigured based on CLI args
-        self.classifier = DeviceClassifier()
-        self.tracker = ChangeTracker()
-        self.annotator = DeviceAnnotator()
-        self.map_gen = MapGenerator()
-        self.export_mgr = ExportManager(self.output_path)
-        self.cli_overrides = {}  # Will be set from main()
-        self.snmp_config = SNMPConfig(self.output_path / "config")
-        self.vuln_scanner = VulnerabilityScanner(self.output_path / "cache")
-        self.modern_ui = ModernInterface(self)
-        self.traffic_analyzer = PassiveTrafficAnalyzer(output_path=self.output_path)
-        self.cli_overrides = {}
-        self.last_changes = None
-        self.passive_analysis_results = None
+        
+        # Initialize core components
+        self.scanner = NetworkScanner()             # Network scanning orchestration
+        self.parser = ScanParser()                  # Parse scan results
+        self.classifier = DeviceClassifier()        # Classify device types
+        self.tracker = ChangeTracker()              # Track network changes
+        self.annotator = DeviceAnnotator()          # Manage device annotations
+        
+        # Initialize utility components
+        self.map_gen = MapGenerator()               # Generate network visualizations
+        self.export_mgr = ExportManager(self.output_path)  # Handle data exports
+        self.snmp_config = SNMPConfig(self.output_path / "config")  # SNMP settings
+        self.vuln_scanner = VulnerabilityScanner(self.output_path / "cache")  # CVE lookup
+        self.traffic_analyzer = PassiveTrafficAnalyzer(output_path=self.output_path)  # Packet analysis
+        
+        # UI components
+        self.modern_ui = ModernInterface(self)      # Alternative interface (experimental)
+        
+        # State management
+        self.cli_overrides = {}                     # CLI argument overrides
+        self.last_changes = None                    # Cache last change detection results
+        self.passive_analysis_results = None        # Cache traffic analysis results
 
     def ensure_directories(self):
-        """Create output directories if they don't exist"""
+        """
+        Create required output directories if they don't exist.
+        
+        Directory structure:
+        output/
+        ├── scans/      # Raw scan data (JSON)
+        ├── reports/    # HTML reports and visualizations
+        ├── changes/    # Change tracking data
+        ├── config/     # Configuration files (SNMP, etc.)
+        └── cache/      # Cached data (vulnerability DB, etc.)
+        """
         dirs = [
-            self.output_path / "scans",
-            self.output_path / "reports",
-            self.output_path / "changes",
-            self.output_path / "config",
-            self.output_path / "cache",
+            self.output_path / "scans",      # Raw scan results
+            self.output_path / "reports",    # Generated reports
+            self.output_path / "changes",    # Change tracking
+            self.output_path / "config",     # Configuration storage
+            self.output_path / "cache",      # Temporary/cached data
         ]
         for d in dirs:
             d.mkdir(parents=True, exist_ok=True)
@@ -126,25 +182,44 @@ class NetworkMapper:
                     break
 
     def run_scan_wizard(self):
-        """Interactive scan wizard with improved UX"""
+        """
+        Interactive scan wizard that guides users through network scanning.
+        
+        This wizard implements a step-by-step process for configuring and executing
+        a network scan. It handles all user inputs with validation and provides
+        clear feedback throughout the process.
+        
+        Workflow:
+        1. Target selection (IP/CIDR/hostname)
+        2. Scan type selection (fast vs deeper)
+        3. Optional SNMP configuration
+        4. Optional vulnerability scanning
+        5. Optional passive traffic analysis
+        6. Execute scan with progress tracking
+        7. Post-process results (classification, enrichment)
+        8. Generate and display reports
+        
+        The wizard respects CLI overrides when present, allowing for automation
+        while maintaining the interactive experience for manual users.
+        """
         console.print("\n[bold cyan]Network Scan Wizard[/bold cyan]")
 
-        # Get target with validation
+        # Step 1: Get and validate scan target
         target = self._get_scan_target()
 
-        # Select scan type with clear descriptions
+        # Step 2: Select scan profile (fast or deeper)
         scan_type, scan_name, needs_root, use_masscan = self._select_scan_type()
 
-        # Interactive SNMP setup (unless disabled via CLI)
+        # Step 3: Configure SNMP if not disabled via CLI
         snmp_enabled, snmp_config = self._handle_snmp_setup()
 
-        # Interactive vulnerability scanning setup
+        # Step 4: Enable/disable vulnerability correlation
         vuln_enabled = self._handle_vulnerability_setup()
 
-        # Passive traffic analysis setup
+        # Step 5: Configure passive traffic analysis
         passive_enabled, passive_duration = self._handle_passive_analysis_setup()
 
-        # Run scan
+        # Generate timestamp for this scan session
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # Create status indicator

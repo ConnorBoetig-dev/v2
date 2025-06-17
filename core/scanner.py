@@ -1,18 +1,27 @@
 """
-Network Scanner Module - Now with parallel/async execution for 5-10x performance improvement
+Network Scanner Module - Synchronous wrapper for async network scanning operations
 
-This module provides the NetworkScanner class that orchestrates network discovery
-using multiple scanning tools (nmap, masscan, arp-scan) with parallel execution.
+This module serves as the primary interface for network discovery operations in NetworkMapper.
+It provides a backward-compatible synchronous API while leveraging asynchronous operations
+internally for massive performance improvements (5-10x for large networks).
 
-The implementation now uses asyncio for concurrent subnet scanning, parallel enrichment,
-and asynchronous SNMP queries while maintaining full backward compatibility.
+Key Design Decisions:
+- Wraps AsyncNetworkScanner to maintain backward compatibility with existing code
+- Automatically handles event loop creation/management for sync contexts
+- Preserves the simple scan() interface while enabling parallel subnet scanning
+- Supports both CLI usage (sync) and potential future async integrations
+
+Architecture Notes:
+- This is a thin wrapper - all actual scanning logic lives in scanner_async.py
+- Event loop detection ensures it works in both sync and async contexts
+- Cleanup operations are guaranteed through try/finally blocks
 """
 
 import asyncio
 import logging
 from typing import Dict, List, Optional
 
-# Import the async implementation
+# Import the async implementation that contains all the actual scanning logic
 from .scanner_async import AsyncNetworkScanner
 
 # Configure logging
@@ -30,7 +39,7 @@ class NetworkScanner(AsyncNetworkScanner):
     - SNMP queries (concurrent SNMP operations)
 
     All existing functionality is preserved including:
-    - All scan profiles (discovery, inventory, deep, fast, os_detect)
+    - Scan profiles (fast, deeper)
     - Progress tracking with Rich console
     - Real-time output parsing
     - Sudo authentication handling
@@ -52,36 +61,67 @@ class NetworkScanner(AsyncNetworkScanner):
         This method maintains the synchronous interface for backward compatibility
         while leveraging async operations internally for parallel execution.
 
+        The method intelligently detects the execution context:
+        - In async context: Returns a future that can be awaited
+        - In sync context: Creates an event loop and blocks until completion
+
         Args:
-            target: Network target (IP, CIDR, hostname)
-            scan_type: Type of scan (discovery, inventory, deep, fast, os_detect)
-            use_masscan: Use masscan for discovery (faster for large networks)
-            needs_root: Whether scan requires root privileges
-            snmp_config: SNMP configuration for device enrichment
+            target: Network target specification
+                - Single IP: "192.168.1.1"
+                - CIDR notation: "192.168.1.0/24" or "10.0.0.0/16"
+                - Hostname: "example.com"
+                - Special: "localnet" for local network detection
+            scan_type: Scanning profile to use
+                - "fast": Quick scan with minimal service detection (2-5 min)
+                - "deeper": Comprehensive scan with OS/service fingerprinting (5-15 min)
+            use_masscan: Enable masscan for initial host discovery
+                - True: Use masscan (100k pps) then enrich with nmap
+                - False: Use nmap only (slower but more compatible)
+            needs_root: Whether scan requires root/sudo privileges
+                - True: For SYN scans, OS detection, masscan
+                - False: For basic TCP connect scans
+            snmp_config: Optional SNMP enrichment configuration
+                - {"community": "public", "version": "v2c", "enabled": True}
+                - None: Skip SNMP enrichment
 
         Returns:
-            List of discovered devices with enriched information
+            List of discovered devices, each containing:
+                - ip: IP address
+                - mac: MAC address (if available)
+                - hostname: Resolved hostname
+                - open_ports: List of open TCP/UDP ports
+                - services: List of detected services
+                - os: Operating system guess
+                - vendor: Vendor from MAC OUI lookup
+                - type: Device type classification
+
+        Raises:
+            RuntimeError: If scanner binaries not found
+            PermissionError: If sudo required but not available
+            NetworkError: If target unreachable or invalid
         """
         # Check if we're already in an event loop (async context)
         try:
             loop = asyncio.get_running_loop()
-            # We're in an async context, create a task
+            # We're in an async context, create a task that can be awaited
             logger.info("Running scan in existing event loop")
             future = asyncio.ensure_future(
                 super().scan(target, scan_type, use_masscan, needs_root, snmp_config)
             )
-            # Can't use run_until_complete in existing loop
-            # Return a coroutine for the caller to await
+            # Return the future for the async caller to await
+            # This allows the scanner to work in async contexts (e.g., web apps)
             return future
         except RuntimeError:
-            # No event loop, create one for sync execution
+            # No event loop exists - we're in a synchronous context (CLI usage)
+            # Create a new event loop for this scan operation
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
             try:
                 logger.info(f"Starting parallel scan of {target} with type {scan_type}")
 
-                # Run async scan
+                # Execute the async scan operation in the new event loop
+                # This blocks until the scan completes (expected behavior for CLI)
                 result = loop.run_until_complete(
                     super().scan(target, scan_type, use_masscan, needs_root, snmp_config)
                 )
@@ -90,13 +130,26 @@ class NetworkScanner(AsyncNetworkScanner):
                 return result
 
             finally:
-                # Clean up
-                self.cleanup_all_temp_files()
-                loop.close()
-                asyncio.set_event_loop(None)
+                # Critical cleanup to prevent resource leaks
+                # Always execute regardless of scan success/failure
+                self.cleanup_all_temp_files()  # Remove any temporary scan files
+                loop.close()  # Close the event loop
+                asyncio.set_event_loop(None)  # Reset the event loop context
 
     def get_scan_progress(self) -> Dict[str, any]:
-        """Get current scan progress information"""
+        """
+        Get current scan progress information.
+        
+        Used by the UI to display real-time scan progress. This method
+        provides a snapshot of the current scan state without blocking.
+        
+        Returns:
+            Dictionary containing:
+                - total_hosts: Estimated total hosts in target network
+                - completed_hosts: Number of hosts scanned so far
+                - percentage: Completion percentage (0-100)
+                - hang_detected: Whether scan appears to be hung
+        """
         return {
             "total_hosts": self.total_hosts,
             "completed_hosts": self.hosts_completed,
@@ -108,7 +161,20 @@ class NetworkScanner(AsyncNetworkScanner):
 
     @property
     def parallel_performance_info(self) -> Dict[str, any]:
-        """Get information about parallel execution capabilities"""
+        """
+        Get information about parallel execution capabilities.
+        
+        This property exposes the internal concurrency limits and expected
+        performance characteristics. Useful for debugging and optimization.
+        
+        Returns:
+            Dictionary containing concurrency limits and performance metrics:
+                - max_concurrent_subnets: How many /24 subnets scan in parallel
+                - max_concurrent_enrichment: Parallel nmap enrichment limit
+                - max_concurrent_snmp: Simultaneous SNMP queries allowed
+                - async_enabled: Always True for this implementation
+                - expected_performance_gain: Typical speedup vs sequential
+        """
         return {
             "max_concurrent_subnets": self._scan_semaphore._value,
             "max_concurrent_enrichment": self._enrich_semaphore._value,
@@ -118,5 +184,5 @@ class NetworkScanner(AsyncNetworkScanner):
         }
 
 
-# For backward compatibility, ensure the sync methods work as expected
+# Export only the main class to prevent confusion between sync/async versions
 __all__ = ["NetworkScanner"]

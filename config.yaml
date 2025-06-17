@@ -1,69 +1,183 @@
-# NetworkMapper v2 Configuration
+# NetworkMapper v2 Configuration File
+#
+# This file contains default configuration options for NetworkMapper.
+# All settings can be overridden via command-line arguments or
+# environment variables. The configuration is loaded at startup
+# and affects various aspects of scanning, reporting, and visualization.
+#
+# Configuration precedence (highest to lowest):
+# 1. Command-line arguments
+# 2. Environment variables (NETWORKMAPPER_*)
+# 3. This configuration file
+# 4. Hard-coded defaults
+#
+# Note: This file is NOT required. NetworkMapper will use sensible
+# defaults if this file is missing or incomplete.
 
 # Default scan settings
+# These control the default behavior of network scans
 scan:
-  example_target: "192.168.1.0/24"  # Just an example format
+  # Example target format - NOT USED IN ACTUAL SCANS
+  # Shows users the expected format for network targets
+  example_target: "192.168.1.0/24"  # Supports: IPs, CIDR, ranges, hostnames
+  
+  # Default scan type when not specified
+  # Options: "discovery", "fast", "deeper"
   default_type: "discovery"
-  timeout: 300  # seconds
+  
+  # Global scan timeout in seconds
+  # Individual scanner timeouts may be shorter
+  timeout: 300  # 5 minutes default
+  
+  # Number of retry attempts for failed scans
+  # Applies to network errors, not scan failures
   retry_attempts: 2
 
 # Scanner preferences
+# Controls behavior of individual scanning tools (nmap, masscan, arp-scan)
 scanners:
-  prefer_masscan: false  # Use masscan for discovery when available
-  nmap_timing: "-T4"     # Nmap timing template (T0-T5)
+  # Prefer masscan for initial discovery phase
+  # masscan is faster but less accurate than nmap
+  prefer_masscan: false  # Set to true for large networks
+  
+  # Nmap timing template
+  # T0=paranoid, T1=sneaky, T2=polite, T3=normal, T4=aggressive, T5=insane
+  nmap_timing: "-T4"     # Aggressive by default for speed
   
   # Masscan optimization for large networks
-  masscan_rate: 25000  # Default packet rate for masscan
-  masscan_rate_large: 50000  # Rate for /16 or larger networks
-  large_network_threshold: 10000  # Networks with > 10k IPs get optimized settings
+  # These settings balance speed vs network impact
+  
+  # Default packet rate for masscan (packets/second)
+  # Higher = faster but more network load
+  masscan_rate: 25000  # Conservative default
+  
+  # Increased rate for large networks where speed matters
+  masscan_rate_large: 50000  # /16 or larger networks
+  
+  # Threshold for "large network" optimizations
+  # Networks with more IPs than this get special handling
+  large_network_threshold: 10000  # ~4 Class B subnets
   
   # Deep scan options
-  deep_scan_ports: "5000"  # Number of top ports for deep scan (use "all" for -p-)
-  deep_scan_scripts: true  # Enable NSE scripts in deep scan
+  # Controls the thoroughness of detailed scans
+  
+  # Number of top ports to scan in deep mode
+  # Use "all" or "-p-" to scan all 65535 ports (very slow)
+  deep_scan_ports: "5000"  # Top 5000 most common ports
+  
+  # Enable Nmap Scripting Engine (NSE) scripts
+  # Provides additional service detection but slower
+  deep_scan_scripts: true  # Safe scripts only
   
   # Progress display settings
-  progress_details: true  # Show detailed scan progress output (default: minimal)
-  progress_refresh_rate: 4  # Progress bar refresh rate (Hz)
+  # Controls how scan progress is shown to users
+  
+  # Show detailed progress information
+  # true = show discovered hosts, current phase, etc.
+  # false = minimal progress bar only
+  progress_details: true
+  
+  # How often to update progress display (Hz)
+  # Higher values = smoother updates but more CPU
+  progress_refresh_rate: 4  # 4 updates per second
   
   # Hang detection
-  hang_threshold: 30  # Seconds without progress before warning
-  auto_kill_hung: false  # Automatically kill hung scans after timeout
+  # Prevents scans from getting stuck indefinitely
+  
+  # Time without progress before showing warning
+  hang_threshold: 30  # seconds
+  
+  # Automatically terminate hung scans
+  # false = just warn, true = kill and continue
+  auto_kill_hung: false  # Manual intervention by default
   
   # Stats output intervals
-  nmap_stats_interval: "1s"  # How often nmap reports progress
+  # Controls verbosity of scanner output
+  
+  # How often nmap reports scan progress
+  # More frequent = better progress tracking but noisier logs
+  nmap_stats_interval: "1s"  # Every second
   
 # Report settings
+# Controls HTML report generation and display
 report:
+  # Automatically open reports in browser after generation
   auto_open: true
+  
+  # Include Three.js 3D visualization
+  # Set to false for compatibility or performance
   include_3d_view: true
+  
+  # Maximum devices shown per page in tables
+  # Higher values may slow down browser rendering
   max_devices_per_page: 100
 
 # Device classification
+# Controls the AI-powered device type identification
 classification:
+  # Minimum confidence score (0-100) for classification
+  # Devices below this threshold marked as "unknown"
   confidence_threshold: 70
+  
+  # Automatically classify devices during scanning
+  # false = just collect data without classification
   auto_classify: true
 
 # Change detection
+# Controls what changes are tracked between scans
 changes:
+  # Track changes in running services
   track_services: true
+  
+  # Track changes in open ports
   track_ports: true
+  
+  # Track operating system changes
   track_os: true
+  
+  # Track MAC address changes (device replacement)
   track_mac: true
-  retention_days: 90  # Keep scan history for 90 days
+  
+  # How long to keep historical scan data
+  # Older scans are automatically purged
+  retention_days: 90  # 3 months of history
 
 # Network visualization
+# Fine-tune the appearance of network maps
 visualization:
+  # D3.js force-directed graph parameters
+  # Negative = repulsion, positive = attraction
   d3_force_strength: -300
+  
+  # Ideal distance between connected nodes
   d3_link_distance: 100
+  
+  # Initial camera distance for 3D view
+  # Higher = zoomed out, lower = zoomed in
   three_js_camera_distance: 15
 
 # Output settings
+# Controls how scan results are saved
 output:
+  # Save raw scanner output for debugging
+  # Useful for troubleshooting scan issues
   save_raw_scan: true
+  
+  # Compress scan files older than 30 days
+  # Saves disk space for long-term storage
   compress_old_scans: false
+  
+  # Default export formats for reports
+  # Available: json, csv, html, pdf, excel
   export_formats: ["json", "csv", "html"]
 
 # Logging
+# Controls application logging behavior
 logging:
-  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  # Log level verbosity
+  # DEBUG = everything, ERROR = errors only
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  
+  # Log file location (relative to output directory)
+  # Set to null to disable file logging
   file: "network_mapper.log"

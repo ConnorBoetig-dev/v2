@@ -1,56 +1,124 @@
-# .dockerignore - Files to exclude from Docker image
+# Docker ignore file for NetworkMapper v2
+# Excludes unnecessary files from the Docker build context
 
-# Python cache
+# Python cache and compiled files
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
+*.py[cod]
+*$py.class
 *.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Virtual environment (we create our own in Docker)
+# Virtual environments
 venv/
 env/
 ENV/
+.venv/
 
-# Output data (should be mounted as volume)
+# Output and data directories (mounted as volumes)
 output/
+*.pcap
+*.cap
 
-# Test coverage
+# Test and coverage files
 .coverage
+.coverage.*
 htmlcov/
+.tox/
 .pytest_cache/
+.hypothesis/
+*.cover
+.mutmut-cache
 
-# IDE files
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
 
-# Git
+# Version control
 .git/
 .gitignore
+.gitattributes
+.gitlab-ci.yml
+.github/
 
-# Documentation that's not needed in runtime
-.context/
+# Documentation (not needed at runtime)
 docs/
+*.md
+!README.md
+!CLAUDE.md
 
-# Development files
+# Development and CI files
 .pre-commit-config.yaml
 .flake8
+.pylintrc
 pytest.ini
+tox.ini
+.travis.yml
+.circleci/
+Makefile
+setup.cfg
 
-# Temporary files
-*.tmp
+# Logs and temporary files
 *.log
+*.tmp
+*.temp
 *.bak
-*~
+.cache/
 
-# OS files
+# OS-specific files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
 
-# Build artifacts
-build/
-dist/
-*.egg-info/
+# Jupyter notebooks (development only)
+*.ipynb
+.ipynb_checkpoints/
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Database files (if any)
+*.db
+*.sqlite
+*.sqlite3
+
+# Secret files (should never be in image)
+*.key
+*.pem
+*.crt
+*.cer
+.env
+.env.*
+!.env.example
+secrets/

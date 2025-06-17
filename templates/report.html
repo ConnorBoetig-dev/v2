@@ -1,3 +1,29 @@
+<!-- 
+Network Scan Report Template - Comprehensive network analysis visualization
+
+This template generates the main HTML report for NetworkMapper scan results.
+It provides a modern, dark-themed interface with multiple views:
+- Summary dashboard with key metrics
+- Device inventory tables with filtering
+- Network visualizations (moved to separate window)
+- Security analysis and vulnerability reporting
+- Service distribution charts
+
+The template uses:
+- Modern CSS with dark theme for reduced eye strain
+- Responsive design for various screen sizes
+- Interactive elements with JavaScript
+- Data tables with search and sort capabilities
+- Visual indicators for device criticality and changes
+
+Template variables (passed from mapper.py):
+- scan_date: Scan timestamp
+- total_devices: Device count
+- device_types: Type distribution
+- critical_count: Critical infrastructure count
+- new_devices: Recently discovered devices
+- devices: Complete device list with all metadata
+-->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -6,6 +32,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Network Scan Report - {{ scan_date }}</title>
     <style>
+        /* Reset and base styles for consistent rendering */
         * {
             margin: 0;
             padding: 0;

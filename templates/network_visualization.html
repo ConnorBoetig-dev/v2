@@ -1,3 +1,36 @@
+<!--
+Network Visualization Template - Interactive D3.js and Three.js network maps
+
+This template provides the interactive network visualization interface with both
+2D (D3.js force-directed graph) and 3D (Three.js) views. It's opened in a 
+separate window to provide maximum screen space for exploring network topology.
+
+Key features:
+- 2D force-directed graph with:
+  - Device type color coding
+  - Interactive node dragging
+  - Zoom and pan controls
+  - Device search and filtering
+  - Change tracking indicators (new/modified devices)
+  - Detailed device tooltips
+  - Export to PNG functionality
+  
+- 3D layered visualization with:
+  - Vertical stratification by device type
+  - Orbital camera controls
+  - Auto-rotation option
+  - Glowing effects for critical devices
+  - Curved connection lines
+  
+- Shared features:
+  - Device details sidebar
+  - Real-time statistics
+  - Responsive design
+  - Dark theme optimized for long viewing sessions
+  
+The visualization receives data through the global networkData variable
+injected by the Flask template engine.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,13 +38,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Network Visualization - {{ scan_date }}</title>
     
-    <!-- D3.js for 2D visualization -->
+    <!-- D3.js v7 for modern force-directed graphs -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
     
-    <!-- Three.js for 3D visualization -->
+    <!-- Three.js for 3D WebGL visualization -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
-    <!-- OrbitControls for Three.js - matching version -->
+    <!-- OrbitControls for 3D camera manipulation -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
     <style>
