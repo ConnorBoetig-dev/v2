@@ -1,98 +1,83 @@
-# NetworkMapper v2 - Docker Makefile
-# Convenient shortcuts for Docker operations
+# Makefile for NetworkMapper v2 - Local Development
+# Provides simple shortcuts for common tasks.
 
-.PHONY: help build run scan shell test clean logs web stop setup
-
-# Default target
-help:
-	@echo "NetworkMapper Docker Commands:"
-	@echo ""
-	@echo "  make setup      - Initial setup (directories, env file, build)"
-	@echo "  make build      - Build Docker image"
-	@echo "  make run        - Run interactive mode"
-	@echo "  make scan       - Quick scan example (edit TARGET in Makefile)"
-	@echo "  make shell      - Open shell in container"
-	@echo "  make test       - Run test suite"
-	@echo "  make logs       - View container logs"
-	@echo "  make web        - Start web interface"
-	@echo "  make stop       - Stop all containers"
-	@echo "  make clean      - Remove containers and images"
-	@echo ""
-	@echo "Examples:"
-	@echo "  make scan TARGET=192.168.1.0/24"
-	@echo "  make scan TARGET=10.0.0.0/16 TYPE=fast"
-
-# Initial setup
-setup:
-	@echo "Setting up NetworkMapper Docker environment..."
-	@./docker-setup.sh
-
-# Build Docker image
-build:
-	docker-compose build
-
-# Run interactive mode
-run:
-	docker-compose run --rm networkmapper
-
-# Run a scan (requires TARGET variable)
+# --- Variables ---
+# Use the python executable from the virtual environment
+VENV_PYTHON = ./venv/bin/python3
 TARGET ?= 192.168.1.0/24
 TYPE ?= discovery
+
+# --- Phony Targets (commands that don't produce files) ---
+.PHONY: help setup run scan test lint clean update-oui
+
+# --- Main Commands ---
+
+# Default target: Show help message
+help:
+	@echo "NetworkMapper v2 - Makefile"
+	@echo "--------------------------------"
+	@echo "Usage: make [command]"
+	@echo ""
+	@echo "Commands:"
+	@echo "  help          Show this help message."
+	@echo "  setup         Run the initial setup script (setup.sh)."
+	@echo "  run           Start the NetworkMapper interactive interface."
+	@echo "  scan          Run a non-interactive scan. Ex: make scan TARGET=10.0.0.0/16 TYPE=fast"
+	@echo "  test          Run the full pytest test suite."
+	@echo "  lint          Run code formatters and linters (black, flake8)."
+	@echo "  clean         Remove all generated files (cache, logs, venv)."
+	@echo "  update-oui    Download the latest MAC vendor database."
+	@echo ""
+
+# Run the setup script
+# This target ensures setup.sh is executable and then runs it.
+# A new user only needs to run `make setup`.
+setup:
+	@echo "▶️  Making setup script executable..."
+	@chmod +x ./setup.sh
+	@echo "▶️  Running setup script..."
+	@./setup.sh
+
+# Run the main application
+mapper:
+	@echo "🚀 Starting NetworkMapper..."
+	@$(VENV_PYTHON) mapper.py
+
+# Run a non-interactive scan
 scan:
-	docker-compose run --rm networkmapper --target $(TARGET) --scan-type $(TYPE)
+	@echo "🎯 Scanning target: $(TARGET) with type: $(TYPE)"
+	@# Check if the scan type requires sudo
+	@if [ "$(TYPE)" = "deeper" ] || [ "$(TYPE)" = "fast" ] || [ "$(TYPE)" = "arp" ]; then \
+		echo "🔐 Scan type '$(TYPE)' requires sudo privileges..."; \
+		sudo $(VENV_PYTHON) mapper.py --target $(TARGET) --scan-type $(TYPE); \
+	else \
+		$(VENV_PYTHON) mapper.py --target $(TARGET) --scan-type $(TYPE); \
+	fi
 
-# Open shell in container
-shell:
-	docker-compose run --rm networkmapper shell
-
-# Run tests
+# Run the test suite
 test:
-	docker-compose run --rm networkmapper test
+	@echo "🧪 Running test suite..."
+	@$(VENV_PYTHON) -m pytest tests/ -v
 
-# View logs
-logs:
-	docker-compose logs -f
+# Run linters and formatters
+lint:
+	@echo "🎨 Formatting with black..."
+	@$(VENV_PYTHON) -m black . --line-length=100
+	@echo "🔬 Linting with flake8..."
+	@$(VENV_PYTHON) -m flake8 .
 
-# Start web interface
-web:
-	docker-compose --profile web up -d networkmapper-web
-	@echo "Web interface available at http://localhost:5000"
-
-# Stop all containers
-stop:
-	docker-compose down
-
-# Clean up Docker resources
+# Clean up generated files
 clean:
-	docker-compose down -v --rmi local
+	@echo "🧹 Cleaning up project directory..."
+	@rm -rf venv
+	@rm -rf output
+	@rm -rf .pytest_cache
+	@rm -rf htmlcov
+	@rm -f .coverage
+	@find . -type d -name "__pycache__" -exec rm -r {} +
+	@echo "✅ Cleanup complete."
 
-# Quick scan shortcuts
-scan-local:
-	@$(MAKE) scan TARGET=192.168.1.0/24 TYPE=fast
-
-scan-deep:
-	@$(MAKE) scan TARGET=$(TARGET) TYPE=deeper
-
-# Development helpers
-rebuild:
-	docker-compose build --no-cache
-
-exec:
-	docker-compose exec networkmapper bash
-
-# Check network capabilities
-check:
-	docker-compose run --rm networkmapper check
-
-# Update from git and rebuild
-update:
-	git pull
-	docker-compose build --no-cache
-
-# Show image size
-size:
-	docker images networkmapper:v2 --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
-
-# Prune unused Docker resources
-prune:
-	docker system prune -f
+# Update the OUI database
+update-oui:
+	@echo "🌐 Updating OUI database..."
+	@$(VENV_PYTHON) -c "from utils.mac_lookup import MACLookup; MACLookup().update_database()"
