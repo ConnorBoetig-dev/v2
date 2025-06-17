@@ -23,13 +23,13 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-# --- Logging Functions with Emojis ---
+
 log_info() { echo -e "${GREEN}${BOLD}[✓]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}${BOLD}[!]${NC} $1"; }
 log_error() { echo -e "${RED}${BOLD}[✗]${NC} $1"; }
 log_step() { echo -e "\n${CYAN}${BOLD}==>${NC} ${BOLD}$1${NC}"; }
 
-# --- ASCII Art Banner ---
+
 print_banner() {
     clear
     echo -e "${BLUE}"
@@ -145,8 +145,11 @@ install_system_deps() {
             log_step "Installing with apt..."
             (sudo apt-get update > /dev/null 2>&1) &
             spinner $! "Updating package lists..."
+            log_info "Package lists updated successfully."
             (sudo apt-get install -y "${missing_deps[@]}" > /dev/null 2>&1) &
             spinner $! "Installing ${missing_deps[*]}..."
+            log_info "Packages installed successfully."
+
 
         elif [[ "$OS_TYPE" == "darwin" ]]; then
             if ! command_exists brew; then log_error "Homebrew not found. Please install it: https://brew.sh/"; exit 1; fi
@@ -173,14 +176,13 @@ setup_venv() {
 
 install_python_deps() {
     log_step "🧩 Installing Python packages..."
-    # Activate venv for this step
     source "${VENV_DIR}/bin/activate"
-    # Run pip install in the background and show a spinner
-    pip install --upgrade pip > /dev/null 2>&1 &
+    (pip install --upgrade pip > /dev/null 2>&1) &
     spinner $! "Upgrading pip..."
-    pip install -r requirements.txt > /dev/null 2>&1 &
+    log_info "Pip upgraded successfully."
+    (pip install -r requirements.txt > /dev/null 2>&1) &
     spinner $! "Installing dependencies from requirements.txt... (this may take a moment)"
-    # Deactivate after
+    log_info "Dependencies installed successfully."
     deactivate
     log_info "All Python packages installed successfully."
 }
@@ -192,10 +194,9 @@ create_directories() {
 }
 
 print_final_message() {
-    # Use different colors to make the ASCII art pop
-    ART_COLOR_1='\033[0;36m' # Cyan
-    ART_COLOR_2='\033[0;35m' # Magenta
-    ART_COLOR_3='\033[0;34m' # Blue
+    ART_COLOR_1='\033[0;36m'
+    ART_COLOR_2='\033[0;35m'
+    ART_COLOR_3='\033[0;34m'
 
     echo -e "\n${GREEN}======================================================================${NC}"
     echo -e "${ART_COLOR_1}"
@@ -250,7 +251,8 @@ EOF
     echo -e "This will create the '${BOLD}mapper${NC}' command, allowing you to run the tool from anywhere."
     echo ""
 }
-# --- Main Execution ---
+
+
 main() {
     print_banner
     echo ""
@@ -266,5 +268,4 @@ main() {
     print_final_message
 }
 
-# Run the main function
 main
