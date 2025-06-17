@@ -4,6 +4,33 @@
 **Developer**: Claude Assistant  
 **Status**: ✅ All requested improvements completed
 
+## Latest Updates (Port Coverage & Sharing)
+
+### 5. ✅ Expanded Port Coverage
+**Issue**: Limited port lists could miss many devices
+**Resolution**: Dramatically expanded masscan port coverage
+- **Deep Scan**: Increased from 10 to 35+ ports (includes UDP)
+- **Deeper Scan**: Increased from 34 to 400+ ports
+- **Added Coverage**:
+  - IoT devices (MQTT, mDNS, smart home ports)
+  - Enterprise applications (WebLogic, Tomcat, etc.)
+  - Industrial/SCADA systems
+  - Gaming and streaming services
+  - Cloud/container services
+  - Alternative web ports (8000-8100 range)
+  - UDP services for better discovery
+
+### 6. ✅ Simplified Sharing Setup
+**Created**: New Docker and Makefile for easy distribution
+- **Dockerfile**: Simple, well-commented container setup
+- **Makefile**: User-friendly commands for common tasks
+- **SHARING_GUIDE.md**: Clear instructions for colleagues
+- **Benefits**:
+  - One-command setup: `make docker-build`
+  - No dependency hassles
+  - Consistent environment for all users
+  - Easy distribution within company
+
 ## Tasks Completed
 
 ### 1. ✅ Code Formatting (Black)

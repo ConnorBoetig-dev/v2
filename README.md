@@ -51,17 +51,30 @@ A comprehensive Python-based network discovery and security assessment tool that
 
 ## Quick Start
 
+### 🐳 Easiest Method - Docker (Recommended for Sharing)
+
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/networkmapper-v2.git
 cd networkmapper-v2
 
-# Quick setup and launch
-./quick_start.sh
+# Build and run with Docker (no setup required!)
+make docker-build
+make docker-run
+```
 
-# OR manual installation:
-pip3 install -r requirements.txt
-python3 mapper.py
+### 💻 Local Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/networkmapper-v2.git
+cd networkmapper-v2
+
+# Automated setup
+make setup
+
+# Run the tool
+./venv/bin/python mapper.py
 ```
 
 ## Installation

@@ -36,13 +36,15 @@ networkmapper-v2/
 │   ├── generate_minimal_network_test.py
 │   ├── generate_test_data.py       # Test data generation
 │   └── view_demo.py               # Demo viewer
-├── Dockerfile                      # Docker container configuration
+├── Dockerfile                      # Simple Docker setup for easy sharing ✅ NEW
+├── .dockerignore                  # Docker ignore file ✅ NEW
 ├── exports/                        # Export directory
 │   └── .gitkeep
 ├── .flake8                        # Flake8 linting configuration
 ├── .gitignore                     # Git ignore rules
 ├── install_scapy.sh               # Scapy installation script
-├── Makefile                       # Build automation
+├── Makefile                       # User-friendly commands ✅ NEW
+├── SHARING_GUIDE.md               # Instructions for colleagues ✅ NEW
 ├── mapper.py                      # Main application entry point ✅ ENHANCED
 ├── modern_interface.py            # Modern CLI interface with Rich
 ├── network_mapper/                # Alternative architecture (experimental)

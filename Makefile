@@ -1,319 +1,146 @@
-# NetworkMapper v2 Makefile
-# Comprehensive test suite and development tasks
+# Makefile for NetworkMapper v2
+# This file provides simple commands to build and run the project
+# Usage: make [command]
 
-.PHONY: all test unit integration lint clean coverage install dev-install help
+# Variables (you can change these)
+IMAGE_NAME = networkmapper
+CONTAINER_NAME = networkmapper-scanner
+OUTPUT_DIR = $(shell pwd)/output
 
-# Python interpreter
-PYTHON := python3
-PIP := pip3
-
-# Directories
-TEST_DIR := tests
-UNIT_TEST_DIR := $(TEST_DIR)/unit
-INTEGRATION_TEST_DIR := $(TEST_DIR)/integration
-COV_DIR := htmlcov
-OUTPUT_DIR := output
-
-# Test discovery patterns
-UNIT_TESTS := $(UNIT_TEST_DIR)/test_*.py
-INTEGRATION_TESTS := $(INTEGRATION_TEST_DIR)/test_*.py
-
-# Default target
-all: lint test
-
-# Help target
+# Default command when you just type 'make'
+.PHONY: help
 help:
-	@echo "NetworkMapper v2 - Available targets:"
+	@echo "NetworkMapper v2 - Available Commands:"
+	@echo "======================================"
+	@echo "  make setup         - Install everything locally (no Docker)"
+	@echo "  make docker-build  - Build the Docker image"
+	@echo "  make docker-run    - Run NetworkMapper in Docker"
+	@echo "  make docker-shell  - Open a shell in the Docker container"
+	@echo "  make clean         - Clean up output files"
+	@echo "  make test          - Run the test suite"
+	@echo "  make lint          - Check code formatting"
 	@echo ""
-	@echo "Run Commands:"
-	@echo "  make run          - Run NetworkMapper interactive CLI"
-	@echo "  make scan         - Run a quick test scan (localhost)"
-	@echo "  make demo         - Generate demo data and open report"
+	@echo "Quick Start:"
+	@echo "  1. Run 'make setup' for local installation"
+	@echo "  OR"
+	@echo "  2. Run 'make docker-build' then 'make docker-run'"
+
+# Install everything locally (for development)
+.PHONY: setup
+setup:
+	@echo "Setting up NetworkMapper locally..."
+	# Check if Python 3 is installed
+	@which python3 > /dev/null || (echo "Error: Python 3 not found. Please install Python 3.8+" && exit 1)
+	# Create virtual environment if it doesn't exist
+	@if [ ! -d "venv" ]; then \
+		echo "Creating virtual environment..."; \
+		python3 -m venv venv; \
+	fi
+	# Activate venv and install requirements
+	@echo "Installing Python packages..."
+	@./venv/bin/pip install --upgrade pip
+	@./venv/bin/pip install -r requirements.txt
+	# Create output directories
+	@mkdir -p output/{scans,reports,changes,annotations,cache,config,exports}
+	# Check for required system tools
 	@echo ""
-	@echo "Installation:"
-	@echo "  make install      - Install production dependencies"
-	@echo "  make dev-install  - Install development dependencies"
+	@echo "Checking system dependencies..."
+	@which nmap > /dev/null && echo "✓ nmap found" || echo "✗ nmap not found - install with: sudo apt install nmap"
+	@which masscan > /dev/null && echo "✓ masscan found" || echo "✗ masscan not found (optional) - see README for installation"
+	@which arp-scan > /dev/null && echo "✓ arp-scan found" || echo "✗ arp-scan not found (optional) - install with: sudo apt install arp-scan"
 	@echo ""
-	@echo "Testing:"
-	@echo "  make test         - Run all tests (unit + integration)"
-	@echo "  make unit         - Run unit tests only"
-	@echo "  make integration  - Run integration tests only"
-	@echo "  make quick        - Run quick smoke tests"
-	@echo "  make coverage     - Run tests with coverage report"
-	@echo ""
-	@echo "Module Tests:"
-	@echo "  make test-scanner      - Test scanner module"
-	@echo "  make test-parser       - Test parser module"
-	@echo "  make test-classifier   - Test classifier module"
-	@echo "  make test-tracker      - Test tracker module"
-	@echo "  make test-annotator    - Test annotator module"
-	@echo "  make test-vulnerability - Test vulnerability scanner"
-	@echo "  make test-snmp         - Test SNMP modules"
-	@echo "  make test-export       - Test export manager"
-	@echo ""
-	@echo "Code Quality:"
-	@echo "  make lint         - Run code linting"
-	@echo "  make format       - Auto-format code"
-	@echo "  make clean        - Clean temporary files and caches"
+	@echo "Setup complete! Run with: ./venv/bin/python mapper.py"
 
-# Install dependencies
-install:
-	$(PIP) install -r requirements.txt
+# Build the Docker image
+.PHONY: docker-build
+docker-build:
+	@echo "Building Docker image..."
+	docker build -t $(IMAGE_NAME) .
+	@echo "Docker image built successfully!"
 
-# Install development dependencies
-dev-install: install
-	$(PIP) install pytest pytest-cov pytest-timeout pytest-mock flake8 mypy black isort
+# Run NetworkMapper in Docker (interactive mode)
+.PHONY: docker-run
+docker-run:
+	@echo "Starting NetworkMapper in Docker..."
+	@echo "Note: This will mount ./output to save scan results"
+	docker run -it --rm \
+		--name $(CONTAINER_NAME) \
+		--network host \
+		--privileged \
+		-v $(OUTPUT_DIR):/app/output \
+		$(IMAGE_NAME) \
+		python3 mapper.py
 
-# Run all tests
-test: unit integration
-	@echo "All tests completed successfully!"
+# Run a specific network scan in Docker
+# Usage: make docker-scan TARGET=192.168.1.0/24
+.PHONY: docker-scan
+docker-scan:
+	@if [ -z "$(TARGET)" ]; then \
+		echo "Error: Please specify TARGET"; \
+		echo "Usage: make docker-scan TARGET=192.168.1.0/24"; \
+		exit 1; \
+	fi
+	@echo "Scanning $(TARGET) with Docker..."
+	docker run -it --rm \
+		--network host \
+		--privileged \
+		-v $(OUTPUT_DIR):/app/output \
+		$(IMAGE_NAME) \
+		python3 -c "from mapper import NetworkMapper; nm = NetworkMapper(); nm.run_scan('$(TARGET)')"
 
-# Run unit tests
-unit:
-	@echo "Running unit tests..."
-	$(PYTHON) -m pytest $(UNIT_TEST_DIR) -v --tb=short
+# Open a shell inside the Docker container (for debugging)
+.PHONY: docker-shell
+docker-shell:
+	@echo "Opening shell in Docker container..."
+	docker run -it --rm \
+		--network host \
+		--privileged \
+		-v $(OUTPUT_DIR):/app/output \
+		$(IMAGE_NAME) \
+		/bin/bash
 
-# Run integration tests
-integration:
-	@echo "Running integration tests..."
-	$(PYTHON) -m pytest $(INTEGRATION_TEST_DIR) -v --tb=short
-
-# Run specific module tests
-test-scanner:
-	@echo "Testing scanner module..."
-	$(PYTHON) -m pytest $(UNIT_TEST_DIR)/test_scanner.py -v
-
-test-parser:
-	@echo "Testing parser module..."
-	$(PYTHON) -m pytest $(UNIT_TEST_DIR)/test_parser.py -v
-
-test-classifier:
-	@echo "Testing classifier module..."
-	$(PYTHON) -m pytest $(UNIT_TEST_DIR)/test_classifier.py -v
-
-test-tracker:
-	@echo "Testing tracker module..."
-	$(PYTHON) -m pytest $(UNIT_TEST_DIR)/test_tracker.py -v
-
-test-annotator:
-	@echo "Testing annotator module..."
-	$(PYTHON) -m pytest $(UNIT_TEST_DIR)/test_annotator.py -v
-
-# Test new modules
-test-vulnerability:
-	@echo "Testing vulnerability scanner..."
-	$(PYTHON) -m pytest $(TEST_DIR) -k "vulnerability" -v
-
-test-snmp:
-	@echo "Testing SNMP modules..."
-	$(PYTHON) -m pytest $(TEST_DIR) -k "snmp" -v
-
-test-export:
-	@echo "Testing export manager..."
-	$(PYTHON) -m pytest test_exports.py -v
-
-# Run commands
-run:
-	@echo "Starting NetworkMapper CLI..."
-	$(PYTHON) mapper.py
-
-scan:
-	@echo "Running quick localhost scan..."
-	@echo "127.0.0.1" | $(PYTHON) mapper.py --disable-snmp
-
-demo:
-	@echo "Generating demo network data..."
-	$(PYTHON) generate_test_data.py
-	@echo "Demo data generated. Run 'make run' to generate reports."
-
-# Quick smoke tests (fastest tests only)
-quick:
-	@echo "Running quick smoke tests..."
-	$(PYTHON) -m pytest $(TEST_DIR) -v -m "not slow" --tb=short -x
-
-# Verbose test output
-verbose:
-	@echo "Running tests with verbose output..."
-	$(PYTHON) -m pytest $(TEST_DIR) -vv --tb=long
-
-# Run tests with coverage
-coverage:
-	@echo "Running tests with coverage..."
-	$(PYTHON) -m pytest $(TEST_DIR) --cov=core --cov=utils --cov-report=html --cov-report=term
-	@echo "Coverage report generated in $(COV_DIR)/"
-
-# Lint code
-lint:
-	@echo "Running linting checks..."
-	@echo "1. Running flake8..."
-	-$(PYTHON) -m flake8 core utils mapper.py generate_*.py --max-line-length=100 --ignore=E203,W503
-	@echo "2. Running mypy type checking..."
-	-$(PYTHON) -m mypy core utils mapper.py --ignore-missing-imports
-	@echo "3. Checking black formatting..."
-	-$(PYTHON) -m black --check core utils mapper.py tests generate_*.py
-	@echo "4. Checking import sorting..."
-	-$(PYTHON) -m isort --check-only core utils mapper.py tests
-
-# Format code
-format:
-	@echo "Formatting code..."
-	$(PYTHON) -m black core utils mapper.py tests
-	$(PYTHON) -m isort core utils mapper.py tests
-
-# Clean temporary files
+# Clean up output files (be careful!)
+.PHONY: clean
 clean:
-	@echo "Cleaning temporary files..."
-	find . -type f -name "*.pyc" -delete
-	find . -type d -name "__pycache__" -delete
-	find . -type d -name ".pytest_cache" -exec rm -rf {} +
-	rm -rf $(COV_DIR)
-	rm -rf .coverage
-	rm -rf .mypy_cache
-	rm -f $(OUTPUT_DIR)/test_*
-	@echo "Cleanup complete!"
+	@echo "Cleaning output directory..."
+	@read -p "Are you sure? This will delete all scan results! (y/N) " confirm; \
+	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+		rm -rf output/*; \
+		mkdir -p output/{scans,reports,changes,annotations,cache,config,exports}; \
+		echo "Output directory cleaned"; \
+	else \
+		echo "Cancelled"; \
+	fi
 
-# Run tests in parallel
-parallel:
-	@echo "Running tests in parallel..."
-	$(PYTHON) -m pytest $(TEST_DIR) -v -n auto
+# Run tests
+.PHONY: test
+test:
+	@echo "Running tests..."
+	@if [ -d "venv" ]; then \
+		./venv/bin/pytest tests/ -v; \
+	else \
+		echo "Error: Virtual environment not found. Run 'make setup' first"; \
+		exit 1; \
+	fi
 
-# Run tests with specific markers
-test-critical:
-	@echo "Running critical tests only..."
-	$(PYTHON) -m pytest $(TEST_DIR) -v -m "critical"
+# Run linting
+.PHONY: lint
+lint:
+	@echo "Running code quality checks..."
+	@if [ -f "scripts/lint.sh" ]; then \
+		./scripts/lint.sh; \
+	else \
+		echo "Checking with Black..."; \
+		./venv/bin/black --check .; \
+	fi
 
-test-slow:
-	@echo "Running slow tests only..."
-	$(PYTHON) -m pytest $(TEST_DIR) -v -m "slow"
+# Remove Docker image
+.PHONY: docker-clean
+docker-clean:
+	@echo "Removing Docker image..."
+	docker rmi $(IMAGE_NAME) || true
 
-# Continuous integration target
-ci: lint test coverage
-	@echo "CI pipeline completed!"
-
-# Development test loop (watches for changes)
-watch:
-	@echo "Starting test watcher..."
-	$(PYTHON) -m pytest_watch $(TEST_DIR) --clear
-
-# Generate test report
-test-report:
-	@echo "Generating detailed test report..."
-	$(PYTHON) -m pytest $(TEST_DIR) -v --html=test_report.html --self-contained-html
-
-# Check test coverage thresholds
-check-coverage: coverage
-	@echo "Checking coverage thresholds..."
-	$(PYTHON) -m pytest $(TEST_DIR) --cov=core --cov=utils --cov-fail-under=80
-
-# Profile tests to find slow ones
-profile-tests:
-	@echo "Profiling test execution time..."
-	$(PYTHON) -m pytest $(TEST_DIR) --durations=10
-
-# Run security checks
-security:
-	@echo "Running security checks..."
-	$(PIP) install safety bandit
-	-$(PYTHON) -m safety check
-	-$(PYTHON) -m bandit -r core utils mapper.py
-
-# Full test suite with all checks
-full-test: clean lint test coverage security
-	@echo "Full test suite completed!"
-
-# Debug a specific test
-debug:
-	@echo "Running tests in debug mode..."
-	$(PYTHON) -m pytest $(TEST_DIR) -v --pdb --pdbcls=IPython.terminal.debugger:TerminalPdb
-
-# Create test fixtures
-fixtures:
-	@echo "Generating test fixtures..."
-	$(PYTHON) generate_test_data.py
-	$(PYTHON) generate_minimal_network_test.py
-
-# Run tests with specific Python version
-test-py38:
-	python3.8 -m pytest $(TEST_DIR) -v
-
-test-py39:
-	python3.9 -m pytest $(TEST_DIR) -v
-
-test-py310:
-	python3.10 -m pytest $(TEST_DIR) -v
-
-test-py311:
-	python3.11 -m pytest $(TEST_DIR) -v
-
-# Benchmark tests
-benchmark:
-	@echo "Running performance benchmarks..."
-	$(PYTHON) -m pytest $(TEST_DIR) -v --benchmark-only
-
-# Memory profiling
-memtest:
-	@echo "Running memory profiling..."
-	$(PIP) install pytest-memray
-	$(PYTHON) -m pytest $(TEST_DIR) --memray
-
-# Test documentation examples
-test-docs:
-	@echo "Testing documentation examples..."
-	$(PYTHON) -m doctest -v core/*.py utils/*.py
-
-# Generate test coverage badge
-badge:
-	@echo "Generating coverage badge..."
-	$(PIP) install coverage-badge
-	coverage-badge -o coverage.svg
-
-# Run mutation testing
-mutate:
-	@echo "Running mutation testing..."
-	$(PIP) install mutmut
-	mutmut run --paths-to-mutate=core/,utils/
-
-# Test environment setup
-test-env:
-	@echo "Setting up test environment..."
-	mkdir -p $(OUTPUT_DIR)/test_scans
-	mkdir -p $(OUTPUT_DIR)/test_reports
-	mkdir -p $(OUTPUT_DIR)/test_changes
-	mkdir -p $(OUTPUT_DIR)/test_annotations
-
-# Integration with CI systems
-jenkins:
-	$(PYTHON) -m pytest $(TEST_DIR) --junitxml=test-results.xml
-
-gitlab:
-	$(PYTHON) -m pytest $(TEST_DIR) --junit-xml=report.xml
-
-# Docker test environment
-docker-test:
-	docker build -t networkmapper-test .
-	docker run --rm networkmapper-test make test
-
-# Stress testing
-stress-test:
-	@echo "Running stress tests..."
-	$(PYTHON) -m pytest $(TEST_DIR) -v -k "stress or performance or large"
-
-# Compatibility testing
-compat-test:
-	@echo "Running compatibility tests..."
-	tox
-
-# Pre-commit hook
-pre-commit: lint quick
-	@echo "Pre-commit checks passed!"
-
-# Post-merge hook
-post-merge: install test
-	@echo "Post-merge checks passed!"
-
-.PHONY: test-all-modules
-test-all-modules: test-scanner test-parser test-classifier test-tracker test-annotator
-	@echo "All module tests completed!"
-
-# Default test configuration
-.DEFAULT_GOAL := help
+# Show Docker image size
+.PHONY: docker-size
+docker-size:
+	@docker images $(IMAGE_NAME) --format "Image: {{.Repository}}\nSize: {{.Size}}"
