@@ -23,6 +23,8 @@ claude_code-multi-AI-MCP/
 CLAUDE.md
 .claudemd
 *.claudemd
+*claude*.md
+**/*claude*.md
 
 # MCP server credentials
 credentials.json
