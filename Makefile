@@ -65,17 +65,17 @@ docker-install:
 # Step 2: Build the NetworkMapper Docker image
 docker-build:
 	@echo "▶️  Building the NetworkMapper Docker image..."
-	@docker-compose build
+	@docker compose build
 
 # Step 3: Run the interactive application inside the Docker container
 docker-run:
 	@echo "🚀 Starting NetworkMapper in Docker..."
-	@docker-compose run --rm networkmapper
+	@docker compose run --rm networkmapper
 
 # Clean up Docker resources related to this project
 docker-clean:
 	@echo "🧹 Removing NetworkMapper Docker image and containers..."
-	@docker-compose down --rmi local --volumes
+	@docker compose down --rmi local --volumes
 
 
 # ==============================================================================
