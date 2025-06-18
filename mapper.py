@@ -40,7 +40,7 @@ from core.classifier import DeviceClassifier    # AI device type identification
 from core.parser import ScanParser              # Parse scanner outputs
 from core.scanner import NetworkScanner         # Multi-tool scan orchestration
 from core.tracker import ChangeTracker          # Network change detection
-
+from core.modern_interface import ModernInterface 
 # Utility imports
 from utils.export_manager import ExportManager  # Multi-format data export
 from utils.snmp_config import SNMPConfig        # SNMP credential management
@@ -48,7 +48,7 @@ from utils.traffic_analyzer import PassiveTrafficAnalyzer  # Packet capture anal
 from utils.visualization import MapGenerator    # D3.js/Three.js visualizations
 from utils.vulnerability_scanner import VulnerabilityScanner  # CVE correlation
 from utils.scan_status import ScanStatusIndicator  # Visual scan progress
-from modern_interface import ModernInterface    # Alternative UI (experimental)
+
 
 # Import friendly error handling with fallback
 try:

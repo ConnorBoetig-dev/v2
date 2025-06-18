@@ -1,31 +1,30 @@
 # docker-compose.yml for NetworkMapper v2
-# Provides a simple way to build and run the application.
+# ©AngelaMos | ©CertGames.com
 
-version: '3.8'
 
 services:
   networkmapper:
-    # Build the image from the Dockerfile in the current directory
-    build: .
-    # Name the image for easy reference
-    image: networkmapper:latest
-    
-    # --- CRITICAL SETTINGS FOR NETWORK SCANNING ---
-    # Use the host's network stack directly. This is REQUIRED for the container
-    # to see and scan other devices on your local network.
-    network_mode: "host"
-    
-    # Provides the container with elevated privileges needed for raw packet
-    # operations used by nmap, masscan, and arp-scan.
+    build:
+      context: .
+      dockerfile: ops/Dockerfile
+    image: mapper:latest    
+    network_mode: "host"   
     privileged: true
-    
-    # --- RUNTIME CONFIGURATION ---
-    # Keep the container running and allow for an interactive terminal
     stdin_open: true
     tty: true
-    
-    # Mount a volume to persist data outside the container.
-    # This saves all reports, scans, and logs to an 'output' folder
-    # on your computer, so they aren't lost when the container stops.
     volumes:
       - ./output:/app/output
+            
+#
+#     0000             0000        7777777777777777/========___________
+#   00000000         00000000      7777^^^^^^^7777/ || ||   ___________
+#  000    000       000    000     777       7777/=========//
+# 000      000     000      000             7777// ((     //
+#0000      0000   0000      0000           7777//   \\   //
+#0000      0000   0000      0000          7777//========//
+#0000      0000   0000      0000         7777
+#0000      0000   0000      0000        7777
+# 000      000     000      000        7777
+#  000    000       000    000       77777
+#   00000000         00000000       7777777
+#     0000             0000        777777777      

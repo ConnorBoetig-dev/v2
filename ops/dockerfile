@@ -31,11 +31,13 @@ FROM base
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy the Python requirements file first to leverage Docker layer caching
-COPY requirements.txt .
+COPY ops/requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies from the copied file
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code into the container
+COPY . .
 
 # Copy the rest of the application code into the container
 COPY . .
@@ -51,5 +53,3 @@ USER netmapper
 # Set the default command to run when the container starts
 ENTRYPOINT ["python3", "mapper.py"]
 
-# By default, show the help menu if no other arguments are given
-CMD ["--help"]
