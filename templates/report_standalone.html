@@ -1,0 +1,2035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Scan Report - {{ scan_date }}</title>
+    
+    <!-- Embedded CSS for standalone use -->
+    <style>
+        /* NetworkMapper v2 - Complete Embedded Styles */
+        
+        /* Modern Color System */
+        :root {
+            /* Primary Gradients */
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-secondary: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            --gradient-accent: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --gradient-success: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            --gradient-warning: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            --gradient-danger: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+            --gradient-info: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            
+            /* Dark Background with Depth */
+            --bg-base: #0a0f1b;
+            --bg-surface: #111827;
+            --bg-elevated: rgba(30, 41, 59, 0.5);
+            --bg-overlay: rgba(15, 23, 42, 0.8);
+            
+            /* Glass Effect */
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            --glass-blur: blur(10px);
+            
+            /* Text Colors */
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --text-disabled: #64748b;
+            
+            /* Vibrant Accent Colors */
+            --color-purple: #8b5cf6;
+            --color-blue: #3b82f6;
+            --color-cyan: #06b6d4;
+            --color-teal: #14b8a6;
+            --color-green: #10b981;
+            --color-yellow: #f59e0b;
+            --color-orange: #f97316;
+            --color-red: #ef4444;
+            --color-pink: #ec4899;
+            
+            /* Device Type Colors (Vibrant) */
+            --device-router: #f97316;
+            --device-switch: #3b82f6;
+            --device-server: #10b981;
+            --device-windows-server: #0ea5e9;
+            --device-linux-server: #22c55e;
+            --device-database: #8b5cf6;
+            --device-workstation: #06b6d4;
+            --device-printer: #ec4899;
+            --device-iot: #84cc16;
+            --device-firewall: #ef4444;
+            --device-unknown: #6b7280;
+            
+            /* Spacing */
+            --space-xs: 0.25rem;
+            --space-sm: 0.5rem;
+            --space-md: 1rem;
+            --space-lg: 1.5rem;
+            --space-xl: 2rem;
+            --space-2xl: 3rem;
+            --space-3xl: 4rem;
+            
+            /* Typography */
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            --font-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+            
+            /* Font Sizes */
+            --text-xs: 0.75rem;
+            --text-sm: 0.875rem;
+            --text-base: 1rem;
+            --text-lg: 1.125rem;
+            --text-xl: 1.25rem;
+            --text-2xl: 1.5rem;
+            --text-3xl: 1.875rem;
+            --text-4xl: 2.25rem;
+            --text-5xl: 3rem;
+            
+            /* Font Weights */
+            --font-normal: 400;
+            --font-medium: 500;
+            --font-semibold: 600;
+            --font-bold: 700;
+            
+            /* Border Radius */
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+            --radius-2xl: 1.5rem;
+            --radius-full: 9999px;
+            
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+            
+            /* Glow Effects */
+            --glow-sm: 0 0 10px;
+            --glow-md: 0 0 20px;
+            --glow-lg: 0 0 30px;
+            
+            /* Transitions */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+            
+            /* Z-Index Scale */
+            --z-base: 0;
+            --z-dropdown: 1000;
+            --z-sticky: 1100;
+            --z-fixed: 1200;
+            --z-modal-backdrop: 1300;
+            --z-modal: 1400;
+            --z-popover: 1500;
+            --z-tooltip: 1600;
+        }
+
+        /* Modern CSS Reset */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            font-size: var(--text-base);
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-base);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
+            z-index: -1;
+            animation: floatingGradient 20s ease-in-out infinite;
+        }
+
+        @keyframes floatingGradient {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(-20px, -20px) scale(1.1); }
+            66% { transform: translate(20px, -10px) scale(0.9); }
+        }
+
+        /* Typography */
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: var(--font-semibold);
+            line-height: 1.2;
+            letter-spacing: -0.025em;
+        }
+
+        h1 { font-size: var(--text-4xl); }
+        h2 { font-size: var(--text-3xl); }
+        h3 { font-size: var(--text-2xl); }
+        h4 { font-size: var(--text-xl); }
+        h5 { font-size: var(--text-lg); }
+        h6 { font-size: var(--text-base); }
+
+        p {
+            margin-bottom: var(--space-md);
+        }
+
+        a {
+            color: var(--color-blue);
+            text-decoration: none;
+            transition: color var(--transition-fast);
+        }
+
+        a:hover {
+            color: var(--color-cyan);
+        }
+
+        /* Focus Styles */
+        :focus {
+            outline: none;
+        }
+
+        :focus-visible {
+            outline: 2px solid var(--color-blue);
+            outline-offset: 2px;
+        }
+
+        /* Selection */
+        ::selection {
+            background-color: var(--color-purple);
+            color: white;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-surface);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--glass-bg);
+            border-radius: var(--radius-full);
+            border: 2px solid var(--bg-surface);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--glass-border);
+        }
+
+        /* Utility Classes */
+        .container {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 var(--space-lg);
+        }
+
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
+        }
+
+        .gradient-text {
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .glow {
+            filter: drop-shadow(0 0 20px currentColor);
+        }
+
+        /* Components */
+        
+        /* Cards */
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: var(--space-lg);
+            box-shadow: var(--glass-shadow);
+            transition: all var(--transition-base);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-primary);
+            opacity: 0;
+            transition: opacity var(--transition-base);
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                var(--glass-shadow),
+                0 10px 40px rgba(139, 92, 246, 0.1);
+            border-color: rgba(139, 92, 246, 0.3);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        /* Stat Cards */
+        .stat-card {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: var(--space-xl);
+            position: relative;
+            overflow: hidden;
+            transition: all var(--transition-base);
+        }
+
+        .stat-card::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, var(--gradient-primary) 0%, transparent 70%);
+            opacity: 0.1;
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(0.8); opacity: 0.1; }
+            50% { transform: scale(1.2); opacity: 0.2; }
+        }
+
+        .stat-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-md);
+        }
+
+        .stat-card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .stat-card-value {
+            font-size: var(--text-4xl);
+            font-weight: var(--font-bold);
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: var(--space-sm) 0;
+        }
+
+        .stat-card-label {
+            color: var(--text-muted);
+            font-size: var(--text-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-card-trend {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
+            font-size: var(--text-sm);
+            padding: var(--space-xs) var(--space-sm);
+            border-radius: var(--radius-full);
+            margin-top: var(--space-sm);
+        }
+
+        .stat-card-trend.up {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--color-green);
+        }
+
+        .stat-card-trend.down {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--color-red);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-sm);
+            padding: var(--space-sm) var(--space-lg);
+            border: none;
+            border-radius: var(--radius-lg);
+            font-size: var(--text-base);
+            font-weight: var(--font-medium);
+            cursor: pointer;
+            transition: all var(--transition-base);
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 6px 30px rgba(139, 92, 246, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--gradient-secondary);
+            color: white;
+            box-shadow: 0 4px 20px rgba(6, 190, 182, 0.3);
+        }
+
+        .btn-accent {
+            background: var(--gradient-accent);
+            color: white;
+            box-shadow: 0 4px 20px rgba(240, 147, 251, 0.3);
+        }
+
+        .btn-glass {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+        }
+
+        .btn-glass:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Device Cards */
+        .device-card {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            transition: all var(--transition-base);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .device-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--gradient-primary);
+        }
+
+        .device-card.type-router::before { background: linear-gradient(90deg, var(--device-router), transparent); }
+        .device-card.type-switch::before { background: linear-gradient(90deg, var(--device-switch), transparent); }
+        .device-card.type-server::before { background: linear-gradient(90deg, var(--device-server), transparent); }
+        .device-card.type-workstation::before { background: linear-gradient(90deg, var(--device-workstation), transparent); }
+
+        .device-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 
+                var(--glass-shadow),
+                0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .device-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-md);
+        }
+
+        .device-card-ip {
+            font-family: var(--font-mono);
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--text-primary);
+        }
+
+        .device-card-status {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--color-green);
+            box-shadow: var(--glow-sm) currentColor;
+            animation: statusPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .device-card-status.critical {
+            background: var(--color-red);
+        }
+
+        .device-card-status.warning {
+            background: var(--color-yellow);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: var(--space-xs) var(--space-sm);
+            border-radius: var(--radius-full);
+            font-size: var(--text-xs);
+            font-weight: var(--font-medium);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all var(--transition-fast);
+        }
+
+        .badge-primary {
+            background: rgba(139, 92, 246, 0.2);
+            color: var(--color-purple);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .badge-success {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--color-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .badge-danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--color-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--color-yellow);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .badge-secondary {
+            background: rgba(6, 182, 212, 0.2);
+            color: var(--color-cyan);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+        }
+
+        /* Progress Bars */
+        .progress {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--gradient-primary);
+            border-radius: var(--radius-full);
+            transition: width var(--transition-slow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.3),
+                transparent
+            );
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* Modals */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: var(--z-modal-backdrop);
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-base);
+        }
+
+        .modal-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: var(--bg-elevated);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-2xl);
+            z-index: var(--z-modal);
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-base);
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: auto;
+        }
+
+        .modal.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* Alerts */
+        .alert {
+            padding: var(--space-md) var(--space-lg);
+            border-radius: var(--radius-lg);
+            border: 1px solid;
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            margin-bottom: var(--space-md);
+        }
+
+        .alert-icon {
+            flex-shrink: 0;
+            font-size: var(--text-xl);
+        }
+
+        .alert-content {
+            flex: 1;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: var(--color-green);
+        }
+
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: var(--color-red);
+        }
+
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: rgba(245, 158, 11, 0.3);
+            color: var(--color-yellow);
+        }
+
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.3);
+            color: var(--color-blue);
+        }
+
+        /* Layout */
+        
+        /* Grid System */
+        .grid {
+            display: grid;
+            gap: var(--space-lg);
+        }
+
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+        .grid-cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+
+        /* Auto-fit Grid */
+        .grid-auto {
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        /* Flexbox Utilities */
+        .flex { display: flex; }
+        .inline-flex { display: inline-flex; }
+        .flex-row { flex-direction: row; }
+        .flex-col { flex-direction: column; }
+        .flex-wrap { flex-wrap: wrap; }
+        .flex-nowrap { flex-wrap: nowrap; }
+
+        .items-start { align-items: flex-start; }
+        .items-center { align-items: center; }
+        .items-end { align-items: flex-end; }
+        .items-stretch { align-items: stretch; }
+
+        .justify-start { justify-content: flex-start; }
+        .justify-center { justify-content: center; }
+        .justify-end { justify-content: flex-end; }
+        .justify-between { justify-content: space-between; }
+        .justify-around { justify-content: space-around; }
+        .justify-evenly { justify-content: space-evenly; }
+
+        .flex-1 { flex: 1 1 0%; }
+        .flex-auto { flex: 1 1 auto; }
+        .flex-initial { flex: 0 1 auto; }
+        .flex-none { flex: none; }
+
+        .gap-xs { gap: var(--space-xs); }
+        .gap-sm { gap: var(--space-sm); }
+        .gap-md { gap: var(--space-md); }
+        .gap-lg { gap: var(--space-lg); }
+        .gap-xl { gap: var(--space-xl); }
+
+        /* Header Layout */
+        .header {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            border-bottom: 1px solid var(--glass-border);
+            position: sticky;
+            top: 0;
+            z-index: var(--z-sticky);
+            transition: all var(--transition-base);
+        }
+
+        .header-content {
+            padding: var(--space-lg) 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-lg);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+
+        .header-title {
+            font-size: var(--text-2xl);
+            font-weight: var(--font-bold);
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xl);
+        }
+
+        /* Main Content */
+        .main {
+            min-height: calc(100vh - 80px);
+            padding: var(--space-xl) 0;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: var(--space-3xl) 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
+            transform: translate(-50%, -50%);
+            animation: heroGlow 10s ease-in-out infinite;
+        }
+
+        @keyframes heroGlow {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.8; }
+        }
+
+        .hero-title {
+            font-size: var(--text-5xl);
+            font-weight: var(--font-bold);
+            margin-bottom: var(--space-md);
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-subtitle {
+            font-size: var(--text-xl);
+            color: var(--text-secondary);
+            margin-bottom: var(--space-xl);
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Section Layout */
+        .section {
+            padding: var(--space-2xl) 0;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: var(--space-2xl);
+        }
+
+        .section-title {
+            font-size: var(--text-3xl);
+            font-weight: var(--font-bold);
+            margin-bottom: var(--space-md);
+        }
+
+        .section-subtitle {
+            font-size: var(--text-lg);
+            color: var(--text-muted);
+        }
+
+        /* Dashboard Layout */
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: var(--space-xl);
+        }
+
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: var(--space-lg);
+        }
+
+        .dashboard-main {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: var(--space-xl);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: var(--space-lg);
+        }
+
+        /* Tab Layout */
+        .tabs {
+            display: flex;
+            gap: var(--space-xs);
+            border-bottom: 1px solid var(--glass-border);
+            margin-bottom: var(--space-xl);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tab {
+            padding: var(--space-sm) var(--space-lg);
+            color: var(--text-muted);
+            font-weight: var(--font-medium);
+            position: relative;
+            transition: all var(--transition-fast);
+            white-space: nowrap;
+            cursor: pointer;
+            background: none;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .tab::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-primary);
+            transform: scaleX(0);
+            transition: transform var(--transition-base);
+        }
+
+        .tab:hover {
+            color: var(--text-secondary);
+        }
+
+        .tab.active {
+            color: var(--text-primary);
+        }
+
+        .tab.active::after {
+            transform: scaleX(1);
+        }
+
+        .tab-content {
+            animation: fadeIn var(--transition-base);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Table Layout */
+        .table-container {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table thead {
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .table th {
+            padding: var(--space-md) var(--space-lg);
+            text-align: left;
+            font-weight: var(--font-semibold);
+            color: var(--text-primary);
+            text-transform: uppercase;
+            font-size: var(--text-sm);
+            letter-spacing: 0.05em;
+        }
+
+        .table td {
+            padding: var(--space-md) var(--space-lg);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+        }
+
+        .table tbody tr {
+            transition: all var(--transition-fast);
+        }
+
+        .table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            border-top: 1px solid var(--glass-border);
+            padding: var(--space-2xl) 0;
+            margin-top: var(--space-3xl);
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--space-xl);
+        }
+
+        .footer-section h4 {
+            font-size: var(--text-lg);
+            margin-bottom: var(--space-md);
+            color: var(--text-primary);
+        }
+
+        .footer-bottom {
+            margin-top: var(--space-2xl);
+            padding-top: var(--space-xl);
+            border-top: 1px solid var(--glass-border);
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        /* Animations */
+        
+        /* Entrance Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes bounceIn {
+            0% { opacity: 0; transform: scale(0.3); }
+            50% { opacity: 1; transform: scale(1.05); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); }
+        }
+
+        /* Utility Animation Classes */
+        .animate-fadeIn { animation: fadeIn 0.5s ease-out; }
+        .animate-fadeInUp { animation: fadeInUp 0.5s ease-out; }
+        .animate-fadeInDown { animation: fadeInDown 0.5s ease-out; }
+        .animate-scaleIn { animation: scaleIn 0.3s ease-out; }
+        .animate-bounceIn { animation: bounceIn 0.5s ease-out; }
+        .animate-pulse { animation: pulse 2s infinite; }
+
+        /* Stagger Animation for Lists */
+        .stagger-animation > * {
+            opacity: 0;
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+
+        .stagger-animation > *:nth-child(1) { animation-delay: 0.1s; }
+        .stagger-animation > *:nth-child(2) { animation-delay: 0.2s; }
+        .stagger-animation > *:nth-child(3) { animation-delay: 0.3s; }
+        .stagger-animation > *:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Hover Animation Triggers */
+        .hover-lift {
+            transition: all var(--transition-base);
+        }
+
+        .hover-lift:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        /* Utility Classes */
+        .text-muted { color: var(--text-muted); }
+        .text-2xl { font-size: var(--text-2xl); }
+        .font-bold { font-weight: var(--font-bold); }
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 1200px) {
+            .grid-cols-6 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+            .grid-cols-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 992px) {
+            .grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 768px) {
+            .grid-cols-3 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+            .grid-cols-2 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+            .dashboard-stats { grid-template-columns: 1fr; }
+            
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .hero-title { font-size: var(--text-3xl); }
+            .hero-subtitle { font-size: var(--text-base); }
+            
+            .tabs {
+                gap: 0;
+            }
+            
+            .tab {
+                padding: var(--space-sm) var(--space-md);
+                font-size: var(--text-sm);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 0 var(--space-md);
+            }
+            
+            .table {
+                font-size: var(--text-sm);
+            }
+            
+            .table th,
+            .table td {
+                padding: var(--space-sm);
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                color: black;
+            }
+            
+            body::before {
+                display: none;
+            }
+            
+            .header,
+            .tabs,
+            .btn,
+            .modal,
+            .modal-backdrop {
+                display: none !important;
+            }
+            
+            .tab-content {
+                display: block !important;
+            }
+            
+            .card,
+            .stat-card,
+            .device-card,
+            .table-container {
+                background: white !important;
+                border: 1px solid #ddd !important;
+                box-shadow: none !important;
+            }
+        }
+    </style>
+    
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header glass">
+        <div class="container">
+            <div class="header-content">
+                <div class="header-brand">
+                    <div class="header-title">NetworkMapper</div>
+                    <span class="badge badge-primary">v2.0</span>
+                </div>
+                <div class="header-nav">
+                    <span class="text-muted">Scan Date: {{ timestamp }}</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Hero Section -->
+            <section class="hero">
+                <h1 class="hero-title animate-fadeInDown">Network Scan Report</h1>
+                <p class="hero-subtitle animate-fadeInUp">
+                    Comprehensive analysis of {{ total_devices }} devices across your network
+                </p>
+                
+                <!-- Quick Actions -->
+                <div class="flex justify-center gap-md animate-fadeIn" style="animation-delay: 0.3s;">
+                    <button class="btn btn-primary" onclick="window.print()">
+                        <i data-feather="printer"></i>
+                        Print Report
+                    </button>
+                    <button class="btn btn-secondary" onclick="downloadCSV()">
+                        <i data-feather="download"></i>
+                        Export CSV
+                    </button>
+                    <button class="btn btn-accent{% if has_changes %} animate-pulse{% endif %}" onclick="compareToLastScan()">
+                        <i data-feather="git-branch"></i>
+                        Compare Scans
+                        {% if has_changes %}
+                        <span class="badge badge-warning">New!</span>
+                        {% endif %}
+                    </button>
+                    <button class="btn btn-glass" onclick="refreshScan()">
+                        <i data-feather="refresh-cw"></i>
+                        New Scan
+                    </button>
+                </div>
+            </section>
+
+            <!-- Statistics Dashboard -->
+            <section class="section">
+                <div class="dashboard-stats stagger-animation">
+                    <!-- Total Devices -->
+                    <div class="stat-card glass hover-lift">
+                        <div class="stat-card-header">
+                            <div class="stat-card-icon glass" style="background: var(--gradient-primary);">
+                                <i data-feather="server" style="color: white;"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card-value">{{ total_devices }}</div>
+                        <div class="stat-card-label">Total Devices</div>
+                        <div class="stat-card-trend up">
+                            <i data-feather="trending-up"></i>
+                            <span>+{{ new_devices|length }} new</span>
+                        </div>
+                    </div>
+
+                    <!-- Critical Infrastructure -->
+                    <div class="stat-card glass hover-lift">
+                        <div class="stat-card-header">
+                            <div class="stat-card-icon glass" style="background: var(--gradient-danger);">
+                                <i data-feather="alert-triangle" style="color: white;"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card-value">{{ critical_devices|length }}</div>
+                        <div class="stat-card-label">Critical Devices</div>
+                        {% if critical_devices|length > 0 %}
+                        <div class="stat-card-trend down">
+                            <i data-feather="alert-circle"></i>
+                            <span>Attention needed</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Device Types -->
+                    <div class="stat-card glass hover-lift">
+                        <div class="stat-card-header">
+                            <div class="stat-card-icon glass" style="background: var(--gradient-info);">
+                                <i data-feather="layers" style="color: white;"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card-value">{{ device_types|length }}</div>
+                        <div class="stat-card-label">Device Types</div>
+                        <div class="progress" style="margin-top: 1rem;">
+                            <div class="progress-bar" style="width: 100%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Security Status -->
+                    <div class="stat-card glass hover-lift">
+                        {% set vulnerable_count = devices|selectattr('vulnerability_count', 'greaterthan', 0)|list|length %}
+                        <div class="stat-card-header">
+                            <div class="stat-card-icon glass" style="background: {% if vulnerable_count > 0 %}var(--gradient-warning){% else %}var(--gradient-success){% endif %};">
+                                <i data-feather="shield" style="color: white;"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card-value">{{ vulnerable_count }}</div>
+                        <div class="stat-card-label">Vulnerable Devices</div>
+                        <div class="stat-card-trend {% if vulnerable_count > 0 %}down{% else %}up{% endif %}">
+                            <i data-feather="{% if vulnerable_count > 0 %}shield-off{% else %}shield{% endif %}"></i>
+                            <span>{% if vulnerable_count > 0 %}Action required{% else %}Secure{% endif %}</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tabs Navigation -->
+            <div class="tabs glass" style="margin-bottom: 2rem;">
+                <button class="tab active" onclick="showTab('devices', this)">
+                    <i data-feather="monitor" style="width: 16px; height: 16px;"></i>
+                    Devices
+                </button>
+                <button class="tab" onclick="showTab('security', this)">
+                    <i data-feather="shield" style="width: 16px; height: 16px;"></i>
+                    Security
+                </button>
+                <button class="tab" onclick="showTab('services', this)">
+                    <i data-feather="globe" style="width: 16px; height: 16px;"></i>
+                    Services
+                </button>
+                <button class="tab" onclick="showTab('network', this)">
+                    <i data-feather="git-branch" style="width: 16px; height: 16px;"></i>
+                    Network Map
+                </button>
+                <button class="tab" onclick="showTab('insights', this)">
+                    <i data-feather="trending-up" style="width: 16px; height: 16px;"></i>
+                    Insights
+                </button>
+            </div>
+
+            <!-- Tab Contents -->
+            <!-- Devices Tab -->
+            <div id="devices-tab" class="tab-content">
+                <div class="section-header">
+                    <h2 class="section-title gradient-text">Discovered Devices</h2>
+                    <p class="section-subtitle">Complete inventory of all network devices</p>
+                </div>
+
+                <!-- Device Grid View -->
+                <div class="dashboard-grid animate-fadeIn">
+                    {% for device in devices %}
+                    <div class="device-card glass hover-lift type-{{ device.type }}{% if device.critical %} critical{% endif %}" 
+                         onclick="showDeviceDetails('{{ device.ip }}')">
+                        <div class="device-card-header">
+                            <span class="device-card-ip">{{ device.ip }}</span>
+                            <div class="device-card-status{% if device.critical %} critical{% endif %}{% if device.vulnerability_count > 0 %} warning{% endif %}"></div>
+                        </div>
+                        
+                        <div class="flex items-center gap-sm" style="margin: 1rem 0;">
+                            <span class="badge badge-primary">{{ device.type|upper }}</span>
+                            {% if device.critical %}
+                            <span class="badge badge-danger">CRITICAL</span>
+                            {% endif %}
+                            {% if device.vulnerability_count > 0 %}
+                            <span class="badge badge-warning">{{ device.vulnerability_count }} VULNS</span>
+                            {% endif %}
+                        </div>
+                        
+                        <div style="color: var(--text-muted); font-size: var(--text-sm);">
+                            {% if device.hostname %}<div><strong>Hostname:</strong> {{ device.hostname }}</div>{% endif %}
+                            {% if device.vendor %}<div><strong>Vendor:</strong> {{ device.vendor }}</div>{% endif %}
+                            {% if device.os %}<div><strong>OS:</strong> {{ device.os }}</div>{% endif %}
+                            {% if device.services %}
+                            <div style="margin-top: 0.5rem;">
+                                <strong>Services:</strong>
+                                <div class="flex flex-wrap gap-xs" style="margin-top: 0.25rem;">
+                                    {% for service in device.services[:3] %}
+                                    <span class="badge badge-primary" style="font-size: 0.7rem;">{{ service.split(':')[0] }}</span>
+                                    {% endfor %}
+                                    {% if device.services|length > 3 %}
+                                    <span class="badge badge-primary" style="font-size: 0.7rem;">+{{ device.services|length - 3 }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Table View Toggle -->
+                <div class="flex justify-end" style="margin: 2rem 0;">
+                    <button class="btn btn-glass" onclick="toggleView()">
+                        <i data-feather="list"></i>
+                        Table View
+                    </button>
+                </div>
+
+                <!-- Device Table (Hidden by default) -->
+                <div id="device-table-view" class="table-container glass" style="display: none;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>IP Address</th>
+                                <th>Hostname</th>
+                                <th>Type</th>
+                                <th>Vendor</th>
+                                <th>OS</th>
+                                <th>Services</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for device in devices %}
+                            <tr>
+                                <td style="font-family: var(--font-mono);">{{ device.ip }}</td>
+                                <td>{{ device.hostname or '-' }}</td>
+                                <td><span class="badge badge-primary">{{ device.type }}</span></td>
+                                <td>{{ device.vendor or '-' }}</td>
+                                <td>{{ device.os or '-' }}</td>
+                                <td>
+                                    {% if device.services %}
+                                    <div class="flex flex-wrap gap-xs">
+                                        {% for service in device.services[:2] %}
+                                        <span class="badge badge-secondary" style="font-size: 0.7rem;">{{ service }}</span>
+                                        {% endfor %}
+                                        {% if device.services|length > 2 %}
+                                        <span class="text-muted" style="font-size: 0.7rem;">+{{ device.services|length - 2 }} more</span>
+                                        {% endif %}
+                                    </div>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if device.critical %}
+                                    <span class="badge badge-danger">CRITICAL</span>
+                                    {% elif device.vulnerability_count > 0 %}
+                                    <span class="badge badge-warning">AT RISK</span>
+                                    {% else %}
+                                    <span class="badge badge-success">SECURE</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-glass" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;" 
+                                            onclick="showDeviceDetails('{{ device.ip }}')">
+                                        <i data-feather="eye" style="width: 16px; height: 16px;"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Security Tab -->
+            <div id="security-tab" class="tab-content" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title gradient-text">Security Analysis</h2>
+                    <p class="section-subtitle">Vulnerability assessment and risk overview</p>
+                </div>
+
+                {% set vulnerable_devices = devices|selectattr('vulnerability_count', 'greaterthan', 0)|list %}
+                {% set critical_vulns = devices|selectattr('critical_vulns', 'greaterthan', 0)|list %}
+                {% set high_vulns = devices|selectattr('high_vulns', 'greaterthan', 0)|list %}
+
+                <!-- Security Overview -->
+                <div class="grid grid-cols-4 gap-lg" style="margin-bottom: 2rem;">
+                    <div class="card glass hover-lift">
+                        <h3 style="color: var(--color-red); margin-bottom: 1rem;">Critical Risk</h3>
+                        <div class="stat-card-value" style="color: var(--color-red);">{{ critical_vulns|length }}</div>
+                        <div class="text-muted">Devices</div>
+                    </div>
+                    <div class="card glass hover-lift">
+                        <h3 style="color: var(--color-orange); margin-bottom: 1rem;">High Risk</h3>
+                        <div class="stat-card-value" style="color: var(--color-orange);">{{ high_vulns|length }}</div>
+                        <div class="text-muted">Devices</div>
+                    </div>
+                    <div class="card glass hover-lift">
+                        <h3 style="color: var(--color-yellow); margin-bottom: 1rem;">Total Vulnerable</h3>
+                        <div class="stat-card-value" style="color: var(--color-yellow);">{{ vulnerable_devices|length }}</div>
+                        <div class="text-muted">Devices</div>
+                    </div>
+                    <div class="card glass hover-lift">
+                        <h3 style="color: var(--color-green); margin-bottom: 1rem;">Secure</h3>
+                        <div class="stat-card-value" style="color: var(--color-green);">{{ devices|length - vulnerable_devices|length }}</div>
+                        <div class="text-muted">Devices</div>
+                    </div>
+                </div>
+
+                {% if vulnerable_devices %}
+                <!-- Vulnerable Devices -->
+                <div class="card glass">
+                    <h3 style="margin-bottom: 1rem;">Vulnerable Devices</h3>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Device</th>
+                                    <th>Risk Level</th>
+                                    <th>Vulnerabilities</th>
+                                    <th>Top CVEs</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for device in vulnerable_devices|sort(attribute='critical_vulns', reverse=true) %}
+                                <tr>
+                                    <td>
+                                        <div><strong>{{ device.ip }}</strong></div>
+                                        <div class="text-muted" style="font-size: 0.875rem;">{{ device.hostname or device.type }}</div>
+                                    </td>
+                                    <td>
+                                        {% if device.get('critical_vulns', 0) > 0 %}
+                                        <span class="badge badge-danger">CRITICAL</span>
+                                        {% elif device.get('high_vulns', 0) > 0 %}
+                                        <span class="badge badge-warning">HIGH</span>
+                                        {% else %}
+                                        <span class="badge badge-warning">MEDIUM</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="flex items-center gap-sm">
+                                            <span class="stat-card-value" style="font-size: 1.5rem;">{{ device.vulnerability_count }}</span>
+                                            <div>
+                                                {% if device.get('critical_vulns', 0) > 0 %}
+                                                <div class="text-muted" style="font-size: 0.75rem;">{{ device.critical_vulns }} critical</div>
+                                                {% endif %}
+                                                {% if device.get('high_vulns', 0) > 0 %}
+                                                <div class="text-muted" style="font-size: 0.75rem;">{{ device.high_vulns }} high</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if device.get('vulnerabilities') %}
+                                        <div class="flex flex-col gap-xs">
+                                            {% for vuln in device.vulnerabilities[:3] %}
+                                            <span class="badge badge-danger" style="font-size: 0.75rem;">
+                                                {{ vuln.cve_id }} ({{ vuln.cvss_score|round(1) }})
+                                            </span>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-glass" style="padding: 0.25rem 0.5rem;" 
+                                                onclick="showVulnerabilityDetails('{{ device.ip }}')">
+                                            View Details
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% else %}
+                <!-- All Secure -->
+                <div class="card glass" style="text-align: center; padding: 3rem;">
+                    <div class="animate-bounceIn">
+                        <i data-feather="shield" style="width: 64px; height: 64px; color: var(--color-green); margin-bottom: 1rem;"></i>
+                        <h3 style="color: var(--color-green);">All Systems Secure</h3>
+                        <p class="text-muted">No vulnerabilities detected in the current scan</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Services Tab -->
+            <div id="services-tab" class="tab-content" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title gradient-text">Network Services</h2>
+                    <p class="section-subtitle">Overview of running services and open ports</p>
+                </div>
+
+                {% set all_services = [] %}
+                {% for device in devices %}
+                    {% for service in device.get('services', []) %}
+                        {% if all_services.append(service) %}{% endif %}
+                    {% endfor %}
+                {% endfor %}
+                
+                {% set service_summary = {} %}
+                {% for service in all_services %}
+                    {% set service_name = service.split(':')[0] %}
+                    {% if service_summary.update({service_name: service_summary.get(service_name, 0) + 1}) %}{% endif %}
+                {% endfor %}
+
+                <!-- Service Distribution -->
+                {% set sorted_services = service_summary.items()|sort(attribute=1, reverse=true)|list %}
+                <div class="grid grid-cols-6 gap-md" style="margin-bottom: 2rem;">
+                    {% for service, count in sorted_services[:12] %}
+                    <div class="card glass hover-lift" style="text-align: center;">
+                        <div class="stat-card-icon glass" style="margin: 0 auto 1rem; background: var(--gradient-info);">
+                            <i data-feather="globe" style="color: white;"></i>
+                        </div>
+                        <h4 style="text-transform: uppercase; font-size: 0.875rem; margin-bottom: 0.5rem;">{{ service }}</h4>
+                        <div class="stat-card-value" style="font-size: 2rem;">{{ count }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Detailed Service List -->
+                <div class="card glass">
+                    <h3 style="margin-bottom: 1rem;">Service Details by Device</h3>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Device</th>
+                                    <th>Open Ports</th>
+                                    <th>Services</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for device in devices|selectattr('services') %}
+                                <tr>
+                                    <td>
+                                        <div><strong>{{ device.ip }}</strong></div>
+                                        <div class="text-muted" style="font-size: 0.875rem;">{{ device.hostname or device.type }}</div>
+                                    </td>
+                                    <td>
+                                        {% if device.open_ports %}
+                                        <div class="flex flex-wrap gap-xs">
+                                            {% for port in device.open_ports[:10] %}
+                                            <span class="badge badge-secondary" style="font-size: 0.75rem;">{{ port }}</span>
+                                            {% endfor %}
+                                            {% if device.open_ports|length > 10 %}
+                                            <span class="text-muted">+{{ device.open_ports|length - 10 }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="flex flex-wrap gap-xs">
+                                            {% for service in device.services %}
+                                            <span class="badge badge-primary" style="font-size: 0.75rem;">{{ service }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Network Map Tab -->
+            <div id="network-tab" class="tab-content" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title gradient-text">Network Topology</h2>
+                    <p class="section-subtitle">Visual representation of your network infrastructure</p>
+                </div>
+
+                <div class="card glass" style="height: 600px; position: relative;">
+                    <div class="flex justify-center items-center" style="height: 100%;">
+                        <div class="text-center">
+                            <i data-feather="git-branch" style="width: 64px; height: 64px; color: var(--color-blue); margin-bottom: 1rem;"></i>
+                            <h3>Interactive Network Map</h3>
+                            <p class="text-muted" style="margin-bottom: 1rem;">Visualize your network topology in 2D or 3D</p>
+                            <button class="btn btn-primary" onclick="openNetworkVisualization()">
+                                <i data-feather="maximize"></i>
+                                Open Network Visualization
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subnet Summary -->
+                <h3 style="margin: 2rem 0 1rem;">Subnet Overview</h3>
+                <div class="grid grid-cols-3 gap-lg">
+                    {% for subnet in subnet_summary %}
+                    <div class="card glass hover-lift">
+                        <h4 style="color: var(--color-blue); margin-bottom: 1rem;">{{ subnet.network }}</h4>
+                        <div class="flex justify-between items-center" style="margin-bottom: 0.5rem;">
+                            <span class="text-muted">Total Devices</span>
+                            <span class="badge badge-primary">{{ subnet.device_count }}</span>
+                        </div>
+                        <div style="margin-top: 1rem;">
+                            <div class="text-muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">Device Types:</div>
+                            <div class="flex flex-wrap gap-xs">
+                                {% for type, count in subnet.types.items() %}
+                                <span class="badge badge-secondary" style="font-size: 0.75rem;">{{ type }} ({{ count }})</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Insights Tab -->
+            <div id="insights-tab" class="tab-content" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title gradient-text">Network Insights</h2>
+                    <p class="section-subtitle">Key findings and recommendations</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-lg">
+                    <!-- Key Findings -->
+                    <div class="card glass">
+                        <h3 style="margin-bottom: 1rem;">
+                            <i data-feather="search" style="width: 20px; height: 20px; vertical-align: middle;"></i>
+                            Key Findings
+                        </h3>
+                        <div class="flex flex-col gap-md">
+                            {% if critical_devices|length > 0 %}
+                            <div class="alert alert-error">
+                                <i data-feather="alert-triangle" class="alert-icon"></i>
+                                <div class="alert-content">
+                                    <strong>{{ critical_devices|length }} critical devices</strong> detected that require immediate attention
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            {% set vulnerable_count = devices|selectattr('vulnerability_count', 'greaterthan', 0)|list|length %}
+                            {% if vulnerable_count > 0 %}
+                            <div class="alert alert-warning">
+                                <i data-feather="shield-off" class="alert-icon"></i>
+                                <div class="alert-content">
+                                    <strong>{{ vulnerable_count }} devices</strong> have known vulnerabilities
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if new_devices|length > 0 %}
+                            <div class="alert alert-info">
+                                <i data-feather="plus-circle" class="alert-icon"></i>
+                                <div class="alert-content">
+                                    <strong>{{ new_devices|length }} new devices</strong> discovered since last scan
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="alert alert-success">
+                                <i data-feather="check-circle" class="alert-icon"></i>
+                                <div class="alert-content">
+                                    Successfully scanned <strong>{{ total_devices }} devices</strong> across {{ subnet_summary|length }} subnets
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommendations -->
+                    <div class="card glass">
+                        <h3 style="margin-bottom: 1rem;">
+                            <i data-feather="list" style="width: 20px; height: 20px; vertical-align: middle;"></i>
+                            Recommendations
+                        </h3>
+                        <div class="flex flex-col gap-md">
+                            {% if vulnerable_count > 0 %}
+                            <div class="flex items-start gap-md">
+                                <div class="badge badge-danger" style="margin-top: 0.25rem;">1</div>
+                                <div>
+                                    <strong>Patch Vulnerable Systems</strong>
+                                    <p class="text-muted" style="font-size: 0.875rem; margin-top: 0.25rem;">
+                                        Apply security updates to {{ vulnerable_count }} vulnerable devices
+                                    </p>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="flex items-start gap-md">
+                                <div class="badge badge-warning" style="margin-top: 0.25rem;">2</div>
+                                <div>
+                                    <strong>Review Open Services</strong>
+                                    <p class="text-muted" style="font-size: 0.875rem; margin-top: 0.25rem;">
+                                        Verify that all {{ all_services|length }} detected services are necessary
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-start gap-md">
+                                <div class="badge badge-primary" style="margin-top: 0.25rem;">3</div>
+                                <div>
+                                    <strong>Monitor Critical Infrastructure</strong>
+                                    <p class="text-muted" style="font-size: 0.875rem; margin-top: 0.25rem;">
+                                        Set up continuous monitoring for critical devices
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Device Type Distribution -->
+                <div class="card glass" style="margin-top: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">Device Type Distribution</h3>
+                    <div class="grid grid-cols-4 gap-md">
+                        {% for type, count in device_types.items() %}
+                        <div class="flex items-center justify-between padding-md glass" style="border-radius: var(--radius-md); padding: 1rem;">
+                            <span class="badge badge-primary">{{ type|upper }}</span>
+                            <span class="text-2xl font-bold">{{ count }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer glass">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Scan Information</h4>
+                    <div class="text-muted" style="font-size: 0.875rem;">
+                        <div>Start Time: {{ scan_metadata.start_time | default('Unknown') }}</div>
+                        <div>Duration: {{ scan_metadata.duration | default('N/A') }}</div>
+                        <div>Target: {{ scan_metadata.target | default('Unknown') }}</div>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4>Scan Parameters</h4>
+                    <div class="flex flex-col gap-xs">
+                        <span class="badge badge-{% if scan_metadata.scan_parameters.snmp_enabled %}success{% else %}secondary{% endif %}">
+                            SNMP: {{ 'Enabled' if scan_metadata.scan_parameters.snmp_enabled else 'Disabled' }}
+                        </span>
+                        <span class="badge badge-{% if scan_metadata.scan_parameters.vulnerability_scan %}success{% else %}secondary{% endif %}">
+                            Vulnerability Scan: {{ 'Enabled' if scan_metadata.scan_parameters.vulnerability_scan else 'Disabled' }}
+                        </span>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4>Summary</h4>
+                    <div class="text-muted" style="font-size: 0.875rem;">
+                        <div>Total Devices: {{ total_devices }}</div>
+                        <div>Subnets: {{ subnet_summary|length }}</div>
+                        <div>Services: {{ all_services|length }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>Generated by NetworkMapper v2.0 • {{ scan_date }}</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Device Details Modal -->
+    <div class="modal-backdrop" id="modal-backdrop" onclick="closeModal()"></div>
+    <div class="modal glass" id="device-modal">
+        <div style="padding: 2rem;">
+            <div class="flex justify-between items-center" style="margin-bottom: 1.5rem;">
+                <h2 id="modal-title">Device Details</h2>
+                <button class="btn btn-glass" onclick="closeModal()" style="padding: 0.5rem;">
+                    <i data-feather="x"></i>
+                </button>
+            </div>
+            <div id="modal-content">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Initialize Feather icons
+        feather.replace();
+
+        // Global data
+        const devicesData = {{ devices | tojson }};
+        const scanTimestamp = '{{ scan_timestamp }}';
+
+        // Tab switching
+        function showTab(tabName, tabElement) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').style.display = 'block';
+            tabElement.classList.add('active');
+            
+            // Reinitialize icons
+            feather.replace();
+        }
+
+        // Toggle between grid and table view
+        function toggleView() {
+            const gridView = document.querySelector('.dashboard-grid');
+            const tableView = document.getElementById('device-table-view');
+            const button = event.target.closest('button');
+            
+            if (gridView.style.display === 'none') {
+                gridView.style.display = 'grid';
+                tableView.style.display = 'none';
+                button.innerHTML = '<i data-feather="list"></i> Table View';
+            } else {
+                gridView.style.display = 'none';
+                tableView.style.display = 'block';
+                button.innerHTML = '<i data-feather="grid"></i> Grid View';
+            }
+            
+            feather.replace();
+        }
+
+        // Show device details modal
+        function showDeviceDetails(ip) {
+            const device = devicesData.find(d => d.ip === ip);
+            if (!device) return;
+            
+            const modal = document.getElementById('device-modal');
+            const backdrop = document.getElementById('modal-backdrop');
+            const title = document.getElementById('modal-title');
+            const content = document.getElementById('modal-content');
+            
+            title.textContent = `Device: ${device.ip}`;
+            
+            content.innerHTML = `
+                <div class="grid grid-cols-2 gap-lg">
+                    <div>
+                        <h4 style="margin-bottom: 1rem;">Basic Information</h4>
+                        <div class="flex flex-col gap-sm">
+                            <div><strong>IP Address:</strong> ${device.ip}</div>
+                            <div><strong>Hostname:</strong> ${device.hostname || 'N/A'}</div>
+                            <div><strong>MAC Address:</strong> ${device.mac || 'N/A'}</div>
+                            <div><strong>Vendor:</strong> ${device.vendor || 'N/A'}</div>
+                            <div><strong>Type:</strong> <span class="badge badge-primary">${device.type}</span></div>
+                            <div><strong>OS:</strong> ${device.os || 'N/A'}</div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 style="margin-bottom: 1rem;">Security Status</h4>
+                        <div class="flex flex-col gap-sm">
+                            <div><strong>Critical:</strong> ${device.critical ? '<span class="badge badge-danger">YES</span>' : '<span class="badge badge-success">NO</span>'}</div>
+                            <div><strong>Vulnerabilities:</strong> ${device.vulnerability_count || 0}</div>
+                            <div><strong>Last Seen:</strong> ${device.last_seen || 'N/A'}</div>
+                            <div><strong>First Seen:</strong> ${device.first_seen || 'N/A'}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                ${device.services && device.services.length > 0 ? `
+                <div style="margin-top: 2rem;">
+                    <h4 style="margin-bottom: 1rem;">Services</h4>
+                    <div class="flex flex-wrap gap-sm">
+                        ${device.services.map(service => `<span class="badge badge-secondary">${service}</span>`).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                ${device.open_ports && device.open_ports.length > 0 ? `
+                <div style="margin-top: 2rem;">
+                    <h4 style="margin-bottom: 1rem;">Open Ports</h4>
+                    <div class="flex flex-wrap gap-sm">
+                        ${device.open_ports.map(port => `<span class="badge badge-primary">${port}</span>`).join('')}
+                    </div>
+                </div>
+                ` : ''}
+            `;
+            
+            backdrop.classList.add('show');
+            modal.classList.add('show');
+            feather.replace();
+        }
+
+        // Close modal
+        function closeModal() {
+            const modal = document.getElementById('device-modal');
+            const backdrop = document.getElementById('modal-backdrop');
+            backdrop.classList.remove('show');
+            modal.classList.remove('show');
+        }
+
+        // Download CSV
+        function downloadCSV() {
+            let csv = 'IP,Hostname,MAC,Vendor,Type,OS,Services,Open Ports,Vulnerability Count,Critical,Notes\n';
+
+            devicesData.forEach(device => {
+                const row = [
+                    device.ip,
+                    device.hostname || '',
+                    device.mac || '',
+                    device.vendor || '',
+                    device.type || 'unknown',
+                    device.os || '',
+                    (device.services || []).join(';'),
+                    (device.open_ports || []).join(';'),
+                    device.vulnerability_count || 0,
+                    device.critical ? 'Yes' : 'No',
+                    device.notes || ''
+                ];
+
+                const escapedRow = row.map(value => {
+                    const str = String(value);
+                    return str.includes(',') ? `"${str}"` : str;
+                });
+
+                csv += escapedRow.join(',') + '\n';
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `network_scan_${scanTimestamp}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Compare to last scan
+        function compareToLastScan() {
+            {% if comparison_file %}
+                window.location.href = '{{ comparison_file }}';
+            {% else %}
+                alert('No comparison report available. Run at least 2 scans to see comparisons.');
+            {% endif %}
+        }
+
+        // Refresh scan
+        function refreshScan() {
+            alert('To run a new scan, please return to the NetworkMapper CLI');
+        }
+
+        // Open network visualization
+        function openNetworkVisualization() {
+            window.open(`network_visualization_${scanTimestamp}.html`, '_blank');
+        }
+
+        // Add smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html>
