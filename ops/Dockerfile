@@ -47,6 +47,9 @@ RUN useradd -ms /bin/bash netmapper && \
     # Give the user passwordless sudo permissions, necessary for scanning
     echo "netmapper ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/netmapper-sudo
 
+# Ensure host-open script is executable if mounted
+RUN chmod +x /usr/local/bin/host-open || true
+
 # Switch to the non-root user
 USER netmapper
 

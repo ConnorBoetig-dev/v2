@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, Tuple, Optional
 
 from rich.console import Console, Group
+from utils.scan_counter import ScanCounter, SimpleFileNamer
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
@@ -429,6 +430,10 @@ class ModernInterface:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         scan_start_time = time.time()
         
+        # Get next scan number
+        scan_number = self.mapper.scan_counter.get_next_scan_number()
+        sanitized_scan_type = SimpleFileNamer.sanitize_scan_type(config['scan_type'])
+        
         try:
             # For all scans (including masscan), use the scanner method which handles output
             console.print("[cyan]🔍 Starting network scan...[/cyan]")
@@ -518,11 +523,11 @@ class ModernInterface:
             config['scan_duration'] = f"{int(scan_duration // 60)}m {int(scan_duration % 60)}s"
             
             # Save results with metadata
-            self._save_scan_with_metadata(devices, timestamp, config)
+            self._save_scan_with_metadata(devices, timestamp, config, scan_number, sanitized_scan_type)
             
             # Generate reports with metadata
             console.print("[cyan]📄 Generating reports...[/cyan]")
-            self.mapper.generate_html_report(devices, timestamp)
+            self.mapper.generate_html_report(devices, scan_number, sanitized_scan_type, timestamp)
                 
             # Show results with modern UI
             self._show_scan_results(devices, timestamp)
@@ -774,7 +779,7 @@ class ModernInterface:
                     
         return devices
         
-    def _save_scan_with_metadata(self, devices, timestamp, config):
+    def _save_scan_with_metadata(self, devices, timestamp, config, scan_number, scan_type):
         """Save scan results with comprehensive metadata"""
         import json
         from datetime import datetime
@@ -804,15 +809,18 @@ class ModernInterface:
                 'target': config['target']
             }
             
-        # Save scan data in the expected format (array of devices)
-        scan_file = self.output_path / "scans" / f"scan_{timestamp}.json"
+        # Save scan data with simple naming
+        scan_file = self.output_path / "scans" / SimpleFileNamer.scan_file(scan_number, scan_type)
         with open(scan_file, 'w') as f:
             json.dump(devices, f, indent=2)
             
         # Save scan summary for reports
-        summary_file = self.output_path / "scans" / f"summary_{timestamp}.json"
+        summary_file = self.output_path / "scans" / SimpleFileNamer.summary_file(scan_number, scan_type)
         with open(summary_file, 'w') as f:
             json.dump(scan_stats, f, indent=2)
+            
+        # Record scan metadata
+        self.mapper.scan_counter.record_scan(scan_number, scan_type, config['target'], timestamp)
             
     def _count_services(self, devices):
         """Count unique services discovered"""
@@ -894,8 +902,11 @@ class ModernInterface:
             )
             
             if result.returncode == 0:
+                # Also reset the scan counter
+                self.mapper.scan_counter.reset()
                 console.print("\n[green]✅ All scan history and reports have been cleared successfully![/green]")
                 console.print("\n[dim]Output directories have been reset and are ready for new scans.[/dim]")
+                console.print("\n[dim]Scan counter has been reset to 1.[/dim]")
             else:
                 console.print(f"\n[red]Error clearing scan history: {result.stderr}[/red]")
                 

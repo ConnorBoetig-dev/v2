@@ -14,6 +14,11 @@ services:
     tty: true
     volumes:
       - ./output:/app/output
+      - ./scripts/host-open.sh:/usr/local/bin/host-open
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - DOCKER_HOST_BROWSER=1
             
 #
 #     0000             0000        7777777777777777/========___________

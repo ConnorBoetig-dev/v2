@@ -48,6 +48,7 @@ from utils.traffic_analyzer import PassiveTrafficAnalyzer  # Packet capture anal
 from utils.visualization import MapGenerator    # D3.js/Three.js visualizations
 from utils.vulnerability_scanner import VulnerabilityScanner  # CVE correlation
 from utils.scan_status import ScanStatusIndicator  # Visual scan progress
+from utils.scan_counter import ScanCounter, SimpleFileNamer  # Simple file naming
 
 
 # Import friendly error handling with fallback
@@ -109,6 +110,7 @@ class NetworkMapper:
         self.cli_overrides = {}                     # CLI argument overrides
         self.last_changes = None                    # Cache last change detection results
         self.passive_analysis_results = None        # Cache traffic analysis results
+        self.scan_counter = ScanCounter(self.output_path)  # Simple file naming counter
 
     def ensure_directories(self):
         """
@@ -221,6 +223,10 @@ class NetworkMapper:
 
         # Generate timestamp for this scan session
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Get next scan number and sanitized scan type
+        scan_number = self.scan_counter.get_next_scan_number()
+        sanitized_scan_type = SimpleFileNamer.sanitize_scan_type(scan_type)
 
         # Create status indicator
         status_indicator = ScanStatusIndicator(console)
@@ -327,9 +333,9 @@ class NetworkMapper:
                     console.print("[yellow]💡 Tip: Check your internet connection for API access[/yellow]")
                 logger.error(f"Vulnerability scanning error: {e}")
 
-        # Save results
-        scan_file = self.output_path / "scans" / f"scan_{timestamp}.json"
-        csv_file = self.output_path / "scans" / f"scan_{timestamp}.csv"
+        # Save results with simple naming
+        scan_file = self.output_path / "scans" / SimpleFileNamer.scan_file(scan_number, sanitized_scan_type)
+        csv_file = self.output_path / "scans" / SimpleFileNamer.csv_file(scan_number, sanitized_scan_type)
 
         with open(scan_file, "w") as f:
             json.dump(devices, f, indent=2)
@@ -339,7 +345,7 @@ class NetworkMapper:
         # Check for changes
         changes = self.tracker.detect_changes(devices)
         if changes:
-            self.save_changes(changes, timestamp)
+            self.save_changes(changes, scan_number)
             # Store changes for report generation
             self.last_changes = changes
 
@@ -376,16 +382,19 @@ class NetworkMapper:
         file_table.add_row("CSV export:", str(csv_file))
 
         if changes:
-            changes_json = self.output_path / "changes" / f"changes_{timestamp}.json"
-            changes_txt = self.output_path / "changes" / f"changes_{timestamp}.txt"
+            changes_json = self.output_path / "changes" / SimpleFileNamer.changes_json_file(scan_number)
+            changes_txt = self.output_path / "changes" / SimpleFileNamer.changes_txt_file(scan_number)
             file_table.add_row("Changes JSON:", str(changes_json))
             file_table.add_row("Changes text:", str(changes_txt))
 
         console.print(file_table)
 
+        # Record scan metadata
+        self.scan_counter.record_scan(scan_number, sanitized_scan_type, target, timestamp)
+        
         # Automatically generate and open visualization
         console.print("\n[yellow]Generating interactive network visualization...[/yellow]")
-        report_file, comparison_file = self.generate_html_report(devices, timestamp)
+        report_file, comparison_file = self.generate_html_report(devices, scan_number, sanitized_scan_type, timestamp)
 
         # Show report paths
         console.print(f"\n[bold]Generated Reports:[/bold]")
@@ -394,9 +403,9 @@ class NetworkMapper:
         report_table.add_column("Path", style="yellow")
 
         # Check which reports were generated
-        network_map = self.output_path / "reports" / f"network_map_{timestamp}.html"
-        detailed_report = self.output_path / "reports" / f"report_{timestamp}.html"
-        traffic_flow = self.output_path / "reports" / f"traffic_flow_{timestamp}.html"
+        network_map = self.output_path / "reports" / SimpleFileNamer.network_map_file(scan_number, sanitized_scan_type)
+        detailed_report = self.output_path / "reports" / SimpleFileNamer.report_file(scan_number, sanitized_scan_type)
+        traffic_flow = self.output_path / "reports" / SimpleFileNamer.traffic_flow_file(scan_number)
 
         if network_map.exists():
             report_table.add_row("Network Map (2D/3D):", str(network_map))
@@ -492,17 +501,17 @@ class NetworkMapper:
                 }
                 writer.writerow(row)
 
-    def save_changes(self, changes, timestamp):
+    def save_changes(self, changes, scan_number):
         """Save change report"""
         if not changes:
             return
 
-        changes_file = self.output_path / "changes" / f"changes_{timestamp}.json"
+        changes_file = self.output_path / "changes" / SimpleFileNamer.changes_json_file(scan_number)
         with open(changes_file, "w") as f:
             json.dump(changes, f, indent=2)
 
         # Also save human-readable summary
-        summary_file = self.output_path / "changes" / f"changes_{timestamp}.txt"
+        summary_file = self.output_path / "changes" / SimpleFileNamer.changes_txt_file(scan_number)
         with open(summary_file, "w") as f:
             f.write(f"Network Changes Report - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write("=" * 60 + "\n\n")
@@ -536,9 +545,9 @@ class NetworkMapper:
                         f.write(f"    - {change['field']}: {change.get('action', 'changed')}\n")
                 f.write("\n")
 
-    def generate_html_report(self, devices, timestamp):
+    def generate_html_report(self, devices, scan_number, scan_type, timestamp):
         """Generate HTML report with network visualization"""
-        import webbrowser
+        from utils.browser_helper import open_in_browser
 
         from jinja2 import Environment, FileSystemLoader
 
@@ -580,7 +589,7 @@ class NetworkMapper:
                 device["uptime_days"] = 0
 
         # Load scan metadata if available
-        metadata_file = self.output_path / "scans" / f"summary_{timestamp}.json"
+        metadata_file = self.output_path / "scans" / SimpleFileNamer.summary_file(scan_number, scan_type)
         scan_metadata = {}
         if metadata_file.exists():
             try:
@@ -588,11 +597,19 @@ class NetworkMapper:
                     scan_metadata = json.load(f)
             except:
                 pass
+        
+        # Ensure scan_metadata has the expected structure for templates
+        if 'scan_parameters' not in scan_metadata:
+            scan_metadata['scan_parameters'] = {
+                'snmp_enabled': False,
+                'vulnerability_scan': False,
+                'passive_analysis': False
+            }
 
         # Check if comparison report exists
         comparison_file_name = None
-        if self.last_changes and self.last_changes.get("summary", {}).get("total_changes", 0) > 0:
-            comparison_file_name = f"comparison_{timestamp}.html"
+        if scan_number > 1 and self.last_changes and self.last_changes.get("summary", {}).get("total_changes", 0) > 0:
+            comparison_file_name = SimpleFileNamer.comparison_file(scan_number, scan_number - 1)
         
         # Prepare report data with enhanced metadata
         report_data = {
@@ -617,7 +634,7 @@ class NetworkMapper:
 
         # 1. Generate original detailed report
         original_template = env.get_template("report.html")
-        original_report_file = self.output_path / "reports" / f"report_{timestamp}.html"
+        original_report_file = self.output_path / "reports" / SimpleFileNamer.report_file(scan_number, scan_type)
         original_html = original_template.render(**report_data)
 
         with open(original_report_file, "w") as f:
@@ -627,7 +644,7 @@ class NetworkMapper:
 
         # 2. Generate new interactive visualization
         viz_template = env.get_template("network_visualization.html")
-        viz_report_file = self.output_path / "reports" / f"network_map_{timestamp}.html"
+        viz_report_file = self.output_path / "reports" / SimpleFileNamer.network_map_file(scan_number, scan_type)
         viz_html = viz_template.render(**report_data)
 
         with open(viz_report_file, "w") as f:
@@ -638,7 +655,7 @@ class NetworkMapper:
         # 3. Generate traffic flow report if passive analysis was performed
         if self.passive_analysis_results:
             traffic_template = env.get_template("traffic_flow_report.html")
-            traffic_report_file = self.output_path / "reports" / f"traffic_flow_{timestamp}.html"
+            traffic_report_file = self.output_path / "reports" / SimpleFileNamer.traffic_flow_file(scan_number)
 
             # Prepare traffic flow data
             flow_data = self.passive_analysis_results.get("flow_matrix", {})
@@ -731,12 +748,12 @@ class NetworkMapper:
         original_url = f"file://{original_report_file.absolute()}"
 
         # Open visualization first
-        webbrowser.open(viz_url)
+        open_in_browser(viz_url)
         # Small delay then open report
         import time
 
         time.sleep(0.5)
-        webbrowser.open(original_url)
+        open_in_browser(original_url)
 
         # Open traffic flow report if generated
         traffic_url = None
@@ -744,7 +761,7 @@ class NetworkMapper:
             traffic_report_file = generated_files[2][1]  # Get the traffic report file
             traffic_url = f"file://{traffic_report_file.absolute()}"
             time.sleep(0.5)
-            webbrowser.open(traffic_url)
+            open_in_browser(traffic_url)
 
         # Show clickable links in terminal
         console.print("\n[green]✓ Reports generated and opened in browser![/green]")
@@ -761,21 +778,21 @@ class NetworkMapper:
 
         # Generate comparison report if we have previous scans and changes
         comparison_file = None
-        scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
-        if len(scan_files) >= 2 and self.last_changes:
+        # Check if we have a previous scan (scan_number > 1)
+        if scan_number > 1 and self.last_changes:
             # Always generate comparison report if we have changes
             if self.last_changes.get("summary", {}).get("total_changes", 0) > 0:
                 console.print(
                     "\n[bold yellow]🔄 Network changes detected! Generating comparison report...[/bold yellow]"
                 )
                 comparison_file = self.generate_comparison_report(
-                    devices, self.last_changes, timestamp
+                    devices, self.last_changes, scan_number, scan_type
                 )
 
                 if comparison_file and comparison_file.exists():
                     comparison_url = f"file://{comparison_file.absolute()}"
                     time.sleep(0.5)
-                    webbrowser.open(comparison_url)
+                    open_in_browser(comparison_url)
                     console.print(
                         f"\n[bold green]✓ Comparison Report Generated and Opened![/bold green]"
                     )
@@ -794,23 +811,22 @@ class NetworkMapper:
 
         return viz_report_file, comparison_file
 
-    def generate_comparison_report(self, current_devices, changes, timestamp):
+    def generate_comparison_report(self, current_devices, changes, scan_number, scan_type):
         """Generate comparison report HTML"""
         if not changes or not changes.get("summary"):
             return None
 
         from jinja2 import Environment, FileSystemLoader
 
-        # Get previous scan timestamp for comparison report naming
-        scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
-        if len(scan_files) < 2:
+        # Assume we're comparing to the previous scan
+        previous_scan_number = scan_number - 1
+        
+        # Get scan info from our counter
+        current_scan_info = self.scan_counter.get_scan_info(scan_number)
+        previous_scan_info = self.scan_counter.get_scan_info(previous_scan_number)
+        
+        if not previous_scan_info:
             return None
-
-        # Load previous scan info
-        previous_scan_file = scan_files[1]
-        previous_timestamp = previous_scan_file.stem.replace("scan_", "")
-        previous_time = datetime.strptime(previous_timestamp, "%Y%m%d_%H%M%S")
-        current_time = datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
 
         # Calculate unchanged devices
         total_current = len(current_devices)
@@ -825,19 +841,21 @@ class NetworkMapper:
         # Prepare comparison data
         comparison_data = {
             "comparison_date": datetime.now().strftime("%B %d, %Y"),
-            "previous_scan_time": previous_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "current_scan_time": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "previous_scan_time": previous_scan_info.get("readable_time", "Unknown"),
+            "current_scan_time": current_scan_info.get("readable_time", "Unknown") if current_scan_info else "Unknown",
+            "previous_scan_number": previous_scan_number,
+            "current_scan_number": scan_number,
             "previous_device_count": changes["summary"].get("total_previous", 0),
             "current_device_count": changes["summary"].get("total_current", 0),
             "new_devices": changes.get("new_devices", []),
             "missing_devices": changes.get("missing_devices", []),
             "changed_devices": changes.get("changed_devices", []),
             "unchanged_count": unchanged_count,
-            "current_scan_timestamp": timestamp,
+            "current_scan_timestamp": current_scan_info.get("timestamp", "") if current_scan_info else "",
         }
 
-        # Render and save comparison report
-        comparison_file = self.output_path / "reports" / f"comparison_{timestamp}.html"
+        # Render and save comparison report with simple naming
+        comparison_file = self.output_path / "reports" / SimpleFileNamer.comparison_file(scan_number, previous_scan_number)
         html_content = template.render(**comparison_data)
 
         with open(comparison_file, "w") as f:
@@ -880,24 +898,59 @@ class NetworkMapper:
             return
 
         table = Table(title="Recent Scans")
-        table.add_column("Date/Time", style="cyan")
+        table.add_column("#", style="bright_blue", width=4)
+        table.add_column("Type", style="cyan")
+        table.add_column("Date/Time", style="yellow")
         table.add_column("Devices", style="green")
-        table.add_column("File", style="yellow")
+        table.add_column("File", style="dim")
 
         for scan_file in scan_files[:10]:  # Show last 10
-            timestamp = scan_file.stem.replace("scan_", "")
-            with open(scan_file) as f:
-                devices = json.load(f)
-
-            date_str = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
-            table.add_row(date_str, str(len(devices)), scan_file.name)
+            filename = scan_file.stem
+            
+            # Parse new format: scan_N_type
+            if "_" in filename and not filename.replace("scan_", "").replace("_", "").isdigit():
+                parts = filename.split("_")
+                if len(parts) >= 3 and parts[1].isdigit():
+                    scan_num = parts[1]
+                    scan_type = "_".join(parts[2:])
+                    
+                    # Get scan info from counter
+                    scan_info = self.scan_counter.get_scan_info(int(scan_num))
+                    if scan_info:
+                        date_str = scan_info['readable_time']
+                    else:
+                        date_str = "Unknown"
+                else:
+                    # Fallback for unexpected format
+                    scan_num = "?"
+                    scan_type = "unknown"
+                    date_str = "Unknown"
+            else:
+                # Old format: scan_TIMESTAMP
+                scan_num = "-"
+                scan_type = "legacy"
+                timestamp = filename.replace("scan_", "")
+                try:
+                    date_str = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    date_str = "Unknown"
+            
+            # Load device count
+            try:
+                with open(scan_file) as f:
+                    devices = json.load(f)
+                device_count = str(len(devices))
+            except:
+                device_count = "?"
+            
+            table.add_row(scan_num, scan_type, date_str, device_count, scan_file.name)
 
         console.print(table)
         input("\nPress Enter to continue...")
 
     def check_changes(self):
         """Check for network changes and generate comparison report"""
-        import webbrowser
+        from utils.browser_helper import open_in_browser
 
         # Get most recent scans
         scan_files = sorted((self.output_path / "scans").glob("scan_*.json"), reverse=True)
@@ -935,7 +988,7 @@ class NetworkMapper:
                 if comparison_file and comparison_file.exists():
                     # Open in browser
                     comparison_url = f"file://{comparison_file.absolute()}"
-                    webbrowser.open(comparison_url)
+                    open_in_browser(comparison_url)
                     console.print(f"\n[bold green]✓ Comparison report opened in browser![/bold green]")
                     console.print(
                         f"[yellow]Report location:[/yellow] [underline]{comparison_url}[/underline]"
@@ -1560,10 +1613,10 @@ class NetworkMapper:
             )
 
         if report_files:
-            import webbrowser
+            from utils.browser_helper import open_in_browser
 
             file_url = f"file://{report_files[0].absolute()}"
-            webbrowser.open(file_url)
+            open_in_browser(file_url)
             console.print("[green]Opening network map in browser...[/green]")
             console.print(f"\n[bold cyan]Network map location:[/bold cyan]")
             console.print(f"[yellow underline]{file_url}[/yellow underline]")
