@@ -80,14 +80,14 @@ spinner() {
         i=$(( (i+1) % ${#spin} )); printf "\r${CYAN}${BOLD} %c ${NC} %s" "${spin:$i:1}" "$message"; sleep 0.1
     done; tput cnorm; printf "\r%s\n" "$(tput el)";
 }
-check_os() { # ... no changes needed
+check_os() { 
     log_step "🛰️  Detecting Operating System..."
     OS_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
     if [[ "$OS_TYPE" == "linux" ]]; then log_info "Linux system detected.";
     elif [[ "$OS_TYPE" == "darwin" ]]; then log_info "macOS system detected.";
     else log_error "Unsupported OS: $OS_TYPE. Please use Linux, macOS, or WSL."; exit 1; fi
 }
-check_python() { # ... no changes needed
+check_python() { 
     log_step "🐍 Checking Python version..."
     if ! command_exists python3; then
         log_error "python3 is not installed. Please install Python ${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR} or higher."
@@ -109,6 +109,7 @@ check_command_in_path() {
         *) return 2;;
     esac
 }
+
 install_system_deps() { 
     log_step "📡 Verifying system-wide scanning tools..."
     deps=("nmap" "masscan" "arp-scan")
@@ -232,9 +233,7 @@ EOF
 EOF
     echo -e "${GREEN}${BOLD}      👻  Environment Setup Complete!  👻${NC}"
     echo -e "${GREEN}======================================================================${NC}"
-    echo ""; echo -e "Your local environment is now prepared."; echo -e "The final step is to create the system-wide command."
-    echo ""; echo -e "  - ${BOLD}To complete the installation, run:${NC}"; echo -e "    ${CYAN}make install${NC}";
-    echo ""; echo -e "This will create the '${BOLD}mapper${NC}' command, allowing you to run the tool from anywhere."; echo ""
+    echo ""; echo -e "  - ${BOLD}To Run Network Mapper :${NC}"; echo -e "    ${CYAN}make mapper${NC}";
 }
 
 main() {
