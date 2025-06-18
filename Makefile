@@ -111,7 +111,7 @@ uninstall:
 	@echo "✅  '$(INSTALL_CMD_NAME)' command has been removed."
 
 # Run the application using the local venv (for development)
-run:
+mapper:
 	@echo "🚀 Starting NetworkMapper from local venv..."
 	@$(VENV_PYTHON) mapper.py
 
