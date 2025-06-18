@@ -17,9 +17,7 @@ This is the easiest and most reliable way to run NetworkMapper, as it works on a
 
 1.  **Install Docker:** If you don't have Docker, run our setup script to install it automatically:
     ```bash
-    # Make sure the script is executable first
-    chmod +x ./scripts/docker.sh
-    ./scripts/docker.sh
+    make docker-install
     ```
 
 2.  **Build & Run:** Use our simple `Makefile` command to build the image and start the application:
@@ -27,7 +25,7 @@ This is the easiest and most reliable way to run NetworkMapper, as it works on a
     make docker-run
     ```
 
-That's it! The interactive menu will start. For more advanced Docker usage, please see our detailed **[Docker Setup Guide](./DOCKER_README.md)**.
+That's it! The interactive menu will start. For more advanced Docker usage, please see our detailed **[Docker Setup Guide](./Docker.md)**.
 
 ### 💻 Local Python Method (For Developers)
 
@@ -35,18 +33,12 @@ This method is for users who want to run the tool directly in a local Python env
 
 1.  **Run the Setup Script:** This script will check dependencies and set up your environment.
     ```bash
-    chmod +x ./scripts/setup.sh
-    ./scripts/setup.sh
+    make setup
     ```
 
-2.  **Install the `mapper` Command:** This final step makes the tool available system-wide.
+2.  **run `mapper.py` Command:** To run Network Mapper
     ```bash
-    make install
-    ```
-
-3.  **Run from Anywhere:** You can now run the tool from any directory.
-    ```bash
-    mapper
+    make run
     ```
 
 ---
@@ -55,7 +47,7 @@ This method is for users who want to run the tool directly in a local Python env
 
 Choose one of the following installation paths.
 
-### 🐳 Option 1: Docker Installation (Recommended)
+### 🐳 Option 1: Docker Installation ( If you cant run locally)
 
 Using Docker is the most straightforward way to get started. It bundles all dependencies and configurations into a self-contained environment.
 
