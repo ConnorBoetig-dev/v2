@@ -1582,21 +1582,63 @@ class NetworkMapper:
 
         # Select scan
         console.print("\n[bold]Select scan to generate report:[/bold]")
+        scan_options = []
+        
         for i, scan_file in enumerate(scan_files[:5]):
-            timestamp = scan_file.stem.replace("scan_", "")
-            date_str = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
-            console.print(f"  {i+1}. {date_str}")
+            filename = scan_file.stem
+            
+            # Parse new format: scan_N_type
+            if "_" in filename and not filename.replace("scan_", "").replace("_", "").isdigit():
+                parts = filename.split("_")
+                if len(parts) >= 3 and parts[1].isdigit():
+                    scan_num = int(parts[1])
+                    scan_type = "_".join(parts[2:])
+                    
+                    # Get scan info from counter
+                    scan_info = self.scan_counter.get_scan_info(scan_num)
+                    if scan_info:
+                        date_str = scan_info['readable_time']
+                        target = scan_info['target']
+                        timestamp = scan_info['timestamp']
+                    else:
+                        date_str = "Unknown"
+                        target = "Unknown"
+                        timestamp = ""
+                    
+                    scan_options.append((scan_file, scan_num, scan_type, date_str, target, timestamp))
+                    console.print(f"  {i+1}. Scan #{scan_num} ({scan_type}) - {target} - {date_str}")
+                    continue
+            
+            # Old format: scan_TIMESTAMP
+            scan_num = None
+            scan_type = "legacy"
+            timestamp = filename.replace("scan_", "")
+            try:
+                date_str = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+            except:
+                date_str = "Unknown"
+            
+            scan_options.append((scan_file, scan_num, scan_type, date_str, "Unknown", timestamp))
+            console.print(f"  {i+1}. Legacy scan - {date_str}")
 
         choice = Prompt.ask(
             "Select scan", choices=[str(i + 1) for i in range(min(5, len(scan_files)))]
         )
-        scan_file = scan_files[int(choice) - 1]
+        
+        scan_file, scan_num, scan_type, date_str, target, timestamp = scan_options[int(choice) - 1]
 
         with open(scan_file) as f:
             devices = json.load(f)
 
-        timestamp = scan_file.stem.replace("scan_", "")
-        self.generate_html_report(devices, timestamp)
+        # Generate report based on format
+        if scan_num is not None:
+            # New format
+            self.generate_html_report(devices, scan_num, scan_type, timestamp)
+        else:
+            # Legacy format - generate with dummy scan number
+            console.print("[yellow]Generating report for legacy scan format...[/yellow]")
+            # For legacy scans, we'll use a special marker
+            self.generate_html_report(devices, 0, "legacy", timestamp)
         input("\nPress Enter to continue...")
 
     def view_network_map(self):
