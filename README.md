@@ -6,6 +6,159 @@ A comprehensive Python-based network discovery and security assessment tool that
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg)
 
+
+## Quick Start
+
+Get up and running with NetworkMapper in under a minute. Choose the method that best fits your needs.
+
+### 🐳 Docker Method (Recommended for All Users)
+
+This is the easiest and most reliable way to run NetworkMapper, as it works on any system (Windows, macOS, Linux) with zero setup.
+
+1.  **Install Docker:** If you don't have Docker, run our setup script to install it automatically:
+    ```bash
+    # Make sure the script is executable first
+    chmod +x ./scripts/docker.sh
+    ./scripts/docker.sh
+    ```
+
+2.  **Build & Run:** Use our simple `Makefile` command to build the image and start the application:
+    ```bash
+    make docker-run
+    ```
+
+That's it! The interactive menu will start. For more advanced Docker usage, please see our detailed **[Docker Setup Guide](./DOCKER_README.md)**.
+
+### 💻 Local Python Method (For Developers)
+
+This method is for users who want to run the tool directly in a local Python environment.
+
+1.  **Run the Setup Script:** This script will check dependencies and set up your environment.
+    ```bash
+    chmod +x ./scripts/setup.sh
+    ./scripts/setup.sh
+    ```
+
+2.  **Install the `mapper` Command:** This final step makes the tool available system-wide.
+    ```bash
+    make install
+    ```
+
+3.  **Run from Anywhere:** You can now run the tool from any directory.
+    ```bash
+    mapper
+    ```
+
+---
+
+## Installation
+
+Choose one of the following installation paths.
+
+### 🐳 Option 1: Docker Installation (Recommended)
+
+Using Docker is the most straightforward way to get started. It bundles all dependencies and configurations into a self-contained environment.
+
+Our `Makefile` simplifies the entire process.
+
+1.  **Install Docker:**
+    Run our automated script to install Docker and Docker Compose if you don't have them.
+    ```bash
+    chmod +x ./scripts/docker.sh && ./scripts/docker.sh
+    ```
+
+2.  **Build the Image:**
+    This command reads the `Dockerfile` and builds the application image. You only need to do this once.
+    ```bash
+    make docker-build
+    ```
+
+For detailed instructions on running with different options, managing data, and troubleshooting, please refer to the **[Docker Setup Guide](./Docker.md)**.
+
+### 💻 Option 2: Local Python Installation
+
+Follow these steps to set up a local development environment.
+
+#### 1. System Dependencies
+
+First, ensure you have the required external scanning tools. Our setup script can check for and install them for you.
+
+*   **Required:** `nmap`
+*   **Recommended:** `masscan`, `arp-scan`
+
+#### 2. Automated Setup
+
+Our `setup.sh` script automates the entire process:
+*   Checks for system dependencies and helps you install them.
+*   Creates a Python virtual environment in `./venv/`.
+*   Installs all required Python packages from `ops/requirements.txt`.
+
+To run it:
+```bash
+# Make the script executable
+chmod +x ./scripts/setup.sh
+
+# Run the setup process
+./scripts/setup.sh
+```
+
+#### 3. Install the Command (Final Step)
+
+After running the setup script, run the following command to create a system-wide `mapper` command for easy access:
+```bash
+make install
+```
+This will prompt for your `sudo` password to create a symbolic link in `/usr/local/bin`.
+
+---
+
+## Usage
+
+How you run NetworkMapper depends on your installation method.
+
+### 🐳 Running with Docker
+
+The `Makefile` provides the easiest way to interact with the Docker container.
+
+**Start the interactive menu:**
+```bash
+make docker-run
+```
+
+**Run a non-interactive scan:**
+Pass arguments directly to the container.
+```bash
+docker-compose run --rm networkmapper --target 192.168.1.0/24 --scan-type deeper
+```
+> For more commands, see the **[Docker Setup Guide](./DOCKER_README.md)**.
+
+### 💻 Running Locally
+
+**If you used `make install`:**
+You can run the application from any directory in your terminal.
+
+**Start the interactive menu:**
+```bash
+mapper
+```
+**Run a non-interactive scan:**
+(Note: Some scan types like `deeper` or `fast` require root privileges)
+```bash
+sudo mapper --target 10.0.0.0/16 --scan-type fast
+```
+
+**If you only used `make setup` (developer mode):**
+You must run the tool from within the project directory using the `Makefile`.
+
+**Start the interactive menu:**
+```bash
+make run
+```
+**Run a non-interactive scan:**
+```bash
+make scan TARGET=192.168.1.0/24 TYPE=fast
+```
+
 ## Features
 
 - **🔍 Multi-Scanner Support**: Intelligent use of nmap, masscan, and arp-scan
@@ -49,152 +202,6 @@ A comprehensive Python-based network discovery and security assessment tool that
 - **Vulnerability Scanning**: CVE correlation with CVSS scores
 - **Passive Analysis**: Real-time traffic capture and flow mapping
 
-## Quick Start
-
-### 🐳 Easiest Method - Docker (Recommended for Sharing)
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/networkmapper-v2.git
-cd networkmapper-v2
-
-# Build and run with Docker (no setup required!)
-make docker-build
-make docker-run
-```
-
-### 💻 Local Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/networkmapper-v2.git
-cd networkmapper-v2
-
-# Automated setup
-make setup
-
-# Run the tool
-./venv/bin/python mapper.py
-```
-
-## Installation
-
-### System Requirements
-- Python 3.8 or higher
-- Operating System: Linux, macOS, or Windows (with WSL)
-- Network access and appropriate permissions for scanning
-
-### Required System Packages
-```bash
-# Core scanner (required)
-sudo apt install nmap
-
-# Optional but recommended
-sudo apt install arp-scan    # For Layer 2 discovery
-sudo apt install masscan     # For high-speed scanning
-```
-
-### Python Dependencies
-```bash
-# Install all dependencies (includes testing and development tools)
-pip3 install -r requirements.txt
-
-# For production only (minimal dependencies)
-pip3 install typer rich python-nmap requests jinja2 pyyaml reportlab openpyxl pandas pysnmp flask
-```
-
-### Platform-Specific Installation
-
-#### Ubuntu/Debian
-```bash
-sudo apt update
-sudo apt install python3 python3-pip python3-venv nmap arp-scan masscan
-
-# Create virtual environment (recommended)
-python3 -m venv venv
-source venv/bin/activate
-
-# Install Python dependencies
-pip install -r requirements.txt
-```
-
-#### macOS
-```bash
-# Install Homebrew if not already installed
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install system packages
-brew install python nmap arp-scan
-
-# Masscan on macOS (build from source)
-git clone https://github.com/robertdavidgraham/masscan
-cd masscan
-make
-sudo make install
-
-# Install Python dependencies
-pip3 install -r requirements.txt
-```
-
-#### Windows (WSL2)
-```bash
-# In WSL2 Ubuntu terminal
-sudo apt update
-sudo apt install python3 python3-pip nmap arp-scan
-pip3 install -r requirements.txt
-```
-
-### Docker Installation
-```bash
-# Build the container
-docker build -t networkmapper .
-
-# Run with host network access
-docker run -it --network host --privileged networkmapper
-
-# Or with volume for persistent data
-docker run -it --network host --privileged -v $(pwd)/output:/app/output networkmapper
-```
-
-### Verify Installation
-```bash
-# Check Python version
-python3 --version  # Should be 3.8+
-
-# Check scanners
-which nmap         # Should show path
-which arp-scan     # Optional
-which masscan      # Optional
-
-# Test the application
-python3 mapper.py --help
-```
-
-## Usage
-
-### Interactive Mode (Recommended)
-```bash
-python3 mapper.py
-```
-
-### Command Line Options
-```bash
-# Disable SNMP enrichment
-python3 mapper.py --disable-snmp
-
-# Specify SNMP settings
-python3 mapper.py --snmp-community private --snmp-version v2c
-```
-
-### Using Helper Scripts
-```bash
-./quick_start.sh    # Quick setup and launch
-./run_demo.sh       # Run demo scenarios
-python scripts/verify_installation.py  # Verify setup
-python scripts/test_core_functionality.py  # Test features
-```
-
-## Scan Types
 
 1. **Discovery Scan** (~30 seconds)
    - Quick host discovery
@@ -249,7 +256,7 @@ NetworkMapper includes a built-in web server for accessing reports remotely.
 ### 1. Local Network Access
 After completing a scan, the web server automatically starts:
 ```bash
-python3 mapper.py
+make mapper
 # Note the URLs displayed after scan completion:
 # Local: http://localhost:5000
 # Network: http://YOUR-IP:5000

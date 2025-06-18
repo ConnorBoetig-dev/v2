@@ -1,18 +1,26 @@
 #!/bin/bash
 #
 # NetworkMapper v2 - Automated Local Setup Script
-#
 # A visually-enhanced, user-friendly setup experience.
 #
-# ©AngelaMos | ©CertGames.com
 
-
+# Exit immediately if a command exits with a non-zero status.
 set -e
 
+# --- THIS IS THE CRUCIAL FIX FOR THE SCRIPT'S LOCATION ---
+# Get the absolute path of the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+# Set the project root as the parent directory of the script's directory
+PROJECT_ROOT="$SCRIPT_DIR/.."
+# --- END OF FIX ---
+
+# --- Configuration ---
 PYTHON_VERSION_MAJOR=3
 PYTHON_VERSION_MINOR=8
-VENV_DIR="venv"
+# All paths should now be relative to the PROJECT_ROOT
+VENV_DIR="$PROJECT_ROOT/venv"
 
+# --- Colors for ANSI escape codes ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -20,18 +28,15 @@ BLUE='\033[0;34m'
 MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
-NC='\033[0m'
-
+NC='\033[0m' # No Color
 
 log_info() { echo -e "${GREEN}${BOLD}[✓]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}${BOLD}[!]${NC} $1"; }
 log_error() { echo -e "${RED}${BOLD}[✗]${NC} $1"; }
 log_step() { echo -e "\n${CYAN}${BOLD}==>${NC} ${BOLD}$1${NC}"; }
-
-
-print_banner() {
+print_banner() { 
     clear
-    echo -e "${BLUE}"
+    echo -e "${CYAN}"
     cat << "EOF"
                                               _..
                                           .qd$$$$bp.
@@ -68,33 +73,21 @@ EOF
     echo -e "      Welcome! Preparing your system for Network Discovery."
     echo -e "${CYAN}======================================================================${NC}"
 }
-
 command_exists() { command -v "$1" >/dev/null 2>&1; }
-
 spinner() {
-    local pid=$1
-    local message=$2
-    local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-    local i=0
-    tput civis
-    while kill -0 $pid 2>/dev/null; do
-        i=$(( (i+1) % ${#spin} ))
-        printf "\r${CYAN}${BOLD} %c ${NC} %s" "${spin:$i:1}" "$message"
-        sleep 0.1
-    done
-    tput cnorm
-    printf "\r%s\n" "$(tput el)"
+    local pid=$1; local message=$2; local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'; local i=0
+    tput civis; while kill -0 $pid 2>/dev/null; do
+        i=$(( (i+1) % ${#spin} )); printf "\r${CYAN}${BOLD} %c ${NC} %s" "${spin:$i:1}" "$message"; sleep 0.1
+    done; tput cnorm; printf "\r%s\n" "$(tput el)";
 }
-
-check_os() {
+check_os() { # ... no changes needed
     log_step "🛰️  Detecting Operating System..."
     OS_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
     if [[ "$OS_TYPE" == "linux" ]]; then log_info "Linux system detected.";
     elif [[ "$OS_TYPE" == "darwin" ]]; then log_info "macOS system detected.";
     else log_error "Unsupported OS: $OS_TYPE. Please use Linux, macOS, or WSL."; exit 1; fi
 }
-
-check_python() {
+check_python() { # ... no changes needed
     log_step "🐍 Checking Python version..."
     if ! command_exists python3; then
         log_error "python3 is not installed. Please install Python ${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR} or higher."
@@ -108,134 +101,99 @@ check_python() {
     fi
     log_info "Python ${PY_VERSION_MAJOR}.${PY_VERSION_MINOR} is ready."
 }
-
-# --- New Helper Function to check path ---
-check_command_in_path() {
-    local cmd_path
-    cmd_path=$(command -v "$1")
-    if [ -z "$cmd_path" ]; then
-        return 1 # Command not found at all
-    fi
-
-    # Check if the command is in a standard system path
-    # This helps catch issues where it's installed in a non-standard location
-    # not included in the default PATH for all users.
+check_command_in_path() { 
+    local cmd_path; cmd_path=$(command -v "$1" 2>/dev/null)
+    if [ -z "$cmd_path" ]; then return 1; fi
     case "$cmd_path" in
-        /usr/bin/*|/usr/sbin/*|/bin/*|/sbin/*|/usr/local/bin/*|/usr/local/sbin/*)
-            return 0 # It's in a standard path
-            ;;
-        *)
-            # Found, but in a weird place. This is a problem.
-            log_warn "Tool '$1' was found at '$cmd_path', which is not a standard system path."
-            log_warn "This may cause issues. Please ensure it is in /usr/bin, /usr/sbin, or a similar directory."
-            return 2 # Found, but path is suspicious
-            ;;
+        /usr/bin/*|/usr/sbin/*|/bin/*|/sbin/*|/usr/local/bin/*|/usr/local/sbin/*) return 0;;
+        *) return 2;;
     esac
 }
-
-install_system_deps() {
+install_system_deps() { 
     log_step "📡 Verifying system-wide scanning tools..."
     deps=("nmap" "masscan" "arp-scan")
     missing_deps=()
     path_issue_deps=()
-
+    path_issue_locations=()
     for dep in "${deps[@]}"; do
         check_command_in_path "$dep"
         local exit_code=$?
-        
-        if [ $exit_code -eq 0 ]; then
-            log_info "$dep is installed and in PATH."
-        elif [ $exit_code -eq 1 ]; then
-            log_warn "$dep is NOT installed."
-            missing_deps+=("$dep")
+        if [ $exit_code -eq 0 ]; then log_info "$dep is installed and in PATH.";
+        elif [ $exit_code -eq 1 ]; then log_warn "$dep is NOT installed."; missing_deps+=("$dep");
         elif [ $exit_code -eq 2 ]; then
-            path_issue_deps+=("$dep")
-        fi
+            local cmd_path=$(command -v "$dep");
+            log_warn "Tool '$dep' is at '$cmd_path' but not in a standard system PATH."
+            path_issue_deps+=("$dep"); path_issue_locations+=("$cmd_path"); fi
     done
-
     if [ ${#path_issue_deps[@]} -ne 0 ]; then
-        log_error "Path Issue Detected for: ${path_issue_deps[*]}"
-        echo -e "These tools are installed but not in a standard location."
-        echo -e "This can happen with manual installations or some package managers."
-        echo -e "${YELLOW}Recommendation:${NC} Please uninstall these versions and let this script (or your system's package manager) install them to a standard location like /usr/bin/."
-        exit 1
+        log_error "Path Issue Detected for: ${path_issue_deps[*]}";
+        echo -e "This tool can be fixed by creating a symbolic link in ${BOLD}/usr/local/bin/${NC}."
+        read -p "Attempt to fix this automatically? (Requires sudo) (y/N) " -n 1 -r; echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            log_step "Requesting privileges to fix paths..."; if ! sudo -v; then log_error "Sudo auth failed."; exit 1; fi
+            for i in "${!path_issue_deps[@]}"; do
+                sudo ln -sf "${path_issue_locations[i]}" "/usr/local/bin/${path_issue_deps[i]}";
+            done; log_info "Paths fixed. Re-running verification..."; install_system_deps; return
+        else log_error "Aborting. Please fix the PATH issue manually."; exit 1; fi
     fi
-
     if [ ${#missing_deps[@]} -ne 0 ]; then
-        log_error "Missing required tools: ${missing_deps[*]}"
+        log_error "Missing required tools: ${missing_deps[*]}";
         read -p "Attempt to install them now? (Requires sudo) (y/N) " -n 1 -r; echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_error "Aborting. Please install missing tools manually."
-            exit 1
-        fi
-
-        log_step "Requesting administrator privileges for installation..."
-        if ! sudo -v; then
-            log_error "Sudo authentication failed. Cannot proceed."
-            exit 1
-        fi
-        log_info "Sudo access granted."
-
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then log_error "Aborting. Please install missing tools manually."; exit 1; fi
+        if ! sudo -v; then log_error "Sudo auth failed."; exit 1; fi; log_info "Sudo access granted."
         if [[ "$OS_TYPE" == "linux" ]]; then
-            log_step "Installing with apt..."
-            (sudo apt-get update > /dev/null 2>&1) &
-            spinner $! "Updating package lists..."
-            (sudo apt-get install -y "${missing_deps[@]}" > /dev/null 2>&1) &
-            spinner $! "Installing ${missing_deps[*]}..."
+            log_step "Installing with apt..."; (sudo apt-get update >/dev/null 2>&1) & spinner $! "Updating package lists..."; (sudo apt-get install -y "${missing_deps[@]}" >/dev/null 2>&1) & spinner $! "Installing ${missing_deps[*]}..."
         elif [[ "$OS_TYPE" == "darwin" ]]; then
-            if ! command_exists brew; then log_error "Homebrew not found. Please install it: https://brew.sh/"; exit 1; fi
-            log_step "Attempting to install with Homebrew..."; brew install "${missing_deps[@]}"
+            if ! command_exists brew; then log_error "Homebrew not found. Install it: https://brew.sh/"; exit 1; fi
+            log_step "Installing with Homebrew..."; brew install "${missing_deps[@]}"
         fi
-
-        log_step "Final verification of tools..."
-        for dep in "${missing_deps[@]}"; do
-            if ! command_exists "$dep"; then
-                log_error "Failed to install or find '$dep' after installation attempt."
-                log_error "Please install it manually and ensure it's in your system's PATH, then re-run setup."
-                exit 1
-            else
-                log_info "$dep is now installed."
-            fi
+        log_step "Final verification..."; for dep in "${missing_deps[@]}"; do
+            if ! command_exists "$dep"; then log_error "Failed to install '$dep'. Please install manually."; exit 1; fi
+            log_info "$dep is now installed."
         done
         log_info "All system dependencies are now correctly installed!"
-    else
+    elif [ ${#path_issue_deps[@]} -eq 0 ]; then
         log_info "All system dependencies are present and correctly configured."
     fi
 }
 
+
 setup_venv() {
-    log_step "📦 Creating Python virtual environment..."
+    log_step "🐍 Creating Python virtual environment..."
     if [ -d "$VENV_DIR" ]; then log_info "Virtual environment already exists."; else
-        python3 -m venv "$VENV_DIR"; log_info "Virtual environment created in ./${VENV_DIR}/"; fi
+        python3 -m venv "$VENV_DIR"; log_info "Virtual environment created at '$VENV_DIR'"; fi
 }
 
 install_python_deps() {
-    log_step "🧩 Installing Python packages..."
+    log_step "🐍 Installing Python packages..."
     source "${VENV_DIR}/bin/activate"
-    (pip install --upgrade pip > /dev/null 2>&1) &
-    spinner $! "Upgrading pip..."
-    log_info "Pip upgraded successfully."
-    (pip install -r requirements.txt > /dev/null 2>&1) &
-    spinner $! "Installing dependencies from requirements.txt... (this may take a moment)"
-    log_info "Dependencies installed successfully."
+
+    local req_file="$PROJECT_ROOT/ops/requirements.txt"
+    if [ ! -f "$req_file" ]; then
+        log_error "Could not find requirements file at '$req_file'!"
+        exit 1
+    fi
+    
+    (
+        pip install --upgrade pip > /dev/null 2>&1
+        pip install -r "$req_file" > /dev/null 2>&1
+    ) &
+    spinner $! "Installing Python dependencies... (this may take a moment)"
+
     deactivate
     log_info "All Python packages installed successfully."
 }
 
 create_directories() {
     log_step "🗂️  Creating output directories..."
-    mkdir -p output/{scans,reports,exports,logs,cache,config,changes,annotations}
+    mkdir -p "$PROJECT_ROOT"/output/{scans,reports,exports,logs,cache,config,changes,annotations}
     log_info "Output directory structure is ready."
 }
 
-print_final_message() {
-    ART_COLOR_1='\033[0;36m'
-    ART_COLOR_2='\033[0;35m'
-    ART_COLOR_3='\033[0;34m'
-
+print_final_message() { 
+    ART_COLOR_1='\033[0;36m'; ART_COLOR_2='\033[0;35m'; ART_COLOR_3='\033[0;34m'
     echo -e "\n${GREEN}======================================================================${NC}"
-    echo -e "${ART_COLOR_1}"
-    cat << "EOF"
+    echo -e "${ART_COLOR_1}"; cat << "EOF"
                ,::%%n
             ,-::%%%%%%=.
            /:::%%%(:  "-:.
@@ -245,8 +203,7 @@ print_final_message() {
        j::::::%:%%%%i 'i  `i
        :::::::%:%%%%%  :_-=".
 EOF
-    echo -e "${ART_COLOR_2}"
-    cat << "EOF"
+    echo -e "${ART_COLOR_2}"; cat << "EOF"
       /:::::::%%%%%%%i      t
      ,:::::::::%%%%%%; .    ]
      f:::::::::%%%%%;  ,.-= j,-""-.
@@ -264,8 +221,7 @@ j::::::'  _.                  :`.n88%888&i
 `%%%%%%%%888888%%%%%%%*%%%%8::::::&88%88&H
  `%o%%%*%8o88888%%%%%%%%%888i::::/|&88%88&i
 EOF
-    echo -e "${ART_COLOR_3}"
-    cat << "EOF"
+    echo -e "${ART_COLOR_3}"; cat << "EOF"
   `%%%%%%88888%%%88888888888;:::/ `888%888&
     `%%%8%%%%%%8888886888*88j::/   H888%88&h
       i%%*%%%%o%%88888888888i:/    `888%888&
@@ -276,22 +232,17 @@ EOF
 EOF
     echo -e "${GREEN}${BOLD}      👻  Environment Setup Complete!  👻${NC}"
     echo -e "${GREEN}======================================================================${NC}"
-    echo ""
-    echo -e "Your local environment is now prepared."
-    echo -e "The final step is to create the system-wide command."
-    echo ""
-    echo -e "  - ${BOLD}To complete the installation, run:${NC}"
-    echo -e "    ${CYAN}make mapper${NC}"
-    echo ""
-    echo -e "This will create the '${BOLD}mapper${NC}' command, allowing you to run the tool from anywhere."
-    echo ""
+    echo ""; echo -e "Your local environment is now prepared."; echo -e "The final step is to create the system-wide command."
+    echo ""; echo -e "  - ${BOLD}To complete the installation, run:${NC}"; echo -e "    ${CYAN}make install${NC}";
+    echo ""; echo -e "This will create the '${BOLD}mapper${NC}' command, allowing you to run the tool from anywhere."; echo ""
 }
 
-
 main() {
+    cd "$PROJECT_ROOT"
+    
     print_banner
     echo ""
-    echo "Initiating setup sequence..."
+    echo "Initiating setup sequence from project root: $(pwd)"
 
     check_os
     check_python
