@@ -33,8 +33,7 @@ install_docker_linux() {
     log_step "Configuring user permissions for Docker...";
     if sudo usermod -aG docker "$USER"; then
         log_info "Added '$USER' to the 'docker' group."
-        log_warn "You must log out and log back in for this to take effect!"
-        log_warn "Or run 'newgrp docker' in your current terminal."
+        log_warn "Run 'newgrp docker' to activate Docker permissions in this terminal."
     else log_error "Failed to add user to docker group. You may need to run 'docker' commands with 'sudo'."; fi
 }
 install_docker_macos() {
@@ -78,8 +77,9 @@ main() {
     echo -e "\n${GREEN}====================================================${NC}";
     echo -e "${GREEN}${BOLD}      ✅  Docker Environment is Ready!${NC}";
     echo -e "${GREEN}====================================================${NC}";
-    echo ""; echo "You can now build and run the NetworkMapper application using Docker."
-    echo "Next steps:"; echo -e "  1. Build image: ${CYAN}make docker-build${NC}"; echo -e "  2. Run the app: ${CYAN}make docker-run${NC}"; echo ""
+    echo ""; echo "Docker is now installed and configured for NetworkMapper."
+    echo ""; echo "Run this command to start the application:"
+    echo -e "  ${BOLD}make docker-build && make docker-run${NC}"; echo ""
 }
 
 main

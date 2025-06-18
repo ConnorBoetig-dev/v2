@@ -13,19 +13,19 @@ Get up and running with NetworkMapper in under a minute. Choose the method that 
 
 ### 🐳 Docker Method (Recommended for All Users)
 
-This is the easiest and most reliable way to run NetworkMapper, as it works on any system (Windows, macOS, Linux) with zero setup.
+This is the easiest and most reliable way to run NetworkMapper on a fresh system.
 
-1.  **Install Docker:** If you don't have Docker, run our setup script to install it automatically:
-    ```bash
-    make docker-install
-    ```
+```bash
+# Clone the repository
+git clone <repository-url> networkmapper
+cd networkmapper
 
-2.  **Build & Run:** Use our simple `Makefile` command to build the image and start the application:
-    ```bash
-    make docker-run
-    ```
+# Install Docker and run NetworkMapper
+make docker-install
+make docker-build
+```
 
-That's it! The interactive menu will start. For more advanced Docker usage, please see our detailed **[Docker Setup Guide](./Docker.md)**.
+That's it! The interactive menu will start. For detailed Docker setup instructions, please see our **[Docker Setup Guide](./DOCKER_SETUP.md)**.
 
 ### 💻 Local Python Method (For Developers)
 
