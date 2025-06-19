@@ -34,6 +34,14 @@ except ImportError:
     SNMP_AVAILABLE = False
     logger.warning("SNMP support not available - install pysnmp to enable")
 
+# Import MAC lookup for vendor resolution
+try:
+    from utils.mac_lookup import MACLookup
+    MAC_LOOKUP_AVAILABLE = True
+except ImportError:
+    MAC_LOOKUP_AVAILABLE = False
+    logger.warning("MAC lookup not available")
+
 
 class AsyncNetworkScanner:
     """Asynchronous network scanner with parallel execution capabilities"""
@@ -49,10 +57,10 @@ class AsyncNetworkScanner:
                     "-O",
                     "--osscan-guess",
                     "--version-intensity",
-                    "0",
+                    "5",  # Better service detection
                     "--top-ports",
                     "100",
-                    "-T5",
+                    "-T4",  # More reliable timing for OS detection
                 ],
                 "description": "Fast scan for large networks (65k+ hosts)",
             },
@@ -67,7 +75,7 @@ class AsyncNetworkScanner:
                     "5",
                     "--top-ports",
                     "500",
-                    "-T3",
+                    "-T4",  # Consistent timing
                     "--script-timeout",
                     "10s",
                 ],
@@ -90,6 +98,9 @@ class AsyncNetworkScanner:
         self._results_lock = asyncio.Lock()  # Thread-safe results merging
         self._temp_files_lock = threading.Lock()  # Thread-safe temp file tracking
         self._temp_files = []  # Track temp files for cleanup
+        
+        # Initialize MAC lookup for vendor resolution
+        self.mac_lookup = MACLookup() if MAC_LOOKUP_AVAILABLE else None
         
     def _load_config(self):
         """Load configuration from config.yaml"""
@@ -118,6 +129,18 @@ class AsyncNetworkScanner:
         snmp_config: Dict = None,
     ) -> List[Dict]:
         """Execute network scan with parallel execution"""
+        
+        # Check for required tools
+        if scan_type in ["fast", "deeper"]:
+            # Check nmap availability
+            nmap_check = subprocess.run(["which", "nmap"], capture_output=True)
+            if nmap_check.returncode != 0:
+                self.console.print("[red]⚠ WARNING: nmap is not installed![/red]")
+                self.console.print("[yellow]Without nmap, the scan will not detect:[/yellow]")
+                self.console.print("[yellow]  - Operating Systems[/yellow]")
+                self.console.print("[yellow]  - Service names (only ports will be shown)[/yellow]")
+                self.console.print("[yellow]  - MAC addresses and vendors[/yellow]")
+                self.console.print("[dim]Install with: sudo apt install nmap[/dim]\n")
         
         # Fast and deeper scan modes use masscan + enrichment approach
         if scan_type == "fast":
@@ -482,11 +505,16 @@ class AsyncNetworkScanner:
                 devices_found = 0
                 last_percent = 0
                 
-                process = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
+                try:
+                    process = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                except FileNotFoundError:
+                    self.console.print("[red]✗ Error: nmap is not installed![/red]")
+                    self.console.print("[yellow]Please install nmap: sudo apt install nmap[/yellow]")
+                    return chunk
                 
                 # Quick error check
                 await asyncio.sleep(0.5)
@@ -642,6 +670,15 @@ class AsyncNetworkScanner:
             self.console.print(f"[cyan]📊 Performing deep enrichment on {len(devices)} discovered hosts...[/cyan]")
             self.console.print("[cyan]🔍 This includes: Comprehensive OS detection, detailed service versions, and extended port scanning[/cyan]")
             devices = await self._enrich_deeper_scan_async(devices)
+            
+            # Final vendor enrichment pass
+            if self.mac_lookup:
+                self.console.print("[dim]Enriching vendor information...[/dim]")
+                for device in devices:
+                    if device.get("mac") and not device.get("vendor"):
+                        vendor = self.mac_lookup.lookup(device["mac"])
+                        if vendor:
+                            device["vendor"] = vendor
         
         return devices
     
@@ -718,15 +755,20 @@ class AsyncNetworkScanner:
                 cmd = ["sudo", "-n", "nmap"] + profile["nmap"] + ["-oX", temp_file] + ips
                 
                 # Run with longer timeout
-                proc = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
+                try:
+                    proc = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                except FileNotFoundError:
+                    self.console.print("[red]✗ Error: nmap is not installed![/red]")
+                    self.console.print("[yellow]Please install nmap: sudo apt install nmap[/yellow]")
+                    return chunk
                 
                 # Wait with timeout
                 try:
-                    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+                    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=600)  # 10 minutes for deeper scan
                 except asyncio.TimeoutError:
                     proc.kill()
                     logger.warning(f"Deeper enrichment timeout for chunk {chunk_idx + 1}")
@@ -742,7 +784,15 @@ class AsyncNetworkScanner:
                     for e in enriched:
                         if e["ip"] in device_map:
                             original = device_map[e["ip"]]
+                            # Merge data, preserving original MAC/vendor if not in enriched
                             e["open_ports"] = list(set(original.get("open_ports", []) + e.get("open_ports", [])))
+                            e["mac"] = e.get("mac") or original.get("mac", "")
+                            e["vendor"] = e.get("vendor") or original.get("vendor", "")
+                            # If we have MAC but no vendor, try lookup
+                            if e.get("mac") and not e.get("vendor") and self.mac_lookup:
+                                vendor = self.mac_lookup.lookup(e["mac"])
+                                if vendor:
+                                    e["vendor"] = vendor
                             merged.append(e)
                         else:
                             merged.append(e)
@@ -779,25 +829,31 @@ class AsyncNetworkScanner:
                     "-sS", "-sV", "-O",
                     "--osscan-guess",
                     "--version-intensity", "0",
-                    "-T5",
+                    "-T4",  # More reliable timing for OS detection
                     "--top-ports", "20",
+                    "--max-os-tries", "2",  # More OS detection attempts
                     "-oX", temp_file,
-                    "--max-rtt-timeout", "100ms",
-                    "--max-retries", "1",
+                    "--max-rtt-timeout", "200ms",  # Increased for reliability
+                    "--max-retries", "2",  # More retries for better detection
                 ] + ips
                 
                 # Show what we're doing
                 self.console.print(f"[dim]Running nmap enrichment on {len(ips)} hosts...[/dim]")
                 
-                process = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
+                try:
+                    process = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                except FileNotFoundError:
+                    self.console.print("[red]✗ Error: nmap is not installed![/red]")
+                    self.console.print("[yellow]Please install nmap: sudo apt install nmap[/yellow]")
+                    return chunk
                 
                 # Set timeout for enrichment
                 try:
-                    await asyncio.wait_for(process.wait(), timeout=120)
+                    await asyncio.wait_for(process.wait(), timeout=300)
                 except asyncio.TimeoutError:
                     process.terminate()
                     await process.wait()
@@ -809,11 +865,11 @@ class AsyncNetworkScanner:
                         "sudo", "-n", "nmap",
                         "-sS", "-sV",
                         "--version-intensity", "0",
-                        "-T5",
+                        "-T4",  # More reliable timing for OS detection
                         "--top-ports", "10",
                         "-oX", temp_file,
-                        "--max-rtt-timeout", "50ms",
-                        "--max-retries", "0",
+                        "--max-rtt-timeout", "100ms",
+                        "--max-retries", "1",
                     ] + ips
                     
                     process = await asyncio.create_subprocess_exec(
@@ -823,7 +879,7 @@ class AsyncNetworkScanner:
                     )
                     
                     try:
-                        await asyncio.wait_for(process.wait(), timeout=30)
+                        await asyncio.wait_for(process.wait(), timeout=60)
                     except asyncio.TimeoutError:
                         process.terminate()
                         await process.wait()
@@ -837,13 +893,21 @@ class AsyncNetworkScanner:
                     for device in chunk:
                         if device["ip"] in enriched_map:
                             e = enriched_map[device["ip"]]
+                            # Update with enriched data, preserving vendor if already set
                             device.update({
                                 "hostname": e.get("hostname", ""),
                                 "os": e.get("os", ""),
                                 "os_accuracy": e.get("os_accuracy", 0),
-                                "services": e.get("services", []),
-                                "vendor": e.get("vendor", device.get("vendor", "")),
+                                "services": e.get("services", []) if e.get("services") else device.get("services", []),
+                                "vendor": e.get("vendor") or device.get("vendor", ""),
+                                "mac": e.get("mac") or device.get("mac", ""),
                             })
+                            
+                            # If we got a MAC but no vendor, try MAC lookup
+                            if device.get("mac") and not device.get("vendor") and self.mac_lookup:
+                                vendor = self.mac_lookup.lookup(device["mac"])
+                                if vendor:
+                                    device["vendor"] = vendor
                 
                 return chunk
                 
@@ -1195,7 +1259,14 @@ class AsyncNetworkScanner:
         mac_elem = host_elem.find('.//address[@addrtype="mac"]')
         if mac_elem is not None:
             device["mac"] = mac_elem.get("addr", "").upper()
-            device["vendor"] = mac_elem.get("vendor", "")
+            # Get vendor from nmap or use MAC lookup
+            nmap_vendor = mac_elem.get("vendor", "")
+            if nmap_vendor:
+                device["vendor"] = nmap_vendor
+            elif self.mac_lookup:
+                vendor = self.mac_lookup.lookup(device["mac"])
+                if vendor:
+                    device["vendor"] = vendor
         
         # Hostname
         hostname_elem = host_elem.find(".//hostname")
@@ -1278,6 +1349,15 @@ class AsyncNetworkScanner:
                                     "discovery_method": "masscan",
                                 }
                             
+                            # Try to get MAC and vendor from ARP cache if available
+                            if self.mac_lookup:
+                                arp_cache = self.mac_lookup.get_arp_cache()
+                                if ip in arp_cache:
+                                    devices[ip]["mac"] = arp_cache[ip]
+                                    vendor = self.mac_lookup.lookup(arp_cache[ip])
+                                    if vendor:
+                                        devices[ip]["vendor"] = vendor
+                            
                             if "ports" in entry and isinstance(entry["ports"], list):
                                 for port_info in entry["ports"]:
                                     if isinstance(port_info, dict):
@@ -1299,7 +1379,17 @@ class AsyncNetworkScanner:
         except Exception as e:
             logger.error(f"Failed to parse masscan output: {e}")
         
-        return list(devices.values())
+        device_list = list(devices.values())
+        
+        # Final vendor enrichment pass for any devices still missing vendor
+        if self.mac_lookup:
+            for device in device_list:
+                if device.get("mac") and not device.get("vendor"):
+                    vendor = self.mac_lookup.lookup(device["mac"])
+                    if vendor:
+                        device["vendor"] = vendor
+        
+        return device_list
 
 
 # Backward compatibility wrapper

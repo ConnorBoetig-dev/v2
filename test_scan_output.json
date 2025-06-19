@@ -1,0 +1,78 @@
+{
+  "scan_metadata": {
+    "start_time": "2025-06-19T10:45:49.500862",
+    "end_time": "2025-06-19T10:45:49.500873",
+    "duration": "5 minutes",
+    "target": "10.1.100.0/24",
+    "scan_type": "deeper",
+    "scan_parameters": {
+      "snmp_enabled": false,
+      "vulnerability_scan": false
+    }
+  },
+  "devices": [
+    {
+      "ip": "10.1.100.31",
+      "mac": "84:A9:38:8F:5C:30",
+      "hostname": "DESKTOP-WIN10",
+      "vendor": "LCFC(Hefei) Electronics Technology co., ltd",
+      "type": "workstation",
+      "os": "Microsoft Windows 10",
+      "os_accuracy": 95,
+      "services": [
+        "ms-wbt-server:3389 (Microsoft Terminal Services)"
+      ],
+      "open_ports": [
+        3389
+      ],
+      "scan_time": "2025-06-19T10:45:48.778424",
+      "discovery_method": "nmap"
+    },
+    {
+      "ip": "10.1.104.6",
+      "mac": "E8:40:F2:E1:FE:63",
+      "hostname": "ubuntu-server",
+      "vendor": "PEGATRON CORPORATION",
+      "type": "server",
+      "os": "Linux 5.4",
+      "os_accuracy": 90,
+      "services": [
+        "ms-wbt-server:3389",
+        "ssh:22 (OpenSSH 8.2)"
+      ],
+      "open_ports": [
+        3389,
+        22
+      ],
+      "scan_time": "2025-06-19T10:45:48.778438",
+      "discovery_method": "nmap"
+    },
+    {
+      "ip": "10.1.100.49",
+      "mac": "9C:6B:00:91:57:CB",
+      "hostname": "",
+      "vendor": "ASRock Incorporation",
+      "type": "unknown",
+      "os": "",
+      "services": [
+        "tcp:3389"
+      ],
+      "open_ports": [
+        3389
+      ],
+      "scan_time": "2025-06-19T10:45:48.778441",
+      "discovery_method": "masscan"
+    }
+  ],
+  "subnet_summary": [
+    {
+      "network": "10.1.100.0/24",
+      "device_count": 3,
+      "types": {
+        "workstation": 1,
+        "server": 1,
+        "unknown": 1
+      }
+    }
+  ]
+}

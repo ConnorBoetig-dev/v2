@@ -57,10 +57,13 @@ SCAN_PROFILES: Dict[ScanType, ScanProfile] = {
             '-sU',  # UDP scan for top ports
             '-sV',  # Version detection
             '-O',   # OS detection
+            '--osscan-guess',  # Aggressive OS guessing
+            '--max-os-tries', '2',  # More OS detection attempts
             '--version-intensity', '7',
             '--top-ports', '1000',
             '--max-retries', '2',
             '--host-timeout', '300s',
+            '-T4',  # Consistent timing
             '--script', 'discovery,safe'
         ],
         masscan_args=[],  # Not suitable for masscan
@@ -77,9 +80,12 @@ SCAN_PROFILES: Dict[ScanType, ScanProfile] = {
             '-sU',  # UDP scan
             '-sV',  # Version detection
             '-O',   # OS detection
+            '--osscan-guess',  # Aggressive OS guessing
+            '--max-os-tries', '3',  # More OS detection attempts
             '-A',   # Aggressive scan
             '--version-all',
             '--top-ports', '5000',
+            '-T4',  # Consistent timing
             '--script', 'default,discovery,vuln,safe',
             '--max-retries', '3',
             '--host-timeout', '900s',
@@ -115,7 +121,8 @@ SCAN_PROFILES: Dict[ScanType, ScanProfile] = {
             '--top-ports', '100',
             '--max-retries', '1',
             '--host-timeout', '15s',
-            '-T4'   # Aggressive timing
+            '-T4',   # Aggressive timing
+            '--osscan-limit'  # Skip OS detection on hosts without ports
         ],
         masscan_args=[
             '-p80,443,22,445,3389,8080',

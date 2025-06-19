@@ -389,6 +389,17 @@
             background: rgba(239, 68, 68, 0.1);
             color: var(--color-red);
         }
+        
+        /* Active service card */
+        .service-card.active {
+            border: 2px solid var(--color-blue);
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+        }
+        
+        .service-card.active .stat-card-icon {
+            transform: scale(1.1);
+        }
 
         /* Buttons */
         .btn {
@@ -1285,19 +1296,18 @@
                         </div>
                     </div>
 
-                    <!-- Security Status -->
+                    <!-- Network Services -->
                     <div class="stat-card glass hover-lift">
-                        {% set vulnerable_count = devices|selectattr('vulnerability_count', 'greaterthan', 0)|list|length %}
                         <div class="stat-card-header">
-                            <div class="stat-card-icon glass" style="background: {% if vulnerable_count > 0 %}var(--gradient-warning){% else %}var(--gradient-success){% endif %};">
-                                <i data-feather="shield" style="color: white;"></i>
+                            <div class="stat-card-icon glass" style="background: var(--gradient-success);">
+                                <i data-feather="globe" style="color: white;"></i>
                             </div>
                         </div>
-                        <div class="stat-card-value">{{ vulnerable_count }}</div>
-                        <div class="stat-card-label">Vulnerable Devices</div>
-                        <div class="stat-card-trend {% if vulnerable_count > 0 %}down{% else %}up{% endif %}">
-                            <i data-feather="{% if vulnerable_count > 0 %}shield-off{% else %}shield{% endif %}"></i>
-                            <span>{% if vulnerable_count > 0 %}Action required{% else %}Secure{% endif %}</span>
+                        <div class="stat-card-value">{{ all_services|length }}</div>
+                        <div class="stat-card-label">Network Services</div>
+                        <div class="stat-card-trend up">
+                            <i data-feather="activity"></i>
+                            <span>Active</span>
                         </div>
                     </div>
                 </div>
@@ -1309,21 +1319,9 @@
                     <i data-feather="monitor" style="width: 16px; height: 16px;"></i>
                     Devices
                 </button>
-                <button class="tab" onclick="showTab('security', this)">
-                    <i data-feather="shield" style="width: 16px; height: 16px;"></i>
-                    Security
-                </button>
                 <button class="tab" onclick="showTab('services', this)">
                     <i data-feather="globe" style="width: 16px; height: 16px;"></i>
                     Services
-                </button>
-                <button class="tab" onclick="showTab('network', this)">
-                    <i data-feather="git-branch" style="width: 16px; height: 16px;"></i>
-                    Network Map
-                </button>
-                <button class="tab" onclick="showTab('insights', this)">
-                    <i data-feather="trending-up" style="width: 16px; height: 16px;"></i>
-                    Insights
                 </button>
             </div>
 
@@ -1335,8 +1333,16 @@
                     <p class="section-subtitle">Complete inventory of all network devices</p>
                 </div>
 
+                <!-- View Toggle -->
+                <div class="flex justify-end" style="margin-bottom: 1rem;">
+                    <button class="btn btn-glass" onclick="toggleView()">
+                        <i data-feather="grid"></i>
+                        Grid View
+                    </button>
+                </div>
+
                 <!-- Device Grid View -->
-                <div class="dashboard-grid animate-fadeIn">
+                <div class="dashboard-grid animate-fadeIn" style="display: none;">
                     {% for device in devices %}
                     <div class="device-card glass hover-lift type-{{ device.type }}{% if device.critical %} critical{% endif %}" 
                          onclick="showDeviceDetails('{{ device.ip }}')">
@@ -1350,21 +1356,18 @@
                             {% if device.critical %}
                             <span class="badge badge-danger">CRITICAL</span>
                             {% endif %}
-                            {% if device.vulnerability_count > 0 %}
-                            <span class="badge badge-warning">{{ device.vulnerability_count }} VULNS</span>
-                            {% endif %}
                         </div>
                         
                         <div style="color: var(--text-muted); font-size: var(--text-sm);">
                             {% if device.hostname %}<div><strong>Hostname:</strong> {{ device.hostname }}</div>{% endif %}
                             {% if device.vendor %}<div><strong>Vendor:</strong> {{ device.vendor }}</div>{% endif %}
-                            {% if device.os %}<div><strong>OS:</strong> {{ device.os }}</div>{% endif %}
+                            {% if device.os %}<div><strong>OS:</strong> {% if 'windows' in device.os|lower %}Windows{% elif 'darwin' in device.os|lower or 'macos' in device.os|lower or 'mac os' in device.os|lower %}macOS{% elif 'linux' in device.os|lower %}Linux{% else %}{{ device.os }}{% endif %}</div>{% endif %}
                             {% if device.services %}
                             <div style="margin-top: 0.5rem;">
                                 <strong>Services:</strong>
                                 <div class="flex flex-wrap gap-xs" style="margin-top: 0.25rem;">
                                     {% for service in device.services[:3] %}
-                                    <span class="badge badge-primary" style="font-size: 0.7rem;">{{ service.split(':')[0] }}</span>
+                                    <span class="badge badge-primary" style="font-size: 0.7rem;">{{ service }}</span>
                                     {% endfor %}
                                     {% if device.services|length > 3 %}
                                     <span class="badge badge-primary" style="font-size: 0.7rem;">+{{ device.services|length - 3 }}</span>
@@ -1377,26 +1380,18 @@
                     {% endfor %}
                 </div>
 
-                <!-- Table View Toggle -->
-                <div class="flex justify-end" style="margin: 2rem 0;">
-                    <button class="btn btn-glass" onclick="toggleView()">
-                        <i data-feather="list"></i>
-                        Table View
-                    </button>
-                </div>
 
-                <!-- Device Table (Hidden by default) -->
-                <div id="device-table-view" class="table-container glass" style="display: none;">
+                <!-- Device Table (shown by default) -->
+                <div id="device-table-view" class="table-container glass">
                     <table class="table">
                         <thead>
                             <tr>
                                 <th>IP Address</th>
                                 <th>Hostname</th>
-                                <th>Type</th>
+                                <th>MAC Address</th>
                                 <th>Vendor</th>
                                 <th>OS</th>
                                 <th>Services</th>
-                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -1405,9 +1400,15 @@
                             <tr>
                                 <td style="font-family: var(--font-mono);">{{ device.ip }}</td>
                                 <td>{{ device.hostname or '-' }}</td>
-                                <td><span class="badge badge-primary">{{ device.type }}</span></td>
+                                <td style="font-family: var(--font-mono);">{{ device.mac or '-' }}</td>
                                 <td>{{ device.vendor or '-' }}</td>
-                                <td>{{ device.os or '-' }}</td>
+                                <td>{% if device.os %}
+                                    {% if 'windows' in device.os|lower %}Windows
+                                    {% elif 'darwin' in device.os|lower or 'macos' in device.os|lower or 'mac os' in device.os|lower %}macOS
+                                    {% elif 'linux' in device.os|lower %}Linux
+                                    {% else %}{{ device.os }}
+                                    {% endif %}
+                                {% else %}-{% endif %}</td>
                                 <td>
                                     {% if device.services %}
                                     <div class="flex flex-wrap gap-xs">
@@ -1423,15 +1424,6 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if device.critical %}
-                                    <span class="badge badge-danger">CRITICAL</span>
-                                    {% elif device.vulnerability_count > 0 %}
-                                    <span class="badge badge-warning">AT RISK</span>
-                                    {% else %}
-                                    <span class="badge badge-success">SECURE</span>
-                                    {% endif %}
-                                </td>
-                                <td>
                                     <button class="btn btn-glass" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;" 
                                             onclick="showDeviceDetails('{{ device.ip }}')">
                                         <i data-feather="eye" style="width: 16px; height: 16px;"></i>
@@ -1444,119 +1436,6 @@
                 </div>
             </div>
 
-            <!-- Security Tab -->
-            <div id="security-tab" class="tab-content" style="display: none;">
-                <div class="section-header">
-                    <h2 class="section-title gradient-text">Security Analysis</h2>
-                    <p class="section-subtitle">Vulnerability assessment and risk overview</p>
-                </div>
-
-                {% set vulnerable_devices = devices|selectattr('vulnerability_count', 'greaterthan', 0)|list %}
-                {% set critical_vulns = devices|selectattr('critical_vulns', 'greaterthan', 0)|list %}
-                {% set high_vulns = devices|selectattr('high_vulns', 'greaterthan', 0)|list %}
-
-                <!-- Security Overview -->
-                <div class="grid grid-cols-4 gap-lg" style="margin-bottom: 2rem;">
-                    <div class="card glass hover-lift">
-                        <h3 style="color: var(--color-red); margin-bottom: 1rem;">Critical Risk</h3>
-                        <div class="stat-card-value" style="color: var(--color-red);">{{ critical_vulns|length }}</div>
-                        <div class="text-muted">Devices</div>
-                    </div>
-                    <div class="card glass hover-lift">
-                        <h3 style="color: var(--color-orange); margin-bottom: 1rem;">High Risk</h3>
-                        <div class="stat-card-value" style="color: var(--color-orange);">{{ high_vulns|length }}</div>
-                        <div class="text-muted">Devices</div>
-                    </div>
-                    <div class="card glass hover-lift">
-                        <h3 style="color: var(--color-yellow); margin-bottom: 1rem;">Total Vulnerable</h3>
-                        <div class="stat-card-value" style="color: var(--color-yellow);">{{ vulnerable_devices|length }}</div>
-                        <div class="text-muted">Devices</div>
-                    </div>
-                    <div class="card glass hover-lift">
-                        <h3 style="color: var(--color-green); margin-bottom: 1rem;">Secure</h3>
-                        <div class="stat-card-value" style="color: var(--color-green);">{{ devices|length - vulnerable_devices|length }}</div>
-                        <div class="text-muted">Devices</div>
-                    </div>
-                </div>
-
-                {% if vulnerable_devices %}
-                <!-- Vulnerable Devices -->
-                <div class="card glass">
-                    <h3 style="margin-bottom: 1rem;">Vulnerable Devices</h3>
-                    <div class="table-container">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Device</th>
-                                    <th>Risk Level</th>
-                                    <th>Vulnerabilities</th>
-                                    <th>Top CVEs</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for device in vulnerable_devices|sort(attribute='critical_vulns', reverse=true) %}
-                                <tr>
-                                    <td>
-                                        <div><strong>{{ device.ip }}</strong></div>
-                                        <div class="text-muted" style="font-size: 0.875rem;">{{ device.hostname or device.type }}</div>
-                                    </td>
-                                    <td>
-                                        {% if device.get('critical_vulns', 0) > 0 %}
-                                        <span class="badge badge-danger">CRITICAL</span>
-                                        {% elif device.get('high_vulns', 0) > 0 %}
-                                        <span class="badge badge-warning">HIGH</span>
-                                        {% else %}
-                                        <span class="badge badge-warning">MEDIUM</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="flex items-center gap-sm">
-                                            <span class="stat-card-value" style="font-size: 1.5rem;">{{ device.vulnerability_count }}</span>
-                                            <div>
-                                                {% if device.get('critical_vulns', 0) > 0 %}
-                                                <div class="text-muted" style="font-size: 0.75rem;">{{ device.critical_vulns }} critical</div>
-                                                {% endif %}
-                                                {% if device.get('high_vulns', 0) > 0 %}
-                                                <div class="text-muted" style="font-size: 0.75rem;">{{ device.high_vulns }} high</div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        {% if device.get('vulnerabilities') %}
-                                        <div class="flex flex-col gap-xs">
-                                            {% for vuln in device.vulnerabilities[:3] %}
-                                            <span class="badge badge-danger" style="font-size: 0.75rem;">
-                                                {{ vuln.cve_id }} ({{ vuln.cvss_score|round(1) }})
-                                            </span>
-                                            {% endfor %}
-                                        </div>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-glass" style="padding: 0.25rem 0.5rem;" 
-                                                onclick="showVulnerabilityDetails('{{ device.ip }}')">
-                                            View Details
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                {% else %}
-                <!-- All Secure -->
-                <div class="card glass" style="text-align: center; padding: 3rem;">
-                    <div class="animate-bounceIn">
-                        <i data-feather="shield" style="width: 64px; height: 64px; color: var(--color-green); margin-bottom: 1rem;"></i>
-                        <h3 style="color: var(--color-green);">All Systems Secure</h3>
-                        <p class="text-muted">No vulnerabilities detected in the current scan</p>
-                    </div>
-                </div>
-                {% endif %}
-            </div>
 
             <!-- Services Tab -->
             <div id="services-tab" class="tab-content" style="display: none;">
@@ -1580,9 +1459,9 @@
 
                 <!-- Service Distribution -->
                 {% set sorted_services = service_summary.items()|sort(attribute=1, reverse=true)|list %}
-                <div class="grid grid-cols-6 gap-md" style="margin-bottom: 2rem;">
+                <div class="grid grid-cols-6 gap-md" style="margin-bottom: 2rem;" id="service-cards">
                     {% for service, count in sorted_services[:12] %}
-                    <div class="card glass hover-lift" style="text-align: center;">
+                    <div class="card glass hover-lift service-card" data-service="{{ service }}" data-count="{{ count }}" style="text-align: center; cursor: pointer;" onclick="sortByService('{{ service }}')">
                         <div class="stat-card-icon glass" style="margin: 0 auto 1rem; background: 
                             {% if service in ['ssh', 'telnet'] %}var(--gradient-success)
                             {% elif service in ['http', 'https'] %}var(--gradient-primary)
@@ -1759,157 +1638,7 @@
                 </div>
             </div>
 
-            <!-- Network Map Tab -->
-            <div id="network-tab" class="tab-content" style="display: none;">
-                <div class="section-header">
-                    <h2 class="section-title gradient-text">Network Topology</h2>
-                    <p class="section-subtitle">Visual representation of your network infrastructure</p>
-                </div>
 
-                <div class="card glass" style="height: 600px; position: relative;">
-                    <div class="flex justify-center items-center" style="height: 100%;">
-                        <div class="text-center">
-                            <i data-feather="git-branch" style="width: 64px; height: 64px; color: var(--color-blue); margin-bottom: 1rem;"></i>
-                            <h3>Interactive Network Map</h3>
-                            <p class="text-muted" style="margin-bottom: 1rem;">Visualize your network topology in 2D or 3D</p>
-                            <button class="btn btn-primary" onclick="openNetworkVisualization()">
-                                <i data-feather="maximize"></i>
-                                Open Network Visualization
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Subnet Summary -->
-                <h3 style="margin: 2rem 0 1rem;">Subnet Overview</h3>
-                <div class="grid grid-cols-3 gap-lg">
-                    {% for subnet in subnet_summary %}
-                    <div class="card glass hover-lift">
-                        <h4 style="color: var(--color-blue); margin-bottom: 1rem;">{{ subnet.network }}</h4>
-                        <div class="flex justify-between items-center" style="margin-bottom: 0.5rem;">
-                            <span class="text-muted">Total Devices</span>
-                            <span class="badge badge-primary">{{ subnet.device_count }}</span>
-                        </div>
-                        <div style="margin-top: 1rem;">
-                            <div class="text-muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">Device Types:</div>
-                            <div class="flex flex-wrap gap-xs">
-                                {% for type, count in subnet.types.items() %}
-                                <span class="badge badge-secondary" style="font-size: 0.75rem;">{{ type }} ({{ count }})</span>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- Insights Tab -->
-            <div id="insights-tab" class="tab-content" style="display: none;">
-                <div class="section-header">
-                    <h2 class="section-title gradient-text">Network Insights</h2>
-                    <p class="section-subtitle">Key findings and recommendations</p>
-                </div>
-
-                <div class="grid grid-cols-2 gap-lg">
-                    <!-- Key Findings -->
-                    <div class="card glass">
-                        <h3 style="margin-bottom: 1rem;">
-                            <i data-feather="search" style="width: 20px; height: 20px; vertical-align: middle;"></i>
-                            Key Findings
-                        </h3>
-                        <div class="flex flex-col gap-md">
-                            {% if critical_devices|length > 0 %}
-                            <div class="alert alert-error">
-                                <i data-feather="alert-triangle" class="alert-icon"></i>
-                                <div class="alert-content">
-                                    <strong>{{ critical_devices|length }} critical devices</strong> detected that require immediate attention
-                                </div>
-                            </div>
-                            {% endif %}
-                            
-                            {% set vulnerable_count = devices|selectattr('vulnerability_count', 'greaterthan', 0)|list|length %}
-                            {% if vulnerable_count > 0 %}
-                            <div class="alert alert-warning">
-                                <i data-feather="shield-off" class="alert-icon"></i>
-                                <div class="alert-content">
-                                    <strong>{{ vulnerable_count }} devices</strong> have known vulnerabilities
-                                </div>
-                            </div>
-                            {% endif %}
-                            
-                            {% if new_devices|length > 0 %}
-                            <div class="alert alert-info">
-                                <i data-feather="plus-circle" class="alert-icon"></i>
-                                <div class="alert-content">
-                                    <strong>{{ new_devices|length }} new devices</strong> discovered since last scan
-                                </div>
-                            </div>
-                            {% endif %}
-                            
-                            <div class="alert alert-success">
-                                <i data-feather="check-circle" class="alert-icon"></i>
-                                <div class="alert-content">
-                                    Successfully scanned <strong>{{ total_devices }} devices</strong> across {{ subnet_summary|length }} subnets
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Recommendations -->
-                    <div class="card glass">
-                        <h3 style="margin-bottom: 1rem;">
-                            <i data-feather="list" style="width: 20px; height: 20px; vertical-align: middle;"></i>
-                            Recommendations
-                        </h3>
-                        <div class="flex flex-col gap-md">
-                            {% if vulnerable_count > 0 %}
-                            <div class="flex items-start gap-md">
-                                <div class="badge badge-danger" style="margin-top: 0.25rem;">1</div>
-                                <div>
-                                    <strong>Patch Vulnerable Systems</strong>
-                                    <p class="text-muted" style="font-size: 0.875rem; margin-top: 0.25rem;">
-                                        Apply security updates to {{ vulnerable_count }} vulnerable devices
-                                    </p>
-                                </div>
-                            </div>
-                            {% endif %}
-                            
-                            <div class="flex items-start gap-md">
-                                <div class="badge badge-warning" style="margin-top: 0.25rem;">2</div>
-                                <div>
-                                    <strong>Review Open Services</strong>
-                                    <p class="text-muted" style="font-size: 0.875rem; margin-top: 0.25rem;">
-                                        Verify that all {{ all_services|length }} detected services are necessary
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            <div class="flex items-start gap-md">
-                                <div class="badge badge-primary" style="margin-top: 0.25rem;">3</div>
-                                <div>
-                                    <strong>Monitor Critical Infrastructure</strong>
-                                    <p class="text-muted" style="font-size: 0.875rem; margin-top: 0.25rem;">
-                                        Set up continuous monitoring for critical devices
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Device Type Distribution -->
-                <div class="card glass" style="margin-top: 2rem;">
-                    <h3 style="margin-bottom: 1rem;">Device Type Distribution</h3>
-                    <div class="grid grid-cols-4 gap-md">
-                        {% for type, count in device_types.items() %}
-                        <div class="flex items-center justify-between padding-md glass" style="border-radius: var(--radius-md); padding: 1rem;">
-                            <span class="badge badge-primary">{{ type|upper }}</span>
-                            <span class="text-2xl font-bold">{{ count }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
         </div>
     </main>
 
@@ -2002,14 +1731,14 @@
             const tableView = document.getElementById('device-table-view');
             const button = event.target.closest('button');
             
-            if (gridView.style.display === 'none') {
-                gridView.style.display = 'grid';
-                tableView.style.display = 'none';
-                button.innerHTML = '<i data-feather="list"></i> Table View';
-            } else {
+            if (tableView.style.display === 'none') {
                 gridView.style.display = 'none';
                 tableView.style.display = 'block';
                 button.innerHTML = '<i data-feather="grid"></i> Grid View';
+            } else {
+                gridView.style.display = 'grid';
+                tableView.style.display = 'none';
+                button.innerHTML = '<i data-feather="list"></i> Table View';
             }
             
             feather.replace();
@@ -2037,14 +1766,13 @@
                             <div><strong>MAC Address:</strong> ${device.mac || 'N/A'}</div>
                             <div><strong>Vendor:</strong> ${device.vendor || 'N/A'}</div>
                             <div><strong>Type:</strong> <span class="badge badge-primary">${device.type}</span></div>
-                            <div><strong>OS:</strong> ${device.os || 'N/A'}</div>
+                            <div><strong>OS:</strong> ${device.os ? (device.os.toLowerCase().includes('windows') ? 'Windows' : device.os.toLowerCase().includes('darwin') || device.os.toLowerCase().includes('macos') || device.os.toLowerCase().includes('mac os') ? 'macOS' : device.os.toLowerCase().includes('linux') ? 'Linux' : device.os) : 'N/A'}</div>
                         </div>
                     </div>
                     <div>
-                        <h4 style="margin-bottom: 1rem;">Security Status</h4>
+                        <h4 style="margin-bottom: 1rem;">Device Status</h4>
                         <div class="flex flex-col gap-sm">
                             <div><strong>Critical:</strong> ${device.critical ? '<span class="badge badge-danger">YES</span>' : '<span class="badge badge-success">NO</span>'}</div>
-                            <div><strong>Vulnerabilities:</strong> ${device.vulnerability_count || 0}</div>
                             <div><strong>Last Seen:</strong> ${device.last_seen || 'N/A'}</div>
                             <div><strong>First Seen:</strong> ${device.first_seen || 'N/A'}</div>
                         </div>
@@ -2138,6 +1866,63 @@
         // Open network visualization
         function openNetworkVisualization() {
             window.open(`network_visualization_${scanTimestamp}.html`, '_blank');
+        }
+
+        // Sort devices by service
+        let currentServiceFilter = null;
+        
+        function sortByService(serviceName) {
+            const deviceRows = document.querySelectorAll('#services-tab tbody tr');
+            const tbody = document.querySelector('#services-tab tbody');
+            const serviceCards = document.querySelectorAll('.service-card');
+            
+            // Toggle filter
+            if (currentServiceFilter === serviceName) {
+                currentServiceFilter = null;
+                // Reset to original order
+                const sortedRows = Array.from(deviceRows).sort((a, b) => {
+                    const ipA = a.querySelector('td').innerText.split('\n')[0];
+                    const ipB = b.querySelector('td').innerText.split('\n')[0];
+                    return ipA.localeCompare(ipB);
+                });
+                
+                // Remove highlighting
+                serviceCards.forEach(card => card.classList.remove('active'));
+                
+                // Reattach rows
+                sortedRows.forEach(row => tbody.appendChild(row));
+            } else {
+                currentServiceFilter = serviceName;
+                
+                // Highlight selected service card
+                serviceCards.forEach(card => {
+                    if (card.dataset.service === serviceName) {
+                        card.classList.add('active');
+                    } else {
+                        card.classList.remove('active');
+                    }
+                });
+                
+                // Sort rows by whether they have the selected service
+                const rowsWithService = [];
+                const rowsWithoutService = [];
+                
+                deviceRows.forEach(row => {
+                    const servicesCell = row.querySelectorAll('td')[2];
+                    const hasService = servicesCell.textContent.includes(serviceName);
+                    
+                    if (hasService) {
+                        rowsWithService.push(row);
+                    } else {
+                        rowsWithoutService.push(row);
+                    }
+                });
+                
+                // Clear tbody and reattach in order
+                tbody.innerHTML = '';
+                rowsWithService.forEach(row => tbody.appendChild(row));
+                rowsWithoutService.forEach(row => tbody.appendChild(row));
+            }
         }
 
         // Add smooth scrolling

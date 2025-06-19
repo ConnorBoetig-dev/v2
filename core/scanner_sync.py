@@ -31,6 +31,14 @@ except ImportError:
     SNMP_AVAILABLE = False
     logger.warning("SNMP support not available - install pysnmp to enable")
 
+# Import MAC lookup for vendor resolution
+try:
+    from utils.mac_lookup import MACLookup
+    MAC_LOOKUP_AVAILABLE = True
+except ImportError:
+    MAC_LOOKUP_AVAILABLE = False
+    logger.warning("MAC lookup not available")
+
 # Import friendly error handling
 try:
     from utils.friendly_errors import FriendlyError, handle_scanner_error, handle_network_error
@@ -56,7 +64,7 @@ class NetworkScanner:
                     "0",
                     "--top-ports",
                     "100",
-                    "-T5",
+                    "-T4",  # More reliable timing for OS detection
                 ],
                 "description": "Fast scan for large networks (65k+ hosts)",
             },
@@ -72,7 +80,9 @@ class NetworkScanner:
                     "5",  # Medium intensity (0-9 scale, default is 7)
                     "--top-ports",
                     "500",  # Scan top 500 ports instead of 100
-                    "-T3",  # Normal timing (less aggressive than T5)
+                    "--max-os-tries",
+                    "3",  # More OS detection attempts
+                    "-T4",  # Consistent timing across all scans
                     "--script-timeout",
                     "10s",  # Add script timeout for reliability
                 ],
@@ -86,6 +96,9 @@ class NetworkScanner:
         self.total_hosts = 0
         self.hosts_completed = 0
         self._scanner_availability = {}  # Cache for scanner availability checks
+        
+        # Initialize MAC lookup for vendor resolution
+        self.mac_lookup = MACLookup() if MAC_LOOKUP_AVAILABLE else None
 
     def _load_config(self):
         """Load configuration from config.yaml"""
@@ -1890,7 +1903,7 @@ class NetworkScanner:
                         "--osscan-guess",  # Aggressive OS guessing
                         "--version-intensity",
                         "0",  # Fastest version detection
-                        "-T5",  # Aggressive timing
+                        "-T4",  # More reliable timing for OS detection  # Aggressive timing
                         # DNS resolution enabled for hostname discovery
                         "--top-ports",
                         "20",  # Only check top 20 ports for speed
@@ -1982,7 +1995,7 @@ class NetworkScanner:
                             "-sV",  # Version detection
                             "--version-intensity",
                             "0",  # Fastest version detection
-                            "-T5",  # Aggressive timing
+                            "-T4",  # More reliable timing for OS detection  # Aggressive timing
                             # DNS resolution enabled for hostname discovery
                             "--top-ports",
                             "10",  # Only top 10 ports

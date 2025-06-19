@@ -68,25 +68,40 @@ class MACLookup:
 
                     # IEEE format: XX-XX-XX   (hex)    Organization Name
                     if re.match(r"^[0-9A-F]{2}-[0-9A-F]{2}-[0-9A-F]{2}", line):
-                        parts = line.split("\t")
+                        # Split by multiple spaces to handle format
+                        parts = re.split(r'\s{2,}|\t', line)
                         if len(parts) >= 2:
-                            oui = parts[0].replace("-", ":").lower()
-                            # Extract organization name (may have (hex) prefix)
-                            vendor_parts = [
-                                p.strip() for p in parts[1:] if p.strip() and p.strip() != "(hex)"
-                            ]
-                            vendor = " ".join(vendor_parts)
-
+                            # Extract just the MAC part (XX-XX-XX)
+                            oui = parts[0].strip().replace("-", ":").lower()
+                            # Extract vendor name, skipping (hex)
+                            vendor = None
+                            for part in parts[1:]:
+                                part = part.strip()
+                                if part and part != "(hex)":
+                                    vendor = part
+                                    break
+                            
                             if vendor:
                                 self.vendor_cache[oui] = vendor
 
-                    # Alternative format from Wireshark manuf file
-                    elif "\t" in line:
-                        parts = line.split("\t", 1)
-                        if len(parts) == 2:
-                            oui = parts[0].replace("-", ":").lower()
-                            if re.match(r"^[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}", oui):
-                                self.vendor_cache[oui] = parts[1].strip()
+                    # Alternative format (XX:XX:XX or XXXXXX)
+                    elif re.match(r"^[0-9A-F]{6}", line):
+                        # Format: XXXXXX     (base 16)     Organization
+                        parts = re.split(r'\s{2,}|\t', line)
+                        if len(parts) >= 2:
+                            mac_hex = parts[0].strip()
+                            if len(mac_hex) == 6:
+                                # Convert XXXXXX to XX:XX:XX
+                                oui = ":".join(mac_hex[i:i+2] for i in range(0, 6, 2)).lower()
+                                # Find vendor, skipping (base 16)
+                                vendor = None
+                                for part in parts[1:]:
+                                    part = part.strip()
+                                    if part and "base 16" not in part:
+                                        vendor = part
+                                        break
+                                if vendor:
+                                    self.vendor_cache[oui] = vendor
 
             print(f"[INFO] Loaded {len(self.vendor_cache)} OUI entries")
 
