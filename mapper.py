@@ -35,17 +35,18 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 # Core functionality imports
-from core.annotator import DeviceAnnotator      # Device annotation and tagging
-from core.classifier import DeviceClassifier    # AI device type identification
-from core.parser import ScanParser              # Parse scanner outputs
-from core.scanner import NetworkScanner         # Multi-tool scan orchestration
-from core.tracker import ChangeTracker          # Network change detection
-from core.modern_interface import ModernInterface 
+from core.annotator import DeviceAnnotator  # Device annotation and tagging
+from core.classifier import DeviceClassifier  # AI device type identification
+from core.parser import ScanParser  # Parse scanner outputs
+from core.scanner import NetworkScanner  # Multi-tool scan orchestration
+from core.tracker import ChangeTracker  # Network change detection
+from core.modern_interface import ModernInterface
+
 # Utility imports
 from utils.export_manager import ExportManager  # Multi-format data export
-from utils.snmp_config import SNMPConfig        # SNMP credential management
+from utils.snmp_config import SNMPConfig  # SNMP credential management
 from utils.traffic_analyzer import PassiveTrafficAnalyzer  # Packet capture analysis
-from utils.visualization import MapGenerator    # D3.js/Three.js visualizations
+from utils.visualization import MapGenerator  # D3.js/Three.js visualizations
 from utils.vulnerability_scanner import VulnerabilityScanner  # CVE correlation
 from utils.scan_status import ScanStatusIndicator  # Visual scan progress
 from utils.scan_counter import ScanCounter, SimpleFileNamer  # Simple file naming
@@ -68,16 +69,16 @@ logger = logging.getLogger(__name__)
 class NetworkMapper:
     """
     Main application class that coordinates all NetworkMapper functionality.
-    
+
     This class serves as the central hub, instantiating all necessary components
     and providing the interactive menu system. It manages the application lifecycle
     and ensures proper initialization of all subsystems.
     """
-    
+
     def __init__(self):
         """
         Initialize NetworkMapper with all required components.
-        
+
         Sets up:
         - Directory structure for outputs
         - Core scanning and analysis components
@@ -88,34 +89,36 @@ class NetworkMapper:
         self.base_path = Path(__file__).parent
         self.output_path = self.base_path / "output"
         self.ensure_directories()
-        
+
         # Initialize core components
-        self.scanner = NetworkScanner()             # Network scanning orchestration
-        self.parser = ScanParser()                  # Parse scan results
-        self.classifier = DeviceClassifier()        # Classify device types
-        self.tracker = ChangeTracker()              # Track network changes
-        self.annotator = DeviceAnnotator()          # Manage device annotations
-        
+        self.scanner = NetworkScanner()  # Network scanning orchestration
+        self.parser = ScanParser()  # Parse scan results
+        self.classifier = DeviceClassifier()  # Classify device types
+        self.tracker = ChangeTracker()  # Track network changes
+        self.annotator = DeviceAnnotator()  # Manage device annotations
+
         # Initialize utility components
-        self.map_gen = MapGenerator()               # Generate network visualizations
+        self.map_gen = MapGenerator()  # Generate network visualizations
         self.export_mgr = ExportManager(self.output_path)  # Handle data exports
         self.snmp_config = SNMPConfig(self.output_path / "config")  # SNMP settings
         self.vuln_scanner = VulnerabilityScanner(self.output_path / "cache")  # CVE lookup
-        self.traffic_analyzer = PassiveTrafficAnalyzer(output_path=self.output_path)  # Packet analysis
-        
+        self.traffic_analyzer = PassiveTrafficAnalyzer(
+            output_path=self.output_path
+        )  # Packet analysis
+
         # UI components
-        self.modern_ui = ModernInterface(self)      # Alternative interface (experimental)
-        
+        self.modern_ui = ModernInterface(self)  # Alternative interface (experimental)
+
         # State management
-        self.cli_overrides = {}                     # CLI argument overrides
-        self.last_changes = None                    # Cache last change detection results
-        self.passive_analysis_results = None        # Cache traffic analysis results
+        self.cli_overrides = {}  # CLI argument overrides
+        self.last_changes = None  # Cache last change detection results
+        self.passive_analysis_results = None  # Cache traffic analysis results
         self.scan_counter = ScanCounter(self.output_path)  # Simple file naming counter
 
     def ensure_directories(self):
         """
         Create required output directories if they don't exist.
-        
+
         Directory structure:
         output/
         ├── scans/      # Raw scan data (JSON)
@@ -125,11 +128,11 @@ class NetworkMapper:
         └── cache/      # Cached data (vulnerability DB, etc.)
         """
         dirs = [
-            self.output_path / "scans",      # Raw scan results
-            self.output_path / "reports",    # Generated reports
-            self.output_path / "changes",    # Change tracking
-            self.output_path / "config",     # Configuration storage
-            self.output_path / "cache",      # Temporary/cached data
+            self.output_path / "scans",  # Raw scan results
+            self.output_path / "reports",  # Generated reports
+            self.output_path / "changes",  # Change tracking
+            self.output_path / "config",  # Configuration storage
+            self.output_path / "cache",  # Temporary/cached data
         ]
         for d in dirs:
             d.mkdir(parents=True, exist_ok=True)
@@ -186,11 +189,11 @@ class NetworkMapper:
     def run_scan_wizard(self):
         """
         Interactive scan wizard that guides users through network scanning.
-        
+
         This wizard implements a step-by-step process for configuring and executing
         a network scan. It handles all user inputs with validation and provides
         clear feedback throughout the process.
-        
+
         Workflow:
         1. Target selection (IP/CIDR/hostname)
         2. Scan type selection (fast vs deeper)
@@ -200,7 +203,7 @@ class NetworkMapper:
         6. Execute scan with progress tracking
         7. Post-process results (classification, enrichment)
         8. Generate and display reports
-        
+
         The wizard respects CLI overrides when present, allowing for automation
         while maintaining the interactive experience for manual users.
         """
@@ -223,14 +226,14 @@ class NetworkMapper:
 
         # Generate timestamp for this scan session
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
         # Get next scan number and sanitized scan type
         scan_number = self.scan_counter.get_next_scan_number()
         sanitized_scan_type = SimpleFileNamer.sanitize_scan_type(scan_type)
 
         # Create status indicator
         status_indicator = ScanStatusIndicator(console)
-        
+
         # Handle ARP scan separately
         if scan_type == "arp":
             # ARP scans are quick, use simple indicator
@@ -240,7 +243,7 @@ class NetworkMapper:
         else:
             # Show scan status
             status_indicator.show_scan_starting(target, scan_type)
-            
+
             # Run scan (scanner has its own progress bars)
             results = self.scanner.scan(
                 target=target,
@@ -249,7 +252,7 @@ class NetworkMapper:
                 needs_root=needs_root,
                 snmp_config=snmp_config if snmp_enabled else None,
             )
-            
+
             # Show completion
             device_count = len(results) if results else 0
             status_indicator.show_scan_complete(device_count)
@@ -312,9 +315,13 @@ class NetworkMapper:
 
             except Exception as e:
                 error_msg = format_error_for_user(e)
-                console.print(f"[yellow]⚠️  Passive analysis couldn't complete: {error_msg}[/yellow]")
+                console.print(
+                    f"[yellow]⚠️  Passive analysis couldn't complete: {error_msg}[/yellow]"
+                )
                 if "permission" in str(e).lower():
-                    console.print("[yellow]💡 Tip: This feature requires administrator privileges (sudo)[/yellow]")
+                    console.print(
+                        "[yellow]💡 Tip: This feature requires administrator privileges (sudo)[/yellow]"
+                    )
                 logger.error(f"Passive analysis error: {e}")
 
         # Vulnerability scanning if enabled
@@ -328,14 +335,22 @@ class NetworkMapper:
                 self._display_vulnerability_summary(vuln_report)
             except Exception as e:
                 error_msg = format_error_for_user(e)
-                console.print(f"[yellow]⚠️  Vulnerability scanning couldn't complete: {error_msg}[/yellow]")
+                console.print(
+                    f"[yellow]⚠️  Vulnerability scanning couldn't complete: {error_msg}[/yellow]"
+                )
                 if "connection" in str(e).lower() or "timeout" in str(e).lower():
-                    console.print("[yellow]💡 Tip: Check your internet connection for API access[/yellow]")
+                    console.print(
+                        "[yellow]💡 Tip: Check your internet connection for API access[/yellow]"
+                    )
                 logger.error(f"Vulnerability scanning error: {e}")
 
         # Save results with simple naming
-        scan_file = self.output_path / "scans" / SimpleFileNamer.scan_file(scan_number, sanitized_scan_type)
-        csv_file = self.output_path / "scans" / SimpleFileNamer.csv_file(scan_number, sanitized_scan_type)
+        scan_file = (
+            self.output_path / "scans" / SimpleFileNamer.scan_file(scan_number, sanitized_scan_type)
+        )
+        csv_file = (
+            self.output_path / "scans" / SimpleFileNamer.csv_file(scan_number, sanitized_scan_type)
+        )
 
         with open(scan_file, "w") as f:
             json.dump(devices, f, indent=2)
@@ -382,8 +397,12 @@ class NetworkMapper:
         file_table.add_row("CSV export:", str(csv_file))
 
         if changes:
-            changes_json = self.output_path / "changes" / SimpleFileNamer.changes_json_file(scan_number)
-            changes_txt = self.output_path / "changes" / SimpleFileNamer.changes_txt_file(scan_number)
+            changes_json = (
+                self.output_path / "changes" / SimpleFileNamer.changes_json_file(scan_number)
+            )
+            changes_txt = (
+                self.output_path / "changes" / SimpleFileNamer.changes_txt_file(scan_number)
+            )
             file_table.add_row("Changes JSON:", str(changes_json))
             file_table.add_row("Changes text:", str(changes_txt))
 
@@ -391,10 +410,12 @@ class NetworkMapper:
 
         # Record scan metadata
         self.scan_counter.record_scan(scan_number, sanitized_scan_type, target, timestamp)
-        
+
         # Automatically generate and open visualization
         console.print("\n[yellow]Generating interactive network visualization...[/yellow]")
-        report_file, comparison_file = self.generate_html_report(devices, scan_number, sanitized_scan_type, timestamp)
+        report_file, comparison_file = self.generate_html_report(
+            devices, scan_number, sanitized_scan_type, timestamp
+        )
 
         # Show report paths
         console.print(f"\n[bold]Generated Reports:[/bold]")
@@ -403,8 +424,16 @@ class NetworkMapper:
         report_table.add_column("Path", style="yellow")
 
         # Check which reports were generated
-        network_map = self.output_path / "reports" / SimpleFileNamer.network_map_file(scan_number, sanitized_scan_type)
-        detailed_report = self.output_path / "reports" / SimpleFileNamer.report_file(scan_number, sanitized_scan_type)
+        network_map = (
+            self.output_path
+            / "reports"
+            / SimpleFileNamer.network_map_file(scan_number, sanitized_scan_type)
+        )
+        detailed_report = (
+            self.output_path
+            / "reports"
+            / SimpleFileNamer.report_file(scan_number, sanitized_scan_type)
+        )
         traffic_flow = self.output_path / "reports" / SimpleFileNamer.traffic_flow_file(scan_number)
 
         if network_map.exists():
@@ -589,7 +618,9 @@ class NetworkMapper:
                 device["uptime_days"] = 0
 
         # Load scan metadata if available
-        metadata_file = self.output_path / "scans" / SimpleFileNamer.summary_file(scan_number, scan_type)
+        metadata_file = (
+            self.output_path / "scans" / SimpleFileNamer.summary_file(scan_number, scan_type)
+        )
         scan_metadata = {}
         if metadata_file.exists():
             try:
@@ -597,20 +628,24 @@ class NetworkMapper:
                     scan_metadata = json.load(f)
             except:
                 pass
-        
+
         # Ensure scan_metadata has the expected structure for templates
-        if 'scan_parameters' not in scan_metadata:
-            scan_metadata['scan_parameters'] = {
-                'snmp_enabled': False,
-                'vulnerability_scan': False,
-                'passive_analysis': False
+        if "scan_parameters" not in scan_metadata:
+            scan_metadata["scan_parameters"] = {
+                "snmp_enabled": False,
+                "vulnerability_scan": False,
+                "passive_analysis": False,
             }
 
         # Check if comparison report exists
         comparison_file_name = None
-        if scan_number > 1 and self.last_changes and self.last_changes.get("summary", {}).get("total_changes", 0) > 0:
+        if (
+            scan_number > 1
+            and self.last_changes
+            and self.last_changes.get("summary", {}).get("total_changes", 0) > 0
+        ):
             comparison_file_name = SimpleFileNamer.comparison_file(scan_number, scan_number - 1)
-        
+
         # Prepare report data with enhanced metadata
         report_data = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -626,7 +661,10 @@ class NetworkMapper:
             "changes": changes,  # Include changes data
             "scan_metadata": scan_metadata,  # Include scan metadata for footer
             "comparison_file": comparison_file_name,  # Include comparison file name
-            "has_changes": bool(self.last_changes and self.last_changes.get("summary", {}).get("total_changes", 0) > 0),
+            "has_changes": bool(
+                self.last_changes
+                and self.last_changes.get("summary", {}).get("total_changes", 0) > 0
+            ),
         }
 
         # Generate BOTH reports
@@ -634,7 +672,9 @@ class NetworkMapper:
 
         # 1. Generate original detailed report
         original_template = env.get_template("report.html")
-        original_report_file = self.output_path / "reports" / SimpleFileNamer.report_file(scan_number, scan_type)
+        original_report_file = (
+            self.output_path / "reports" / SimpleFileNamer.report_file(scan_number, scan_type)
+        )
         original_html = original_template.render(**report_data)
 
         with open(original_report_file, "w") as f:
@@ -644,7 +684,9 @@ class NetworkMapper:
 
         # 2. Generate new interactive visualization
         viz_template = env.get_template("network_visualization.html")
-        viz_report_file = self.output_path / "reports" / SimpleFileNamer.network_map_file(scan_number, scan_type)
+        viz_report_file = (
+            self.output_path / "reports" / SimpleFileNamer.network_map_file(scan_number, scan_type)
+        )
         viz_html = viz_template.render(**report_data)
 
         with open(viz_report_file, "w") as f:
@@ -655,7 +697,9 @@ class NetworkMapper:
         # 3. Generate traffic flow report if passive analysis was performed
         if self.passive_analysis_results:
             traffic_template = env.get_template("traffic_flow_report.html")
-            traffic_report_file = self.output_path / "reports" / SimpleFileNamer.traffic_flow_file(scan_number)
+            traffic_report_file = (
+                self.output_path / "reports" / SimpleFileNamer.traffic_flow_file(scan_number)
+            )
 
             # Prepare traffic flow data
             flow_data = self.passive_analysis_results.get("flow_matrix", {})
@@ -766,20 +810,25 @@ class NetworkMapper:
         # Show clickable links in terminal
         console.print("\n[green]✓ Reports generated and opened in browser![/green]")
         console.print(f"\n[bold cyan]Generated files:[/bold cyan]")
-        
+
         # Convert Docker paths to host paths for display
         def get_display_url(url):
             """Convert Docker container paths to host paths for clickable links"""
             import os
-            if os.environ.get('DOCKER_HOST_BROWSER') == '1':
+
+            if os.environ.get("DOCKER_HOST_BROWSER") == "1":
                 # Running in Docker - convert /app/output to actual host path
                 # Get the actual host path from PWD environment variable if available
-                host_path = os.environ.get('HOST_PROJECT_PATH', '/home/connorboetig/v2')
-                return url.replace('file:///app', f'file://{host_path}')
+                host_path = os.environ.get("HOST_PROJECT_PATH", "/home/connorboetig/v2")
+                return url.replace("file:///app", f"file://{host_path}")
             return url
-        
-        console.print(f"[yellow]Network Visualization:[/yellow] [underline]{get_display_url(viz_url)}[/underline]")
-        console.print(f"[yellow]Detailed Report:[/yellow] [underline]{get_display_url(original_url)}[/underline]")
+
+        console.print(
+            f"[yellow]Network Visualization:[/yellow] [underline]{get_display_url(viz_url)}[/underline]"
+        )
+        console.print(
+            f"[yellow]Detailed Report:[/yellow] [underline]{get_display_url(original_url)}[/underline]"
+        )
 
         if self.passive_analysis_results and traffic_url:
             console.print(
@@ -832,11 +881,11 @@ class NetworkMapper:
 
         # Assume we're comparing to the previous scan
         previous_scan_number = scan_number - 1
-        
+
         # Get scan info from our counter
         current_scan_info = self.scan_counter.get_scan_info(scan_number)
         previous_scan_info = self.scan_counter.get_scan_info(previous_scan_number)
-        
+
         if not previous_scan_info:
             return None
 
@@ -854,7 +903,9 @@ class NetworkMapper:
         comparison_data = {
             "comparison_date": datetime.now().strftime("%B %d, %Y"),
             "previous_scan_time": previous_scan_info.get("readable_time", "Unknown"),
-            "current_scan_time": current_scan_info.get("readable_time", "Unknown") if current_scan_info else "Unknown",
+            "current_scan_time": current_scan_info.get("readable_time", "Unknown")
+            if current_scan_info
+            else "Unknown",
             "previous_scan_number": previous_scan_number,
             "current_scan_number": scan_number,
             "previous_device_count": changes["summary"].get("total_previous", 0),
@@ -863,11 +914,17 @@ class NetworkMapper:
             "missing_devices": changes.get("missing_devices", []),
             "changed_devices": changes.get("changed_devices", []),
             "unchanged_count": unchanged_count,
-            "current_scan_timestamp": current_scan_info.get("timestamp", "") if current_scan_info else "",
+            "current_scan_timestamp": current_scan_info.get("timestamp", "")
+            if current_scan_info
+            else "",
         }
 
         # Render and save comparison report with simple naming
-        comparison_file = self.output_path / "reports" / SimpleFileNamer.comparison_file(scan_number, previous_scan_number)
+        comparison_file = (
+            self.output_path
+            / "reports"
+            / SimpleFileNamer.comparison_file(scan_number, previous_scan_number)
+        )
         html_content = template.render(**comparison_data)
 
         with open(comparison_file, "w") as f:
@@ -918,18 +975,18 @@ class NetworkMapper:
 
         for scan_file in scan_files[:10]:  # Show last 10
             filename = scan_file.stem
-            
+
             # Parse new format: scan_N_type
             if "_" in filename and not filename.replace("scan_", "").replace("_", "").isdigit():
                 parts = filename.split("_")
                 if len(parts) >= 3 and parts[1].isdigit():
                     scan_num = parts[1]
                     scan_type = "_".join(parts[2:])
-                    
+
                     # Get scan info from counter
                     scan_info = self.scan_counter.get_scan_info(int(scan_num))
                     if scan_info:
-                        date_str = scan_info['readable_time']
+                        date_str = scan_info["readable_time"]
                     else:
                         date_str = "Unknown"
                 else:
@@ -943,10 +1000,12 @@ class NetworkMapper:
                 scan_type = "legacy"
                 timestamp = filename.replace("scan_", "")
                 try:
-                    date_str = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+                    date_str = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
                 except:
                     date_str = "Unknown"
-            
+
             # Load device count
             try:
                 with open(scan_file) as f:
@@ -954,7 +1013,7 @@ class NetworkMapper:
                 device_count = str(len(devices))
             except:
                 device_count = "?"
-            
+
             table.add_row(scan_num, scan_type, date_str, device_count, scan_file.name)
 
         console.print(table)
@@ -995,13 +1054,17 @@ class NetworkMapper:
                 timestamp = scan_files[0].stem.replace("scan_", "")
 
                 # Generate the comparison report
-                comparison_file = self.generate_comparison_report(current_devices, changes, timestamp)
+                comparison_file = self.generate_comparison_report(
+                    current_devices, changes, timestamp
+                )
 
                 if comparison_file and comparison_file.exists():
                     # Open in browser
                     comparison_url = f"file://{comparison_file.absolute()}"
                     open_in_browser(comparison_url)
-                    console.print(f"\n[bold green]✓ Comparison report opened in browser![/bold green]")
+                    console.print(
+                        f"\n[bold green]✓ Comparison report opened in browser![/bold green]"
+                    )
                     console.print(
                         f"[yellow]Report location:[/yellow] [underline]{comparison_url}[/underline]"
                     )
@@ -1010,6 +1073,7 @@ class NetworkMapper:
             except Exception as e:
                 console.print(f"[red]Error: {e}[/red]")
                 import traceback
+
                 logger.error(f"Error generating comparison report: {traceback.format_exc()}")
         else:
             console.print("\n[green]No changes detected between scans[/green]")
@@ -1543,31 +1607,29 @@ class NetworkMapper:
         if changes.get("new_devices"):
             console.print(f"[green]NEW DEVICES ({len(changes['new_devices'])})[/green]")
             for device in changes["new_devices"]:
-                hostname = device.get('hostname', '')
+                hostname = device.get("hostname", "")
                 if not hostname:
-                    hostname = ''
+                    hostname = ""
                 console.print(
-                    f"  • {device['ip']} - {hostname} "
-                    f"({device.get('type', 'unknown')})"
+                    f"  • {device['ip']} - {hostname} " f"({device.get('type', 'unknown')})"
                 )
 
         if changes.get("missing_devices"):
             console.print(f"\n[red]MISSING DEVICES ({len(changes['missing_devices'])})[/red]")
             for device in changes["missing_devices"]:
-                hostname = device.get('hostname', '')
+                hostname = device.get("hostname", "")
                 if not hostname:
-                    hostname = ''
+                    hostname = ""
                 console.print(
-                    f"  • {device['ip']} - {hostname} "
-                    f"({device.get('type', 'unknown')})"
+                    f"  • {device['ip']} - {hostname} " f"({device.get('type', 'unknown')})"
                 )
 
         if changes.get("changed_devices"):
             console.print(f"\n[yellow]CHANGED DEVICES ({len(changes['changed_devices'])})[/yellow]")
             for device in changes["changed_devices"]:
-                hostname = device.get('hostname', '')
+                hostname = device.get("hostname", "")
                 if not hostname:
-                    hostname = ''
+                    hostname = ""
                 console.print(f"  • {device['ip']} - {hostname}")
 
     def annotate_devices(self):
@@ -1595,48 +1657,54 @@ class NetworkMapper:
         # Select scan
         console.print("\n[bold]Select scan to generate report:[/bold]")
         scan_options = []
-        
+
         for i, scan_file in enumerate(scan_files[:5]):
             filename = scan_file.stem
-            
+
             # Parse new format: scan_N_type
             if "_" in filename and not filename.replace("scan_", "").replace("_", "").isdigit():
                 parts = filename.split("_")
                 if len(parts) >= 3 and parts[1].isdigit():
                     scan_num = int(parts[1])
                     scan_type = "_".join(parts[2:])
-                    
+
                     # Get scan info from counter
                     scan_info = self.scan_counter.get_scan_info(scan_num)
                     if scan_info:
-                        date_str = scan_info['readable_time']
-                        target = scan_info['target']
-                        timestamp = scan_info['timestamp']
+                        date_str = scan_info["readable_time"]
+                        target = scan_info["target"]
+                        timestamp = scan_info["timestamp"]
                     else:
                         date_str = "Unknown"
                         target = "Unknown"
                         timestamp = ""
-                    
-                    scan_options.append((scan_file, scan_num, scan_type, date_str, target, timestamp))
-                    console.print(f"  {i+1}. Scan #{scan_num} ({scan_type}) - {target} - {date_str}")
+
+                    scan_options.append(
+                        (scan_file, scan_num, scan_type, date_str, target, timestamp)
+                    )
+                    console.print(
+                        f"  {i+1}. Scan #{scan_num} ({scan_type}) - {target} - {date_str}"
+                    )
                     continue
-            
+
             # Old format: scan_TIMESTAMP
             scan_num = None
             scan_type = "legacy"
             timestamp = filename.replace("scan_", "")
             try:
-                date_str = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+                date_str = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
             except:
                 date_str = "Unknown"
-            
+
             scan_options.append((scan_file, scan_num, scan_type, date_str, "Unknown", timestamp))
             console.print(f"  {i+1}. Legacy scan - {date_str}")
 
         choice = Prompt.ask(
             "Select scan", choices=[str(i + 1) for i in range(min(5, len(scan_files)))]
         )
-        
+
         scan_file, scan_num, scan_type, date_str, target, timestamp = scan_options[int(choice) - 1]
 
         with open(scan_file) as f:
@@ -1824,23 +1892,27 @@ class NetworkMapper:
 
         while True:
             try:
-                choice = Prompt.ask(
-                    "\nSelect scan type", choices=["1", "2"], default="1"
-                )
+                choice = Prompt.ask("\nSelect scan type", choices=["1", "2"], default="1")
                 choice_idx = int(choice) - 1
                 scan_type, scan_name, _, _, needs_root = scan_options[choice_idx]
 
                 # Both scan types use masscan for discovery
                 use_masscan = True
-                
+
                 if scan_type == "fast":
                     console.print("\n[cyan]⚡ Deep Scan selected[/cyan]")
-                    console.print("[cyan]📊 Will use masscan for discovery + light nmap enrichment[/cyan]")
+                    console.print(
+                        "[cyan]📊 Will use masscan for discovery + light nmap enrichment[/cyan]"
+                    )
                     console.print("[cyan]💡 Perfect for quick scans of large networks[/cyan]")
                 else:  # deeper
                     console.print("\n[cyan]🔬 Deeper Scan selected[/cyan]")
-                    console.print("[cyan]📊 Will use masscan for discovery + comprehensive nmap enrichment[/cyan]")
-                    console.print("[cyan]🎯 More accurate OS detection and service identification[/cyan]")
+                    console.print(
+                        "[cyan]📊 Will use masscan for discovery + comprehensive nmap enrichment[/cyan]"
+                    )
+                    console.print(
+                        "[cyan]🎯 More accurate OS detection and service identification[/cyan]"
+                    )
                     console.print("[cyan]⏱️  Takes longer but provides better results[/cyan]")
 
                 return scan_type, scan_name, needs_root, use_masscan

@@ -56,6 +56,7 @@ except ImportError:
 # Import API intelligence layer
 try:
     from .api_intelligence import APIIntelligenceLayer, DeviceIntelligence
+
     API_INTELLIGENCE_AVAILABLE = True
 except ImportError:
     logger.warning("API Intelligence layer not available")
@@ -70,11 +71,11 @@ logger = logging.getLogger(__name__)
 class TrafficFlow:
     """
     Represents a traffic flow between two endpoints.
-    
+
     A flow is defined by the 5-tuple: (src_ip, dst_ip, src_port, dst_port, protocol)
     and accumulates statistics about packets and bytes transferred. This data
     structure enables flow-based analysis similar to NetFlow/IPFIX.
-    
+
     Attributes:
         src_ip: Source IP address
         dst_ip: Destination IP address
@@ -108,10 +109,10 @@ class TrafficFlow:
     def to_dict(self) -> Dict:
         """
         Convert flow to dictionary for JSON serialization.
-        
+
         Converts datetime objects to ISO format strings and sets to lists
         for JSON compatibility.
-        
+
         Returns:
             Dictionary representation of the flow
         """
@@ -134,17 +135,17 @@ class TrafficFlow:
 class StealthDevice:
     """
     Represents a device discovered through passive monitoring.
-    
+
     Stealth devices are those not found by active scanning but observed
     in network traffic. They might be:
     - Firewalled devices dropping scan packets
     - Devices with stealth mode enabled
     - Temporary devices (DHCP clients)
     - Devices on different VLANs observable through routing
-    
+
     The profile built includes communication patterns and service usage
     to help classify and understand these hidden devices.
-    
+
     Attributes:
         ip: IP address of the device
         mac: MAC address if available from ARP
@@ -178,11 +179,11 @@ class StealthDevice:
     def to_dict(self) -> Dict:
         """
         Convert stealth device to dictionary for serialization.
-        
+
         Includes all device attributes plus inferred device type based
         on traffic patterns. Handles datetime and set conversions for
         JSON compatibility.
-        
+
         Returns:
             Dictionary representation including guessed device type
         """
@@ -202,26 +203,26 @@ class StealthDevice:
             "user_agent": self.user_agent,
             "likely_type": self.guess_device_type(),
         }
-        
+
         # Add API intelligence if available
         if self.api_intelligence:
             device_dict["api_intelligence"] = self.api_intelligence
-            
+
         return device_dict
 
     def guess_device_type(self) -> str:
         """
         Guess device type based on observed traffic patterns.
-        
+
         Uses heuristics based on:
         - Flow direction ratios (inbound vs outbound)
         - Services observed
         - Number of communication peers
         - Specific service indicators
-        
+
         This is less accurate than active scanning but provides hints
         for devices that can't be actively probed.
-        
+
         Returns:
             Likely device type string
         """
@@ -253,7 +254,7 @@ class StealthDevice:
 class PassiveTrafficAnalyzer:
     """
     Passive traffic analysis for device discovery and flow mapping.
-    
+
     This analyzer captures network traffic to discover devices and map
     communication patterns without sending any packets. It's particularly
     useful for:
@@ -261,27 +262,27 @@ class PassiveTrafficAnalyzer:
     - Understanding actual network usage vs configured services
     - Detecting shadow IT and rogue devices
     - Mapping application dependencies
-    
+
     The analyzer uses multi-threading:
     - Capture thread: Sniffs packets from network interface
     - Processing thread: Analyzes packets and updates data structures
-    
+
     Privacy is maintained by analyzing only packet headers, not payloads.
     """
 
     def __init__(self, interface: str = None, output_path: Path = Path("output")):
         """
         Initialize the traffic analyzer.
-        
+
         Sets up data structures for tracking devices and flows, initializes
         the packet processing pipeline, and prepares the capture interface.
-        
+
         The analyzer maintains several caches:
         - Device profiles for all observed IPs
-        - Flow records for traffic analysis  
+        - Flow records for traffic analysis
         - ARP cache for MAC address correlation
         - DNS cache for hostname resolution
-        
+
         Args:
             interface: Network interface to monitor (None for auto-detect)
             output_path: Base output directory for results
@@ -326,12 +327,12 @@ class PassiveTrafficAnalyzer:
     def _detect_interface(self) -> str:
         """
         Auto-detect suitable network interface for packet capture.
-        
+
         Tries multiple methods:
         1. Default route interface (most likely correct)
         2. First non-loopback interface
         3. Fallback to 'eth0' if all else fails
-        
+
         Returns:
             Interface name suitable for packet capture
         """
@@ -355,17 +356,15 @@ class PassiveTrafficAnalyzer:
         # Fallback to first non-loopback interface
         try:
             # Get all interfaces
-            result = subprocess.run(
-                ["ip", "link", "show"], capture_output=True, text=True
-            )
+            result = subprocess.run(["ip", "link", "show"], capture_output=True, text=True)
             if result.returncode == 0:
-                for line in result.stdout.split('\n'):
-                    if ':' in line and 'lo:' not in line:
+                for line in result.stdout.split("\n"):
+                    if ":" in line and "lo:" not in line:
                         # Extract interface name (e.g., "2: enp0s1:" -> "enp0s1")
-                        parts = line.split(':')
+                        parts = line.split(":")
                         if len(parts) >= 2:
                             interface = parts[1].strip()
-                            if interface and interface != 'lo':
+                            if interface and interface != "lo":
                                 logger.info(f"Using first non-loopback interface: {interface}")
                                 return interface
         except Exception as e:
@@ -374,6 +373,7 @@ class PassiveTrafficAnalyzer:
         # Try netifaces if available
         try:
             import netifaces
+
             for iface in netifaces.interfaces():
                 if iface != "lo" and netifaces.AF_INET in netifaces.ifaddresses(iface):
                     logger.info(f"Using interface from netifaces: {iface}")
@@ -400,11 +400,11 @@ class PassiveTrafficAnalyzer:
     def _init_service_patterns(self) -> Dict[int, str]:
         """
         Initialize port to service mapping for traffic classification.
-        
+
         Maps well-known port numbers to service names for identifying
         traffic types. This helps classify observed flows and understand
         what services devices are using.
-        
+
         Returns:
             Dictionary mapping port numbers to service names
         """
@@ -454,13 +454,13 @@ class PassiveTrafficAnalyzer:
     def start_capture(self, duration: int = 0, packet_count: int = 0) -> None:
         """
         Start passive traffic capture.
-        
+
         Initiates packet capture on the specified interface using two threads:
         - Capture thread: Uses scapy to sniff packets from the network
         - Processing thread: Analyzes packets and updates data structures
-        
+
         This design prevents packet loss by decoupling capture from analysis.
-        
+
         Args:
             duration: Capture duration in seconds (0 for continuous)
             packet_count: Max packets to capture (0 for unlimited)
@@ -498,7 +498,7 @@ class PassiveTrafficAnalyzer:
     def stop_capture(self) -> None:
         """
         Stop passive traffic capture and enrich results.
-        
+
         Gracefully shuts down capture and processing threads, then
         enriches discovered devices with API intelligence data if
         available. Ensures all queued packets are processed before
@@ -520,12 +520,12 @@ class PassiveTrafficAnalyzer:
     def _capture_packets(self, duration: int, packet_count: int) -> None:
         """
         Capture packets using scapy with privilege elevation.
-        
+
         Runs packet capture in a separate process with sudo to access
         raw sockets. Captured packets are written to a temporary file
         which is then read and processed. This approach handles the
         privilege requirements while keeping the main process unprivileged.
-        
+
         Args:
             duration: How long to capture (0 = until stopped)
             packet_count: Maximum packets to capture (0 = unlimited)
@@ -533,32 +533,33 @@ class PassiveTrafficAnalyzer:
         import tempfile
         import subprocess
         import os
-        
+
         temp_file = None
         try:
             # Create temporary file for capture results
-            temp_fd, temp_file = tempfile.mkstemp(suffix='.json', prefix='traffic_capture_')
+            temp_fd, temp_file = tempfile.mkstemp(suffix=".json", prefix="traffic_capture_")
             os.close(temp_fd)
-            
+
             # Make the temp file writable by the sudo process
             os.chmod(temp_file, 0o666)
-            
+
             # Path to sudo wrapper script
             script_path = Path(__file__).parent / "traffic_capture_sudo.py"
-            
+
             # Run capture with sudo
             cmd = [
-                "sudo", "-n",
+                "sudo",
+                "-n",
                 sys.executable,
                 str(script_path),
                 self.interface,
                 str(duration if duration > 0 else 60),  # Default 60s if not specified
-                temp_file
+                temp_file,
             ]
-            
+
             logger.info(f"Starting packet capture with sudo on {self.interface}")
             result = subprocess.run(cmd, capture_output=True, text=True)
-            
+
             if result.returncode != 0:
                 error_msg = result.stderr or result.stdout
                 if "password" in error_msg.lower():
@@ -577,16 +578,16 @@ class PassiveTrafficAnalyzer:
                             return
                     if result.stdout:
                         logger.error(f"Stdout: {result.stdout}")
-                
+
                 # Only return if it's a real error, not just warnings
                 if result.returncode != 0 and "warning" not in error_msg.lower():
                     return
-            
+
             # Check if there's any stdout output
             if result.stdout and result.stdout.strip():
                 # Log the full output for debugging
                 logger.info(f"Capture script output: {result.stdout}")
-                
+
                 # Try to parse as JSON (expected format)
                 try:
                     output_data = json.loads(result.stdout.strip())
@@ -598,23 +599,23 @@ class PassiveTrafficAnalyzer:
                 except json.JSONDecodeError:
                     # If it's not JSON, log it but continue
                     logger.warning(f"Non-JSON output from capture: {result.stdout}")
-                
+
             # Parse capture results
             if os.path.exists(temp_file):
-                with open(temp_file, 'r') as f:
+                with open(temp_file, "r") as f:
                     capture_data = json.load(f)
-                    
+
                 packets = capture_data.get("packets", [])
                 self.stats["packets_captured"] = len(packets)
-                
+
                 # Process packets
                 for pkt_data in packets:
                     if not self.running:
                         break
                     self._process_packet_data(pkt_data)
-                    
+
                 logger.info(f"Processed {len(packets)} packets from capture")
-                    
+
         except Exception as e:
             logger.error(f"Capture error: {e}")
         finally:
@@ -635,7 +636,7 @@ class PassiveTrafficAnalyzer:
             src_port = pkt_data.get("src_port", 0)
             dst_port = pkt_data.get("dst_port", 0)
             protocol = pkt_data.get("proto_name", "")
-            
+
             if not src_ip or not dst_ip:
                 # Handle ARP packets
                 if pkt_data.get("arp_src_ip"):
@@ -645,10 +646,10 @@ class PassiveTrafficAnalyzer:
                         self.arp_cache[src_ip] = src_mac
                         self.discovered_devices.add(src_ip)
                 return
-                
+
             # Create flow key
             flow_key = (src_ip, dst_ip, src_port, dst_port, protocol)
-            
+
             # Update or create flow
             if flow_key in self.flows:
                 flow = self.flows[flow_key]
@@ -663,30 +664,30 @@ class PassiveTrafficAnalyzer:
                     dst_port=dst_port,
                     protocol=protocol,
                     packets=1,
-                    bytes=pkt_data.get("size", 0)
+                    bytes=pkt_data.get("size", 0),
                 )
-                
+
                 # Detect service
                 if dst_port in self.service_patterns:
                     flow.service = self.service_patterns[dst_port]
                 elif src_port in self.service_patterns:
                     flow.service = self.service_patterns[src_port]
-                    
+
                 self.flows[flow_key] = flow
                 self.stats["flows_tracked"] = len(self.flows)
-                
+
             # Track devices
             self.discovered_devices.add(src_ip)
             self.discovered_devices.add(dst_ip)
-            
+
             # Update stats
             self.stats["packets_processed"] += 1
             self.stats["flows_tracked"] = len(self.flows)
             self.stats["devices_discovered"] = len(self.discovered_devices)
-            
+
         except Exception as e:
             logger.debug(f"Error processing packet: {e}")
-    
+
     def _process_packets(self) -> None:
         """Process captured packets"""
         while self.running or not self.packet_queue.empty():
@@ -810,18 +811,26 @@ class PassiveTrafficAnalyzer:
 
         # Update device flow statistics and port tracking
         if direction == "forward":
-            self._update_device_flows(ip.src, outbound=True, service=flow.service, peer=ip.dst, port=dport)
-            self._update_device_flows(ip.dst, outbound=False, service=flow.service, peer=ip.src, port=sport)
+            self._update_device_flows(
+                ip.src, outbound=True, service=flow.service, peer=ip.dst, port=dport
+            )
+            self._update_device_flows(
+                ip.dst, outbound=False, service=flow.service, peer=ip.src, port=sport
+            )
         else:
-            self._update_device_flows(ip.dst, outbound=True, service=flow.service, peer=ip.src, port=sport)
-            self._update_device_flows(ip.src, outbound=False, service=flow.service, peer=ip.dst, port=dport)
-            
+            self._update_device_flows(
+                ip.dst, outbound=True, service=flow.service, peer=ip.src, port=sport
+            )
+            self._update_device_flows(
+                ip.src, outbound=False, service=flow.service, peer=ip.dst, port=dport
+            )
+
         # Extract HTTP User-Agent if available
         if pkt.haslayer(HTTPRequest):
             try:
                 headers = pkt[HTTPRequest].fields
-                if b'User-Agent' in headers:
-                    user_agent = headers[b'User-Agent'].decode('utf-8', errors='ignore')
+                if b"User-Agent" in headers:
+                    user_agent = headers[b"User-Agent"].decode("utf-8", errors="ignore")
                     if ip.src in self.devices and not self.devices[ip.src].user_agent:
                         self.devices[ip.src].user_agent = user_agent
             except Exception as e:
@@ -854,7 +863,9 @@ class PassiveTrafficAnalyzer:
         if hostname and not device.hostname:
             device.hostname = hostname
 
-    def _update_device_flows(self, ip: str, outbound: bool, service: str, peer: str, port: int = 0) -> None:
+    def _update_device_flows(
+        self, ip: str, outbound: bool, service: str, peer: str, port: int = 0
+    ) -> None:
         """Update device flow statistics"""
         if ip not in self.devices:
             return
@@ -872,7 +883,7 @@ class PassiveTrafficAnalyzer:
 
         if peer:
             device.communication_peers.add(peer)
-            
+
         if port > 0:
             device.ports_used.add(port)
 
@@ -889,9 +900,9 @@ class PassiveTrafficAnalyzer:
         if not self.api_intelligence:
             logger.debug("API intelligence not available for device enrichment")
             return
-        
+
         logger.info(f"Enriching {len(self.devices)} devices with API intelligence...")
-        
+
         for ip, device in self.devices.items():
             try:
                 # Gather device intelligence from APIs
@@ -900,24 +911,24 @@ class PassiveTrafficAnalyzer:
                     mac=device.mac,
                     ports=list(device.ports_used),
                     user_agent=device.user_agent,
-                    hostname=device.hostname
+                    hostname=device.hostname,
                 )
-                
+
                 # Update device with API intelligence
                 device.api_intelligence = device_intel.to_dict()
-                
+
                 # Update vendor from API if not already set
                 if device_intel.mac_vendor and device_intel.mac_vendor != "Unknown":
                     if not device.vendor or device.vendor == "Unknown":
                         device.vendor = device_intel.mac_vendor
-                
+
                 # Log enrichment
                 if device_intel.sources:
                     logger.debug(f"Enriched {ip} with sources: {device_intel.sources}")
-                
+
             except Exception as e:
                 logger.warning(f"Failed to enrich device {ip}: {e}")
-        
+
         logger.info("Device enrichment completed")
 
     def get_discovered_devices(self) -> List[Dict]:
@@ -1047,7 +1058,7 @@ class PassiveTrafficAnalyzer:
                 # Update hostname if discovered
                 if passive_device.hostname and not device.get("hostname"):
                     device["hostname"] = passive_device.hostname
-                    
+
                 # Merge API intelligence if available
                 if passive_device.api_intelligence:
                     device["api_intelligence"] = passive_device.api_intelligence
@@ -1072,11 +1083,11 @@ class PassiveTrafficAnalyzer:
                         "outbound_flows": passive_device.outbound_flows,
                     },
                 }
-                
+
                 # Add API intelligence if available
                 if passive_device.api_intelligence:
                     device_data["api_intelligence"] = passive_device.api_intelligence
-                    
+
                 active_map[ip] = device_data
                 logger.info(f"Added stealth device from passive analysis: {ip}")
 

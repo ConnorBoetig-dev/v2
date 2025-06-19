@@ -34,6 +34,7 @@ except ImportError:
 # Import MAC lookup for vendor resolution
 try:
     from utils.mac_lookup import MACLookup
+
     MAC_LOOKUP_AVAILABLE = True
 except ImportError:
     MAC_LOOKUP_AVAILABLE = False
@@ -54,7 +55,9 @@ class NetworkScanner:
         self.scan_profiles = {
             "fast": {
                 # Optimized for large networks - uses masscan for discovery and limited enrichment
-                "masscan": ["-p21,22,23,25,53,80,110,111,135,139,143,161,443,445,465,587,631,993,995,1433,1521,1723,3306,3389,5432,5900,8080,8443,9100,27017,U:53,U:67,U:68,U:69,U:123,U:161,U:500,U:514,U:520,U:1900"],
+                "masscan": [
+                    "-p21,22,23,25,53,80,110,111,135,139,143,161,443,445,465,587,631,993,995,1433,1521,1723,3306,3389,5432,5900,8080,8443,9100,27017,U:53,U:67,U:68,U:69,U:123,U:161,U:500,U:514,U:520,U:1900"
+                ],
                 "nmap": [
                     "-sS",
                     "-sV",
@@ -70,7 +73,9 @@ class NetworkScanner:
             },
             "deeper": {
                 # More thorough scan - uses masscan for discovery and comprehensive nmap enrichment
-                "masscan": ["-p21-23,25,53,67,69,80-81,88,110-111,123,135,137-139,143,161,389,443,445,465,514,515,548,554,587,593,631,636,873,902,993,995,1025-1029,1080,1194,1337,1433-1434,1521,1604,1645,1701,1723,1755,1812-1813,1883,1900,2049,2082-2083,2086-2087,2095-2096,2121,2181,2222,2375,2376,2404,3000,3128,3260,3268-3269,3283,3306,3333,3389-3390,3478,3689,3690,3784,4000,4040,4045,4443,4444,4567,4662,4848,4899,5000-5010,5060-5061,5093,5351,5353,5355,5432,5500,5555,5632,5800,5900-5910,5984-5986,6000-6009,6379,6514,6660-6669,6881,6969,7000-7002,7070,7077,7100,7144,7145,7262,7272,7474,7777,7778,8000-8014,8016,8018,8020-8022,8025,8028,8030-8032,8036,8038,8040-8082,8084-8100,8180-8181,8192,8222,8243,8280,8281,8333,8337,8388,8400,8443-8445,8500,8530-8531,8765,8766,8787,8800,8808,8843,8880,8883,8888,8899,8983,9000-9003,9009,9043,9050,9080-9081,9090-9091,9100,9110,9200,9290,9300,9418,9443,9500,9502,9503,9535,9800,9981,9998-10001,10022-10025,10050,10080,10082,10180,10215,10243,10443,10616-10626,11110-11111,11211,12345,13579,13720-13722,14000,15000,16080,16992-16993,17988,18080,18264,19226,19350,19780,19999-20000,20031,20222,22222,23023,25565,27015,27017-27019,27374,28017,30000,30718,31337,32768,32769,32771,32815,33899,34571-34573,35500,37777,40000,41080,44818,47808,49152-49156,50000,50050,50070,50100,51106,55020,55055,55555,55600,58080,60008,60020,62078,64738,U:53,U:67-69,U:111,U:123,U:135,U:137-138,U:161,U:177,U:445,U:500,U:514,U:520,U:631,U:1434,U:1604,U:1701,U:1900,U:2049,U:4500,U:5060,U:5353,U:5632,U:9200,U:10000,U:17185,U:31337,U:44818,U:47808,U:49152-49154"],
+                "masscan": [
+                    "-p21-23,25,53,67,69,80-81,88,110-111,123,135,137-139,143,161,389,443,445,465,514,515,548,554,587,593,631,636,873,902,993,995,1025-1029,1080,1194,1337,1433-1434,1521,1604,1645,1701,1723,1755,1812-1813,1883,1900,2049,2082-2083,2086-2087,2095-2096,2121,2181,2222,2375,2376,2404,3000,3128,3260,3268-3269,3283,3306,3333,3389-3390,3478,3689,3690,3784,4000,4040,4045,4443,4444,4567,4662,4848,4899,5000-5010,5060-5061,5093,5351,5353,5355,5432,5500,5555,5632,5800,5900-5910,5984-5986,6000-6009,6379,6514,6660-6669,6881,6969,7000-7002,7070,7077,7100,7144,7145,7262,7272,7474,7777,7778,8000-8014,8016,8018,8020-8022,8025,8028,8030-8032,8036,8038,8040-8082,8084-8100,8180-8181,8192,8222,8243,8280,8281,8333,8337,8388,8400,8443-8445,8500,8530-8531,8765,8766,8787,8800,8808,8843,8880,8883,8888,8899,8983,9000-9003,9009,9043,9050,9080-9081,9090-9091,9100,9110,9200,9290,9300,9418,9443,9500,9502,9503,9535,9800,9981,9998-10001,10022-10025,10050,10080,10082,10180,10215,10243,10443,10616-10626,11110-11111,11211,12345,13579,13720-13722,14000,15000,16080,16992-16993,17988,18080,18264,19226,19350,19780,19999-20000,20031,20222,22222,23023,25565,27015,27017-27019,27374,28017,30000,30718,31337,32768,32769,32771,32815,33899,34571-34573,35500,37777,40000,41080,44818,47808,49152-49156,50000,50050,50070,50100,51106,55020,55055,55555,55600,58080,60008,60020,62078,64738,U:53,U:67-69,U:111,U:123,U:135,U:137-138,U:161,U:177,U:445,U:500,U:514,U:520,U:631,U:1434,U:1604,U:1701,U:1900,U:2049,U:4500,U:5060,U:5353,U:5632,U:9200,U:10000,U:17185,U:31337,U:44818,U:47808,U:49152-49154"
+                ],
                 "nmap": [
                     "-sS",
                     "-sV",
@@ -96,7 +101,7 @@ class NetworkScanner:
         self.total_hosts = 0
         self.hosts_completed = 0
         self._scanner_availability = {}  # Cache for scanner availability checks
-        
+
         # Initialize MAC lookup for vendor resolution
         self.mac_lookup = MACLookup() if MAC_LOOKUP_AVAILABLE else None
 
@@ -149,7 +154,9 @@ class NetworkScanner:
             devices = self._run_masscan_deeper(target)
             if devices:
                 # Thorough enrichment with nmap on discovered hosts
-                self.console.print(f"[cyan]📊 Performing deep enrichment on {len(devices)} discovered hosts...[/cyan]")
+                self.console.print(
+                    f"[cyan]📊 Performing deep enrichment on {len(devices)} discovered hosts...[/cyan]"
+                )
                 self.console.print(
                     "[cyan]🔍 This includes: Comprehensive OS detection, detailed service versions, and extended port scanning[/cyan]"
                 )
@@ -763,7 +770,7 @@ class NetworkScanner:
                         raise FriendlyError(
                             "Sudo authentication failed - please retry",
                             "Administrator access is required for this scan.",
-                            "Run the command again and enter your password when prompted"
+                            "Run the command again and enter your password when prompted",
                         )
                     elif stderr_output:
                         raise handle_scanner_error("masscan", RuntimeError(stderr_output))
@@ -867,15 +874,15 @@ class NetworkScanner:
 
                     # Check for hang
                     self._check_hang(current_time, task, progress)
-                    
+
                     # Provide periodic updates if no progress info
                     if current_time - last_status_update > 3:
                         lines_without_progress += 1
                         if lines_without_progress > 5:
                             elapsed = current_time - start_time
                             progress.update(
-                                task, 
-                                status=f"Scanning in progress... ({devices_found} found, {elapsed:.0f}s)"
+                                task,
+                                status=f"Scanning in progress... ({devices_found} found, {elapsed:.0f}s)",
                             )
                         last_status_update = current_time
 
@@ -1679,16 +1686,20 @@ class NetworkScanner:
             ports = "80,443,22,445,3389,8080,135,139,21,23,25,53,161"
             wait_time = "3"
 
-        self.console.print(f"[cyan]🚀 Fast scanning {total_hosts:,} hosts at {scan_rate:,} packets/sec[/cyan]")
+        self.console.print(
+            f"[cyan]🚀 Fast scanning {total_hosts:,} hosts at {scan_rate:,} packets/sec[/cyan]"
+        )
         self.console.print(f"[cyan]📍 Target ports: {ports}[/cyan]")
-        self.console.print(f"[dim]Note: Progress updates may be intermittent during masscan phase[/dim]")
+        self.console.print(
+            f"[dim]Note: Progress updates may be intermittent during masscan phase[/dim]"
+        )
 
         # Ensure sudo
         if not self._ensure_sudo_access():
             raise FriendlyError(
                 "Fast scan requires sudo access",
                 "Administrator privileges are required for high-speed scanning.",
-                "Run with: sudo python3 mapper.py"
+                "Run with: sudo python3 mapper.py",
             )
 
         temp_file = self._create_temp_file("masscan_fast", ".json")
@@ -1754,40 +1765,39 @@ class NetworkScanner:
                 # Process output with better progress tracking
                 last_update_time = start_time
                 no_output_count = 0
-                
+
                 while True:
                     # Try to read line with timeout
                     line = proc.stdout.readline()
-                    
+
                     if not line:
                         # Check if process has finished
                         if proc.poll() is not None:
                             break
-                        
+
                         # No output - update status periodically
                         current_time = time.time()
                         if current_time - last_update_time > 2:  # Update every 2 seconds
                             elapsed = current_time - start_time
                             no_output_count += 1
-                            
+
                             if no_output_count < 5:
                                 progress.update(
-                                    task,
-                                    status=f"Scanning in progress... ({elapsed:.0f}s elapsed)"
+                                    task, status=f"Scanning in progress... ({elapsed:.0f}s elapsed)"
                                 )
                             else:
                                 progress.update(
                                     task,
-                                    status=f"Scanning (no output from masscan)... ({elapsed:.0f}s)"
+                                    status=f"Scanning (no output from masscan)... ({elapsed:.0f}s)",
                                 )
                             last_update_time = current_time
-                        
+
                         time.sleep(0.1)
                         continue
-                    
+
                     line = line.strip()
                     no_output_count = 0  # Reset counter on output
-                    
+
                     # Parse progress
                     if "found=" in line:
                         match = re.search(r"found=(\d+)", line)
@@ -1807,13 +1817,12 @@ class NetworkScanner:
                                 status=f"Found {devices_found} hosts ({rate:.0f}/sec)",
                             )
                             last_update_time = time.time()
-                    
+
                     # Also update on any output to show activity
                     elif time.time() - last_update_time > 3:
                         elapsed = time.time() - start_time
                         progress.update(
-                            task,
-                            status=f"Scanning... ({devices_found} found, {elapsed:.0f}s)"
+                            task, status=f"Scanning... ({devices_found} found, {elapsed:.0f}s)"
                         )
                         last_update_time = time.time()
 
@@ -1877,13 +1886,13 @@ class NetworkScanner:
             for i in range(0, len(ip_list), chunk_size):
                 chunk = ip_list[i : i + chunk_size]
                 chunk_num = i // chunk_size + 1
-                
+
                 # Show which IPs are being enriched
                 ip_range = f"{chunk[0]} - {chunk[-1]}" if len(chunk) > 1 else chunk[0]
                 progress.update(
-                    task, 
-                    completed=i, 
-                    status=f"Enriching chunk {chunk_num}/{total_chunks} ({ip_range})"
+                    task,
+                    completed=i,
+                    status=f"Enriching chunk {chunk_num}/{total_chunks} ({ip_range})",
                 )
 
                 # Create target string for this chunk
@@ -1918,9 +1927,9 @@ class NetworkScanner:
                     # Update status to show nmap is running
                     progress.update(
                         task,
-                        status=f"Running nmap on chunk {chunk_num}/{total_chunks} ({len(chunk)} IPs)..."
+                        status=f"Running nmap on chunk {chunk_num}/{total_chunks} ({len(chunk)} IPs)...",
                     )
-                    
+
                     result = subprocess.run(
                         cmd,
                         capture_output=True,
@@ -1963,12 +1972,12 @@ class NetworkScanner:
                                         f"[green]✓ Hostname found for {device['ip']}: {e.get('hostname')}[/green]"
                                     )
                             enriched_devices.append(device)
-                            
+
                         # Update progress after chunk completion
                         progress.update(
                             task,
                             completed=i + len(chunk),
-                            status=f"Completed chunk {chunk_num}/{total_chunks}"
+                            status=f"Completed chunk {chunk_num}/{total_chunks}",
                         )
                     else:
                         # If enrichment fails, keep original data
@@ -1976,7 +1985,7 @@ class NetworkScanner:
                         progress.update(
                             task,
                             completed=i + len(chunk),
-                            status=f"Chunk {chunk_num} enrichment failed, keeping basic data"
+                            status=f"Chunk {chunk_num} enrichment failed, keeping basic data",
                         )
 
                     self._cleanup_temp_file(temp_file, needs_sudo=True)
@@ -2053,7 +2062,9 @@ class NetworkScanner:
             List of discovered devices
         """
         # Use the same masscan logic but with more ports (defined in scan profile)
-        return self._run_masscan_fast(target)  # Reuse the same method, it will use the profile ports
+        return self._run_masscan_fast(
+            target
+        )  # Reuse the same method, it will use the profile ports
 
     def _enrich_deeper_scan(self, devices: List[Dict]) -> List[Dict]:
         """Enrich devices with comprehensive nmap scanning
@@ -2097,7 +2108,7 @@ class NetworkScanner:
                 progress.update(
                     task,
                     completed=start_idx,
-                    status=f"Scanning chunk {chunk_idx + 1}/{total_chunks} ({len(chunk_ips)} IPs)"
+                    status=f"Scanning chunk {chunk_idx + 1}/{total_chunks} ({len(chunk_ips)} IPs)",
                 )
 
                 # Use the deeper scan profile which has more comprehensive settings
@@ -2110,27 +2121,37 @@ class NetworkScanner:
 
                     # Run with longer timeout for deeper scanning
                     result = subprocess.run(
-                        cmd, capture_output=True, text=True, timeout=300  # 5 minute timeout per chunk
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=300,  # 5 minute timeout per chunk
                     )
 
                     if result.returncode == 0:
                         # Parse results
                         chunk_results = self._parse_nmap_xml(temp_file)
-                        
+
                         # Merge with original device data
                         device_map = {d["ip"]: d for d in devices[start_idx:end_idx]}
                         for enriched in chunk_results:
                             if enriched["ip"] in device_map:
                                 # Keep original open_ports from masscan
                                 original = device_map[enriched["ip"]]
-                                enriched["open_ports"] = list(set(original.get("open_ports", []) + enriched.get("open_ports", [])))
+                                enriched["open_ports"] = list(
+                                    set(
+                                        original.get("open_ports", [])
+                                        + enriched.get("open_ports", [])
+                                    )
+                                )
                                 enriched_devices.append(enriched)
                             else:
                                 enriched_devices.append(enriched)
                     else:
                         # If enrichment fails, keep original devices
                         enriched_devices.extend(devices[start_idx:end_idx])
-                        logger.warning(f"Deeper enrichment failed for chunk {chunk_idx + 1}: {result.stderr}")
+                        logger.warning(
+                            f"Deeper enrichment failed for chunk {chunk_idx + 1}: {result.stderr}"
+                        )
 
                 except subprocess.TimeoutExpired:
                     # On timeout, keep original devices
@@ -2145,14 +2166,20 @@ class NetworkScanner:
             progress.update(task, completed=len(devices), status="Deep enrichment complete")
 
         # Log enrichment summary
-        self.console.print(f"[green]✓ Deep enrichment complete for {len(enriched_devices)} devices[/green]")
-        
+        self.console.print(
+            f"[green]✓ Deep enrichment complete for {len(enriched_devices)} devices[/green]"
+        )
+
         # Show sample of enriched data
         if enriched_devices and self.config["scanners"].get("progress_details", False):
             sample = enriched_devices[0]
             if sample.get("os"):
-                self.console.print(f"[dim]Sample OS detection: {sample['ip']} -> {sample['os']}[/dim]")
+                self.console.print(
+                    f"[dim]Sample OS detection: {sample['ip']} -> {sample['os']}[/dim]"
+                )
             if sample.get("services"):
-                self.console.print(f"[dim]Sample services: {len(sample['services'])} services detected[/dim]")
+                self.console.print(
+                    f"[dim]Sample services: {len(sample['services'])} services detected[/dim]"
+                )
 
         return enriched_devices

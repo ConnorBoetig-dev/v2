@@ -29,58 +29,58 @@ logger = logging.getLogger(__name__)
 class DeviceType(Enum):
     """
     Enumeration of supported device types.
-    
+
     Each type represents a distinct category of network device with unique
     characteristics and security implications. The order here doesn't affect
     classification priority - that's controlled by DeviceSignature.priority.
     """
-    
+
     # Network Infrastructure (typically high-priority, critical devices)
-    ROUTER = "router"              # Layer 3 routing devices, gateways
-    SWITCH = "switch"              # Layer 2 switching devices
-    FIREWALL = "firewall"          # Security appliances, UTM devices
-    
+    ROUTER = "router"  # Layer 3 routing devices, gateways
+    SWITCH = "switch"  # Layer 2 switching devices
+    FIREWALL = "firewall"  # Security appliances, UTM devices
+
     # Server Types (application and service hosts)
-    DATABASE = "database"          # MySQL, PostgreSQL, Oracle, etc.
-    WEB_SERVER = "web_server"      # Apache, nginx, IIS web servers
-    MAIL_SERVER = "mail_server"    # SMTP, POP3, IMAP servers
-    DNS_SERVER = "dns_server"      # Domain name resolution servers
+    DATABASE = "database"  # MySQL, PostgreSQL, Oracle, etc.
+    WEB_SERVER = "web_server"  # Apache, nginx, IIS web servers
+    MAIL_SERVER = "mail_server"  # SMTP, POP3, IMAP servers
+    DNS_SERVER = "dns_server"  # Domain name resolution servers
     DOMAIN_CONTROLLER = "domain_controller"  # Active Directory, LDAP
-    WINDOWS_SERVER = "windows_server"        # General Windows servers
-    LINUX_SERVER = "linux_server"            # General Linux servers
-    
+    WINDOWS_SERVER = "windows_server"  # General Windows servers
+    LINUX_SERVER = "linux_server"  # General Linux servers
+
     # Specialized Devices
-    PRINTER = "printer"            # Network printers, MFPs
-    NAS = "nas"                    # Network Attached Storage
-    HYPERVISOR = "hypervisor"      # VMware, Hyper-V, Proxmox hosts
-    WORKSTATION = "workstation"    # End-user computers
-    IOT = "iot"                    # Internet of Things devices
-    VOIP = "voip"                  # VoIP phones, PBX systems
+    PRINTER = "printer"  # Network printers, MFPs
+    NAS = "nas"  # Network Attached Storage
+    HYPERVISOR = "hypervisor"  # VMware, Hyper-V, Proxmox hosts
+    WORKSTATION = "workstation"  # End-user computers
+    IOT = "iot"  # Internet of Things devices
+    VOIP = "voip"  # VoIP phones, PBX systems
     MEDIA_SERVER = "media_server"  # Streaming, media services
-    
+
     # Industrial/Utility Systems
-    UPS = "ups"                    # Uninterruptible Power Supplies
-    PLC = "plc"                    # Programmable Logic Controllers
-    SCADA = "scada"                # Supervisory Control systems
-    
+    UPS = "ups"  # Uninterruptible Power Supplies
+    PLC = "plc"  # Programmable Logic Controllers
+    SCADA = "scada"  # Supervisory Control systems
+
     # Support Services
-    NTP_SERVER = "ntp_server"      # Time synchronization servers
+    NTP_SERVER = "ntp_server"  # Time synchronization servers
     MONITORING_SERVER = "monitoring_server"  # Nagios, Zabbix, etc.
-    BACKUP_SERVER = "backup_server"          # Backup systems
-    
+    BACKUP_SERVER = "backup_server"  # Backup systems
+
     # Fallback category
-    UNKNOWN = "unknown"            # Unclassified devices
+    UNKNOWN = "unknown"  # Unclassified devices
 
 
 @dataclass
 class DeviceSignature:
     """
     Device type signature definition.
-    
+
     A signature represents the characteristic pattern of a device type,
     used for matching against discovered devices. Higher priority signatures
     are evaluated first, and confidence scores determine match quality.
-    
+
     Attributes:
         device_type: The DeviceType this signature identifies
         ports: List of characteristic open ports (any match counts)
@@ -216,7 +216,14 @@ class DeviceClassifier:
                 device_type=DeviceType.DOMAIN_CONTROLLER,
                 ports=[88, 135, 139, 389, 445, 464, 636, 3268],  # Kerberos, LDAP, SMB
                 services=["kerberos", "ldap", "ldaps", "msrpc", "netbios", "microsoft-ds"],
-                keywords=["domain controller", "active directory", "ldap", "kerberos", "dc01", "dc02"],
+                keywords=[
+                    "domain controller",
+                    "active directory",
+                    "ldap",
+                    "kerberos",
+                    "dc01",
+                    "dc02",
+                ],
                 vendor_patterns=["Microsoft"],
                 priority=95,  # Critical infrastructure
             ),
@@ -374,7 +381,15 @@ class DeviceClassifier:
                     "thermostat",
                     "security",
                 ],
-                vendor_patterns=["Espressif", "Raspberry", "Arduino", "Tuya", "Philips", "Honeywell", "Hikvision"],
+                vendor_patterns=[
+                    "Espressif",
+                    "Raspberry",
+                    "Arduino",
+                    "Tuya",
+                    "Philips",
+                    "Honeywell",
+                    "Hikvision",
+                ],
                 priority=30,
             ),
             DeviceType.VOIP: DeviceSignature(
@@ -412,7 +427,11 @@ class DeviceClassifier:
             "Netgear": [DeviceType.ROUTER, DeviceType.SWITCH, DeviceType.NAS],
             "TP-Link": [DeviceType.ROUTER, DeviceType.SWITCH, DeviceType.IOT],
             "VMware": [DeviceType.HYPERVISOR],
-            "Microsoft": [DeviceType.WINDOWS_SERVER, DeviceType.WORKSTATION, DeviceType.DOMAIN_CONTROLLER],
+            "Microsoft": [
+                DeviceType.WINDOWS_SERVER,
+                DeviceType.WORKSTATION,
+                DeviceType.DOMAIN_CONTROLLER,
+            ],
             "APC|Schneider": [DeviceType.UPS],
             "Eaton": [DeviceType.UPS],
             "Siemens": [DeviceType.PLC, DeviceType.SCADA],
@@ -457,11 +476,11 @@ class DeviceClassifier:
     def classify_devices(self, devices: List[Dict]) -> List[Dict]:
         """
         Classify a list of devices based on their network characteristics.
-        
+
         This is the main entry point for device classification. Each device is
         analyzed independently using signature matching, and the results include
         both the device type and a confidence score.
-        
+
         The classification process:
         1. Extract device characteristics (ports, services, OS, vendor)
         2. Score against all signatures
@@ -488,10 +507,10 @@ class DeviceClassifier:
         for device in devices:
             # Create a copy to avoid modifying the original
             classified_device = device.copy()
-            
+
             # Perform classification
             device_type, confidence = self._classify_single_device(device)
-            
+
             # Add classification results
             classified_device["type"] = device_type.value
             classified_device["confidence"] = confidence

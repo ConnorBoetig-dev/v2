@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 class ExportManager:
     """
     Manages exports to various formats (PDF, Excel, CSV, JSON).
-    
+
     This class orchestrates the export process, handling format-specific
     requirements while maintaining consistency across all export types.
     Each format serves different needs:
@@ -62,11 +62,11 @@ class ExportManager:
     def __init__(self, output_path: Path = None):
         """
         Initialize export manager with output directory.
-        
+
         Creates a dedicated exports directory to organize output files.
         This separation keeps exports distinct from scan results and
         other application data.
-        
+
         Args:
             output_path: Base path for exports (default: current directory)
         """
@@ -79,7 +79,7 @@ class ExportManager:
     ) -> Path:
         """
         Export network scan data to professional PDF report.
-        
+
         Generates a comprehensive PDF report suitable for management and
         documentation purposes. The report includes:
         - Executive summary with key metrics
@@ -87,11 +87,11 @@ class ExportManager:
         - Network change analysis (if provided)
         - Critical infrastructure highlights
         - Detailed device inventory (first 50)
-        
+
         The PDF uses professional styling with color coding for different
         sections and importance levels. Tables are formatted for clarity
         and reports are designed to be print-friendly.
-        
+
         Args:
             devices: List of device dictionaries containing scan results
             changes: Optional change tracking data with new/missing/changed devices
@@ -375,21 +375,21 @@ class ExportManager:
     ) -> Path:
         """
         Export network scan data to Excel workbook with multiple sheets.
-        
+
         Creates a comprehensive Excel workbook with:
         1. Summary sheet - Overview and statistics
         2. All Devices - Complete inventory with formatting
         3. Critical Devices - Filtered view of critical infrastructure
         4. Network Changes - New/missing/changed devices (if data provided)
         5. Subnet Analysis - Network segmentation breakdown
-        
+
         Excel format provides the most detailed export with:
         - Color coding for device criticality
         - Auto-adjusted column widths
         - Professional formatting and borders
         - Multiple views of the same data
         - Easy filtering and sorting capabilities
-        
+
         Args:
             devices: List of device dictionaries
             changes: Optional change tracking data
@@ -683,18 +683,18 @@ class ExportManager:
     ) -> Path:
         """
         Export to enhanced JSON format with metadata.
-        
+
         JSON export provides:
         - Complete data preservation
         - Machine-readable format
         - Metadata for context
         - Structured organization
         - Easy integration with other tools
-        
+
         The export includes summary statistics, subnet analysis,
         and all device data in a hierarchical structure suitable
         for APIs and data processing pipelines.
-        
+
         Args:
             devices: List of device dictionaries
             changes: Optional change tracking data
@@ -730,16 +730,16 @@ class ExportManager:
     def export_to_csv_enhanced(self, devices: List[Dict], filename: Optional[str] = None) -> Path:
         """
         Export to enhanced CSV format with vulnerability data.
-        
+
         CSV export is ideal for:
         - Importing into spreadsheet applications
         - Data analysis tools
         - Simple interchange format
         - Wide compatibility
-        
+
         Includes vulnerability information and flattens nested
         data structures for tabular representation.
-        
+
         Args:
             devices: List of device dictionaries
             filename: Optional custom filename
@@ -764,22 +764,24 @@ class ExportManager:
             df["services"] = df["services"].apply(
                 lambda x: ";".join(x) if isinstance(x, list) else ""
             )
-        
+
         # Extract data from API intelligence
         if "api_intelligence" in df.columns:
             # Extract data sources
             df["vendor_source"] = df["api_intelligence"].apply(
-                lambda x: x.get("data_sources", {}).get("mac_vendor", "") if isinstance(x, dict) else ""
+                lambda x: x.get("data_sources", {}).get("mac_vendor", "")
+                if isinstance(x, dict)
+                else ""
             )
-            
+
             # Extract API confidence
             df["api_confidence"] = df["api_intelligence"].apply(
                 lambda x: x.get("confidence", 0) if isinstance(x, dict) else 0
             )
-            
+
             # Drop the complex api_intelligence column
             df = df.drop(columns=["api_intelligence"])
-        
+
         # Extract passive analysis data if present
         if "passive_analysis" in df.columns:
             df["traffic_flows"] = df["passive_analysis"].apply(
@@ -799,20 +801,20 @@ class ExportManager:
     def _generate_summary(self, devices: List[Dict]) -> Dict:
         """
         Generate comprehensive summary statistics from device data.
-        
+
         Analyzes the device list to produce insights including:
         - Device type distribution
         - Vendor breakdown
         - Operating system diversity
         - Common services and ports
         - Security risk indicators (high-risk ports)
-        
+
         This summary helps identify:
         - Network composition patterns
         - Potential security concerns
         - Vendor consolidation opportunities
         - Service standardization needs
-        
+
         Args:
             devices: List of device dictionaries
 
@@ -879,22 +881,22 @@ class ExportManager:
     def _analyze_subnets(self, devices: List[Dict]) -> Dict:
         """
         Analyze device distribution across network subnets.
-        
+
         Groups devices by /24 subnets to understand:
         - Network segmentation
         - Device density by subnet
         - Critical infrastructure distribution
         - Subnet-specific device types
-        
+
         This analysis helps with:
         - Network architecture documentation
         - Identifying subnet purposes
         - Security zone planning
         - Capacity planning
-        
+
         Note: Assumes /24 subnet masks for simplicity. Real subnet
         masks may vary in production networks.
-        
+
         Args:
             devices: List of device dictionaries
 

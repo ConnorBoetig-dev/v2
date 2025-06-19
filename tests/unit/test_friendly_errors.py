@@ -71,7 +71,7 @@ class TestScannerErrorHandling:
         """Test handling scanner not found error"""
         original_error = Exception("nmap: command not found")
         friendly_error = handle_scanner_error("nmap", original_error)
-        
+
         assert isinstance(friendly_error, FriendlyError)
         assert "Nmap is not installed" in str(friendly_error)
         assert "sudo apt install nmap" in str(friendly_error)
@@ -80,14 +80,14 @@ class TestScannerErrorHandling:
         """Test handling masscan not found"""
         original_error = Exception("masscan: not found")
         friendly_error = handle_scanner_error("masscan", original_error)
-        
+
         assert "Masscan is not installed" in str(friendly_error)
 
     def test_handle_permission_error(self):
         """Test handling permission denied error"""
         original_error = Exception("Operation not permitted")
         friendly_error = handle_scanner_error("nmap", original_error)
-        
+
         # Check that it returns appropriate permission error
         assert isinstance(friendly_error, FriendlyError)
         error_str = str(friendly_error)
@@ -98,14 +98,14 @@ class TestScannerErrorHandling:
         """Test handling network unreachable error"""
         original_error = Exception("Network is unreachable")
         friendly_error = handle_scanner_error("nmap", original_error)
-        
+
         assert "Cannot reach the specified network" in str(friendly_error)
 
     def test_handle_generic_scan_error(self):
         """Test handling generic scan error"""
         original_error = Exception("Some other error")
         friendly_error = handle_scanner_error("nmap", original_error)
-        
+
         assert "scan encountered an error" in str(friendly_error)
 
 
@@ -116,7 +116,7 @@ class TestNetworkErrorHandling:
         """Test handling invalid target error"""
         original_error = Exception("Could not parse target")
         friendly_error = handle_network_error(original_error, "bad-target")
-        
+
         assert isinstance(friendly_error, FriendlyError)
         assert "network target format is invalid" in str(friendly_error)
 
@@ -124,14 +124,14 @@ class TestNetworkErrorHandling:
         """Test handling unreachable network"""
         original_error = Exception("Network unreachable")
         friendly_error = handle_network_error(original_error)
-        
+
         assert "Cannot reach the specified network" in str(friendly_error)
 
     def test_handle_no_hosts_found(self):
         """Test handling no hosts found"""
         original_error = Exception("No hosts found")
         friendly_error = handle_network_error(original_error)
-        
+
         assert "No devices were found" in str(friendly_error)
 
 
@@ -186,7 +186,7 @@ class TestErrorMessageContent:
     def test_all_error_messages_have_user_message(self):
         """Test that all error messages have user messages"""
         from utils.friendly_errors import ERROR_MESSAGES
-        
+
         for key, value in ERROR_MESSAGES.items():
             assert "user" in value
             assert len(value["user"]) > 0
@@ -194,7 +194,7 @@ class TestErrorMessageContent:
     def test_suggestions_are_helpful(self):
         """Test that suggestions are actionable"""
         from utils.friendly_errors import ERROR_MESSAGES
-        
+
         # Check some key suggestions
         assert "sudo apt install" in ERROR_MESSAGES["nmap_not_found"]["suggestion"]
         assert "sudo python3" in ERROR_MESSAGES["sudo_required"]["suggestion"]

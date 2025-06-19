@@ -42,7 +42,9 @@ class MACLookup:
         if self.oui_file.exists():
             self._parse_oui_file()
         else:
-            print("[WARNING] OUI database not found at cache/oui.txt. MAC vendor lookups will be limited.")
+            print(
+                "[WARNING] OUI database not found at cache/oui.txt. MAC vendor lookups will be limited."
+            )
             # Fallback to minimal hardcoded database for critical vendors
             self.vendor_cache = {
                 "00:00:0c": "Cisco Systems, Inc",
@@ -53,9 +55,6 @@ class MACLookup:
                 "b8:27:eb": "Raspberry Pi Foundation",
                 "00:1b:21": "Intel Corporate",
             }
-
-
-
 
     def _parse_oui_file(self):
         """Parse the OUI database file"""
@@ -69,7 +68,7 @@ class MACLookup:
                     # IEEE format: XX-XX-XX   (hex)    Organization Name
                     if re.match(r"^[0-9A-F]{2}-[0-9A-F]{2}-[0-9A-F]{2}", line):
                         # Split by multiple spaces to handle format
-                        parts = re.split(r'\s{2,}|\t', line)
+                        parts = re.split(r"\s{2,}|\t", line)
                         if len(parts) >= 2:
                             # Extract just the MAC part (XX-XX-XX)
                             oui = parts[0].strip().replace("-", ":").lower()
@@ -80,19 +79,19 @@ class MACLookup:
                                 if part and part != "(hex)":
                                     vendor = part
                                     break
-                            
+
                             if vendor:
                                 self.vendor_cache[oui] = vendor
 
                     # Alternative format (XX:XX:XX or XXXXXX)
                     elif re.match(r"^[0-9A-F]{6}", line):
                         # Format: XXXXXX     (base 16)     Organization
-                        parts = re.split(r'\s{2,}|\t', line)
+                        parts = re.split(r"\s{2,}|\t", line)
                         if len(parts) >= 2:
                             mac_hex = parts[0].strip()
                             if len(mac_hex) == 6:
                                 # Convert XXXXXX to XX:XX:XX
-                                oui = ":".join(mac_hex[i:i+2] for i in range(0, 6, 2)).lower()
+                                oui = ":".join(mac_hex[i : i + 2] for i in range(0, 6, 2)).lower()
                                 # Find vendor, skipping (base 16)
                                 vendor = None
                                 for part in parts[1:]:
@@ -196,7 +195,6 @@ class MACLookup:
         except Exception:
             return {}
 
-
     def lookup(self, mac: str) -> Optional[str]:
         """Lookup vendor by MAC address using local database only"""
         if not mac:
@@ -287,9 +285,9 @@ class MACLookup:
 
             # IEEE OUI database URL
             url = "http://standards-oui.ieee.org/oui/oui.txt"
-            
+
             print("[INFO] Downloading IEEE OUI database from standards-oui.ieee.org...")
-            
+
             # Download with timeout
             response = requests.get(url, timeout=30, stream=True)
             response.raise_for_status()
@@ -319,7 +317,7 @@ class MACLookup:
 
             # Alternative: Wireshark's manuf database from automated build server
             url = "https://www.wireshark.org/download/automated/data/manuf"
-            
+
             print("[INFO] Trying alternative source (Wireshark manuf database)...")
 
             response = requests.get(url, timeout=30)

@@ -26,50 +26,52 @@ from .utils.logger import setup_logging
 def create_application() -> CLIContext:
     """
     Create and configure the application with all dependencies.
-    
+
     This function sets up the entire dependency injection container,
     ensuring proper initialization order and configuration.
     """
     # Load configuration
     config = load_config()
-    
+
     # Setup logging
-    setup_logging(config.get('logging', {}))
-    
+    setup_logging(config.get("logging", {}))
+
     # Create persistence layer
-    data_dir = Path(config.get('data_dir', './output'))
+    data_dir = Path(config.get("data_dir", "./output"))
     repository = DeviceRepository(data_dir)
-    
+
     # Create external clients
-    snmp_client = SNMPClient(config.get('snmp', {}))
-    dns_client = DNSClient(config.get('dns', {}))
-    
+    snmp_client = SNMPClient(config.get("snmp", {}))
+    dns_client = DNSClient(config.get("dns", {}))
+
     # Create enrichers
     enrichers = []
-    if config.get('enrichment', {}).get('snmp_enabled', True):
+    if config.get("enrichment", {}).get("snmp_enabled", True):
         from .core.services.enrichment_service import SNMPEnricher
+
         enrichers.append(SNMPEnricher(snmp_client))
-    
-    if config.get('enrichment', {}).get('dns_enabled', True):
+
+    if config.get("enrichment", {}).get("dns_enabled", True):
         from .core.services.enrichment_service import DNSEnricher
+
         enrichers.append(DNSEnricher(dns_client))
-    
+
     # Create core services
     scanner_factory = ScannerFactory()
     classifier = DeviceClassifier()
     change_tracker = ChangeTracker()
     annotation_service = AnnotationService(repository)
-    
+
     # Create vulnerability analyzer if enabled
     vuln_analyzer = None
-    if config.get('vulnerability', {}).get('enabled', True):
+    if config.get("vulnerability", {}).get("enabled", True):
         from .infrastructure.external.osv_client import OSVClient
         from .infrastructure.external.circl_client import CIRCLClient
-        
+
         osv_client = OSVClient()
         circl_client = CIRCLClient()
         vuln_analyzer = VulnerabilityAnalyzer([osv_client, circl_client])
-    
+
     # Create scan orchestrator
     orchestrator = ScanOrchestrator(
         scanner_factory=scanner_factory,
@@ -78,20 +80,20 @@ def create_application() -> CLIContext:
         change_tracker=change_tracker,
         repository=repository,
         vulnerability_analyzer=vuln_analyzer,
-        max_workers=config.get('performance', {}).get('max_workers', 10)
+        max_workers=config.get("performance", {}).get("max_workers", 10),
     )
-    
+
     # Create exporter factory
-    exporter_factory = ExporterFactory(config.get('export', {}))
-    
+    exporter_factory = ExporterFactory(config.get("export", {}))
+
     # Create CLI context
     context = CLIContext(
         scan_orchestrator=orchestrator,
         annotation_service=annotation_service,
         exporter_factory=exporter_factory,
-        config=config
+        config=config,
     )
-    
+
     return context
 
 
@@ -100,13 +102,13 @@ def main():
     try:
         # Create application
         context = create_application()
-        
+
         # Initialize CLI with dependencies
         initialize_cli(context)
-        
+
         # Run CLI
         app()
-        
+
     except KeyboardInterrupt:
         print("\nOperation cancelled by user")
         sys.exit(0)

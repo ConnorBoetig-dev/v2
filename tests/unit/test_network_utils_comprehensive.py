@@ -17,7 +17,7 @@ class TestNetworkUtilsValidation:
         valid, error = NetworkUtils.validate_target("192.168.1.1")
         assert valid is True
         assert error is None
-        
+
         valid, error = NetworkUtils.validate_target("10.0.0.1")
         assert valid is True
         assert error is None
@@ -27,7 +27,7 @@ class TestNetworkUtilsValidation:
         valid, error = NetworkUtils.validate_target("192.168.1.0/24")
         assert valid is True
         assert error is None
-        
+
         valid, error = NetworkUtils.validate_target("10.0.0.0/8")
         assert valid is True
         assert error is None
@@ -38,18 +38,18 @@ class TestNetworkUtilsValidation:
         valid, error = NetworkUtils.validate_target("256.256.256.256")
         assert valid is False
         assert "Invalid target" in error
-        
+
         # Invalid CIDR
         valid, error = NetworkUtils.validate_target("192.168.1.0/33")
         assert valid is False
         assert "Invalid target" in error
-        
+
         # Empty string
         valid, error = NetworkUtils.validate_target("")
         assert valid is False
         assert error is not None
 
-    @patch('socket.gethostbyname')
+    @patch("socket.gethostbyname")
     def test_validate_target_hostname(self, mock_gethostbyname):
         """Test validating hostnames"""
         # Valid hostname
@@ -57,7 +57,7 @@ class TestNetworkUtilsValidation:
         valid, error = NetworkUtils.validate_target("example.com")
         assert valid is True
         assert error is None
-        
+
         # Invalid hostname
         mock_gethostbyname.side_effect = socket.error("Host not found")
         valid, error = NetworkUtils.validate_target("invalid.hostname.local")
@@ -69,11 +69,11 @@ class TestNetworkUtilsValidation:
         # Localhost
         valid, error = NetworkUtils.validate_target("127.0.0.1")
         assert valid is True
-        
+
         # Broadcast
         valid, error = NetworkUtils.validate_target("255.255.255.255")
         assert valid is True
-        
+
         # Network address
         valid, error = NetworkUtils.validate_target("192.168.1.0")
         assert valid is True
@@ -89,7 +89,7 @@ class TestNetworkUtilsExpansion:
         assert len(ips) == 2  # .1 and .2 (excludes network and broadcast)
         assert "192.168.1.1" in ips
         assert "192.168.1.2" in ips
-        
+
         # /32 network (single host)
         ips = NetworkUtils.expand_network("192.168.1.1/32")
         assert len(ips) == 0 or len(ips) == 1  # Depends on implementation
@@ -124,7 +124,7 @@ class TestNetworkUtilsSubnet:
         """Test getting subnet for valid IP"""
         subnet = NetworkUtils.get_subnet("192.168.1.100")
         assert subnet == "192.168.1.0/24"
-        
+
         subnet = NetworkUtils.get_subnet("10.0.0.50")
         assert subnet == "10.0.0.0/24"
 
@@ -148,11 +148,11 @@ class TestNetworkUtilsSubnet:
         # Loopback
         subnet = NetworkUtils.get_subnet("127.0.0.1")
         assert subnet == "127.0.0.0/24"
-        
+
         # Private ranges
         subnet = NetworkUtils.get_subnet("10.0.0.1")
         assert subnet == "10.0.0.0/24"
-        
+
         subnet = NetworkUtils.get_subnet("172.16.0.1")
         assert subnet == "172.16.0.0/24"
 
@@ -174,7 +174,7 @@ class TestNetworkUtilsEdgeCases:
         """Test handling empty string inputs"""
         valid, error = NetworkUtils.validate_target("")
         assert valid is False
-        
+
         ips = NetworkUtils.expand_network("")
         assert ips == [""] or ips == []
 
@@ -191,12 +191,12 @@ class TestNetworkUtilsEdgeCases:
         valid, error = NetworkUtils.validate_target(long_input)
         assert valid is False
 
-    @patch('ipaddress.ip_network')
+    @patch("ipaddress.ip_network")
     def test_ipaddress_exceptions(self, mock_ip_network):
         """Test handling ipaddress module exceptions"""
         # Simulate various exceptions
         mock_ip_network.side_effect = ValueError("Invalid network")
-        
+
         ips = NetworkUtils.expand_network("192.168.1.0/24")
         # Should handle exception gracefully
         assert isinstance(ips, list)
@@ -206,8 +206,8 @@ class TestNetworkUtilsEdgeCases:
         # Min IP
         valid, error = NetworkUtils.validate_target("0.0.0.0")
         assert valid is True
-        
-        # Max IP  
+
+        # Max IP
         valid, error = NetworkUtils.validate_target("255.255.255.255")
         assert valid is True
 
@@ -216,11 +216,11 @@ class TestNetworkUtilsEdgeCases:
         # /0 - entire Internet
         valid, error = NetworkUtils.validate_target("0.0.0.0/0")
         assert valid is True
-        
+
         # /31 - point-to-point
         valid, error = NetworkUtils.validate_target("192.168.1.0/31")
         assert valid is True
-        
+
         # /32 - single host
         valid, error = NetworkUtils.validate_target("192.168.1.1/32")
         assert valid is True
@@ -234,11 +234,11 @@ class TestNetworkUtilsIntegration:
         # First validate
         valid, error = NetworkUtils.validate_target("192.168.1.0/28")
         assert valid is True
-        
+
         # Then expand
         ips = NetworkUtils.expand_network("192.168.1.0/28")
         assert len(ips) == 14  # 16 - 2 (network and broadcast)
-        
+
         # Verify first and last usable IPs
         assert "192.168.1.1" in ips
         assert "192.168.1.14" in ips
@@ -246,25 +246,25 @@ class TestNetworkUtilsIntegration:
     def test_subnet_calculation_workflow(self):
         """Test subnet calculation workflow"""
         test_ips = ["192.168.1.10", "192.168.1.20", "192.168.1.30"]
-        
+
         subnets = []
         for ip in test_ips:
             subnet = NetworkUtils.get_subnet(ip)
             subnets.append(subnet)
-        
+
         # All should be in same /24
         assert all(s == "192.168.1.0/24" for s in subnets)
 
-    @patch('socket.gethostbyname')
+    @patch("socket.gethostbyname")
     def test_hostname_resolution_workflow(self, mock_gethostbyname):
         """Test hostname resolution workflow"""
         # Setup mock
         mock_gethostbyname.return_value = "192.168.1.100"
-        
+
         # Validate hostname
         valid, error = NetworkUtils.validate_target("internal.server.local")
         assert valid is True
-        
+
         # Get subnet for resolved IP
         subnet = NetworkUtils.get_subnet("192.168.1.100")
         assert subnet == "192.168.1.0/24"

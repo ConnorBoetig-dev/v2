@@ -3,6 +3,7 @@
 
 import sys
 from pathlib import Path
+
 sys.path.append(str(Path(__file__).parent))
 
 from utils.mac_lookup import MACLookup
@@ -29,26 +30,19 @@ for i, (k, v) in enumerate(mac_lookup.vendor_cache.items()):
 # Now grep the actual file for our MACs
 print("\nSearching OUI file directly:")
 import subprocess
-result = subprocess.run(
-    ["grep", "-i", "84-A9-38", "cache/oui.txt"],
-    capture_output=True,
-    text=True
-)
+
+result = subprocess.run(["grep", "-i", "84-A9-38", "cache/oui.txt"], capture_output=True, text=True)
 if result.stdout:
     print(f"Found 84-A9-38: {result.stdout.strip()}")
 
 result = subprocess.run(
-    ["grep", "-i", "^E8-40-F2", "cache/oui.txt"],
-    capture_output=True,
-    text=True  
+    ["grep", "-i", "^E8-40-F2", "cache/oui.txt"], capture_output=True, text=True
 )
 if result.stdout:
     print(f"Found E8-40-F2: {result.stdout.strip()}")
 
 result = subprocess.run(
-    ["grep", "-i", "^A0-CE-C8", "cache/oui.txt"],
-    capture_output=True,
-    text=True
+    ["grep", "-i", "^A0-CE-C8", "cache/oui.txt"], capture_output=True, text=True
 )
 if result.stdout:
     print(f"Found A0-CE-C8: {result.stdout.strip()}")

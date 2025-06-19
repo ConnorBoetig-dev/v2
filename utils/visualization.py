@@ -29,32 +29,32 @@ from typing import Dict, List, Optional, Tuple
 class MapGenerator:
     """
     Generates visualization data for network topology displays.
-    
+
     This class creates structured data suitable for rendering with D3.js
     (2D visualization) and Three.js (3D visualization). It analyzes device
     relationships and creates logical network topologies that reflect
     real-world network architectures.
     """
-    
+
     def generate_d3_data(self, devices: List[Dict]) -> Dict:
         """
         Generate D3.js compatible network data with enhanced topology.
-        
+
         Creates a force-directed graph structure with:
         - Nodes representing devices with rich metadata
         - Links representing logical network connections
         - Hierarchical layout hints for better visualization
         - Device grouping by type and criticality
-        
+
         The topology generation follows networking best practices:
         - Routers form the network backbone
         - Switches connect to routers
         - End devices connect to switches
         - Application-layer connections for servers
-        
+
         Args:
             devices: List of device dictionaries from scanner
-        
+
         Returns:
             Dictionary with nodes, links, and metadata for D3.js
         """
@@ -117,17 +117,17 @@ class MapGenerator:
     ) -> Dict:
         """
         Generate D3.js data with traffic flow information.
-        
+
         Creates visualization data that shows actual network traffic patterns
         discovered through passive analysis. This differs from the topology
         view by showing real communication paths rather than logical structure.
-        
+
         Flow visualization helps identify:
         - Active communication patterns
         - Service dependencies
         - Unusual traffic flows
         - Network bottlenecks
-        
+
         Args:
             devices: List of devices including passive discoveries
             flow_matrix: Optional traffic flow matrix from passive analysis
@@ -190,7 +190,7 @@ class MapGenerator:
             # Debug: Track skipped connections
             skipped_sources = 0
             skipped_targets = 0
-            
+
             for src_ip, destinations in flow_matrix.items():
                 if src_ip not in node_index:
                     skipped_sources += 1
@@ -200,7 +200,7 @@ class MapGenerator:
                     if dst_ip not in node_index:
                         skipped_targets += 1
                         continue
-                    
+
                     if packet_count == 0:
                         continue
 
@@ -216,10 +216,12 @@ class MapGenerator:
                             "type": "traffic_flow",
                         }
                     )
-            
+
             # Add debug info to metadata if connections were skipped
             if skipped_sources > 0 or skipped_targets > 0:
-                print(f"[DEBUG] Skipped {skipped_sources} source IPs and {skipped_targets} target IPs not in device list")
+                print(
+                    f"[DEBUG] Skipped {skipped_sources} source IPs and {skipped_targets} target IPs not in device list"
+                )
 
         return {
             "nodes": nodes,
@@ -235,16 +237,16 @@ class MapGenerator:
     def _merge_links(self, traffic_links: List[Dict], topology_links: List[Dict]) -> List[Dict]:
         """
         Merge traffic flow links with topology links.
-        
+
         Combines actual observed traffic flows with inferred topology connections,
         preferring real traffic data when both exist between the same nodes.
         This creates a comprehensive view showing both actual usage and logical
         network structure.
-        
+
         Args:
             traffic_links: Links from passive traffic analysis
             topology_links: Links from topology inference
-        
+
         Returns:
             Merged list with duplicates removed, traffic flows prioritized
         """
@@ -267,13 +269,13 @@ class MapGenerator:
     def _get_device_group(self, device: Dict) -> int:
         """
         Assign visual group based on device characteristics and criticality.
-        
+
         Groups are used for:
         - Visual clustering in force-directed layouts
         - Color coding in visualizations
         - Determining node importance/size
         - Layout positioning hints
-        
+
         Group hierarchy:
         1. Critical infrastructure (routers, firewalls)
         2. Core services (switches, domain controllers)
@@ -283,10 +285,10 @@ class MapGenerator:
         6. End user devices
         7. IoT devices
         8. Unknown/other
-        
+
         Args:
             device: Device dictionary with type and metadata
-        
+
         Returns:
             Group number (1-8) for visualization grouping
         """
@@ -294,7 +296,7 @@ class MapGenerator:
         subtype = device.get("subtype", "")
         is_critical = device.get("critical", False)
         dependent_count = device.get("dependent_count", 0)
-        
+
         # Critical infrastructure (group 1)
         if device_type in ["router", "firewall"] or subtype == "gateway":
             return 1
@@ -305,7 +307,12 @@ class MapGenerator:
         elif is_critical and dependent_count > 3:
             return 3
         # Server infrastructure (group 4)
-        elif "server" in device_type or device_type in ["web_server", "database", "backup_server", "monitoring_server"]:
+        elif "server" in device_type or device_type in [
+            "web_server",
+            "database",
+            "backup_server",
+            "monitoring_server",
+        ]:
             return 4
         # Industrial/OT systems (group 5)
         elif device_type in ["plc", "scada", "ups"] or subtype in ["plc", "scada", "ups"]:
@@ -482,19 +489,19 @@ class MapGenerator:
     def generate_threejs_data(self, devices: List[Dict]) -> Dict:
         """
         Generate Three.js 3D visualization data with layered positioning.
-        
+
         Creates a 3D network topology with:
         - Vertical layers by device type (routers at top, workstations at bottom)
         - Circular arrangement within each layer
         - Color coding by device type
         - Curved connections between layers
-        
+
         The 3D view provides better separation of device types and reduces
         visual clutter compared to 2D layouts.
-        
+
         Args:
             devices: List of device dictionaries
-        
+
         Returns:
             Dictionary with positions, colors, labels, and connections for Three.js
         """
@@ -629,16 +636,16 @@ class MapGenerator:
     def _create_3d_connections(self, devices: List[Dict], positions: Dict, connections: List[Dict]):
         """
         Create 3D connections with visual variety and network hierarchy.
-        
+
         Generates curved connections between devices with different styles:
         - Backbone: Thick red lines between routers
         - Uplinks: Medium cyan lines from switches to routers
         - Server: Blue lines for server connections
         - Access: Green lines for workstation connections
         - Peripheral: Yellow lines for IoT/printer connections
-        
+
         Connection thickness and opacity indicate importance and traffic volume.
-        
+
         Args:
             devices: List of all devices
             positions: Dictionary mapping IPs to 3D positions
@@ -731,18 +738,18 @@ class MapGenerator:
     def _ip_distance(self, ip1: str, ip2: str) -> int:
         """
         Calculate weighted Manhattan distance between IPs for logical proximity.
-        
+
         Uses weighted octets to prioritize subnet locality:
         - Same subnet (first 3 octets) = very close
         - Different subnets = progressively farther
-        
+
         This helps create realistic topologies where devices in the same
         subnet tend to connect to the same infrastructure.
-        
+
         Args:
             ip1: First IP address
             ip2: Second IP address
-        
+
         Returns:
             Integer distance value (lower = closer)
         """
@@ -760,13 +767,13 @@ class MapGenerator:
     def _count_types(self, devices: List[Dict]) -> Dict[str, int]:
         """
         Count devices by type for summary statistics.
-        
+
         Simple aggregation used in metadata generation to show
         network composition at a glance.
-        
+
         Args:
             devices: List of device dictionaries
-        
+
         Returns:
             Dictionary mapping device types to counts
         """
@@ -775,23 +782,23 @@ class MapGenerator:
             dtype = device.get("type", "unknown")
             counts[dtype] = counts.get(dtype, 0) + 1
         return counts
-    
+
     def _calculate_critical_stats(self, devices: List[Dict]) -> Dict:
         """
         Calculate comprehensive statistics about critical assets.
-        
+
         Analyzes critical infrastructure to provide insights on:
         - Total critical device count
         - High-dependency devices (many dependents)
         - Always-on requirements
         - Long uptime devices (stability indicators)
         - Distribution by device type
-        
+
         These metrics help prioritize security efforts and maintenance windows.
-        
+
         Args:
             devices: List of device dictionaries
-        
+
         Returns:
             Dictionary with critical asset statistics
         """
@@ -803,52 +810,52 @@ class MapGenerator:
             "critical_by_type": {},
             "critical_tags": {},
         }
-        
+
         for device in devices:
             if device.get("critical", False):
                 stats["total_critical"] += 1
-                
+
                 # Count by type
                 dtype = device.get("type", "unknown")
                 stats["critical_by_type"][dtype] = stats["critical_by_type"].get(dtype, 0) + 1
-            
+
             # High dependency devices
             if device.get("dependent_count", 0) > 20:
                 stats["high_dependency"] += 1
-            
+
             # Always-on devices
             if device.get("always_on", False):
                 stats["always_on"] += 1
-            
+
             # Long uptime devices
             if device.get("uptime_days", 0) > 180:
                 stats["long_uptime"] += 1
-            
+
             # Count tags
             for tag in device.get("tags", []):
                 if tag in ["critical", "high_dependency", "always_on", "long_uptime"]:
                     stats["critical_tags"][tag] = stats["critical_tags"].get(tag, 0) + 1
-        
+
         return stats
 
     def generate_subnet_topology(self, devices: List[Dict]) -> Dict:
         """
         Generate subnet-level topology view for network segmentation analysis.
-        
+
         Aggregates devices by /24 subnets to show:
         - Device distribution across subnets
         - Device type composition per subnet
         - Critical asset distribution
         - Subnet utilization
-        
+
         This high-level view helps identify:
         - Network segmentation effectiveness
         - Subnet purposes (server farm, user segment, etc.)
         - Critical asset concentration risks
-        
+
         Args:
             devices: List of device dictionaries
-        
+
         Returns:
             Dictionary with subnet analysis data
         """

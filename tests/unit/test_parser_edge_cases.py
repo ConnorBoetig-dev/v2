@@ -105,7 +105,7 @@ class TestParserEdgeCases:
         """Test standardizing device with missing fields"""
         incomplete_device = {"ip": "192.168.1.1"}
         standardized = parser._standardize_devices([incomplete_device])
-        
+
         assert len(standardized) == 1
         device = standardized[0]
         # Check default values are added
@@ -120,7 +120,7 @@ class TestParserEdgeCases:
         # Create a circular reference
         data = {"ip": "192.168.1.1"}
         data["self"] = data
-        
+
         # Parser should handle this without infinite recursion
         try:
             result = parser.parse_results([data])
@@ -148,7 +148,7 @@ class TestParserEdgeCases:
         for i in range(100):
             current["nested"] = {"level": i}
             current = current["nested"]
-        
+
         result = parser.parse_results([nested])
         assert len(result) >= 0  # Should handle deep nesting
 
@@ -170,12 +170,14 @@ class TestParserEdgeCases:
         # Create large dataset
         large_dataset = []
         for i in range(10000):
-            large_dataset.append({
-                "ip": f"10.0.{i // 256}.{i % 256}",
-                "hostname": f"host{i}",
-                "open_ports": [22, 80, 443],
-            })
-        
+            large_dataset.append(
+                {
+                    "ip": f"10.0.{i // 256}.{i % 256}",
+                    "hostname": f"host{i}",
+                    "open_ports": [22, 80, 443],
+                }
+            )
+
         result = parser.parse_results(large_dataset)
         assert len(result) == 10000
         # Verify first and last devices
@@ -185,7 +187,7 @@ class TestParserEdgeCases:
     def test_parse_with_datetime_objects(self, parser):
         """Test parsing results with datetime objects"""
         from datetime import datetime
-        
+
         data_with_datetime = [
             {
                 "ip": "192.168.1.1",

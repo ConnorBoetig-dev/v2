@@ -139,10 +139,10 @@ class NetworkScanner(AsyncNetworkScanner):
     def get_scan_progress(self) -> Dict[str, any]:
         """
         Get current scan progress information.
-        
+
         Used by the UI to display real-time scan progress. This method
         provides a snapshot of the current scan state without blocking.
-        
+
         Returns:
             Dictionary containing:
                 - total_hosts: Estimated total hosts in target network
@@ -163,10 +163,10 @@ class NetworkScanner(AsyncNetworkScanner):
     def parallel_performance_info(self) -> Dict[str, any]:
         """
         Get information about parallel execution capabilities.
-        
+
         This property exposes the internal concurrency limits and expected
         performance characteristics. Useful for debugging and optimization.
-        
+
         Returns:
             Dictionary containing concurrency limits and performance metrics:
                 - max_concurrent_subnets: How many /24 subnets scan in parallel

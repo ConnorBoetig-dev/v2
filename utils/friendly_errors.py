@@ -112,11 +112,11 @@ ERROR_MESSAGES: Dict[str, Dict[str, str]] = {
 def get_friendly_error(error_key: str, **kwargs) -> Dict[str, str]:
     """Get user-friendly error message by key"""
     error_info = ERROR_MESSAGES.get(error_key, ERROR_MESSAGES["unexpected_error"])
-    
+
     # Format the messages with any provided kwargs
     user_msg = error_info["user"].format(**kwargs)
     suggestion = error_info.get("suggestion", "").format(**kwargs)
-    
+
     return {
         "user_message": user_msg,
         "suggestion": suggestion,
@@ -126,7 +126,7 @@ def get_friendly_error(error_key: str, **kwargs) -> Dict[str, str]:
 def handle_scanner_error(scanner_name: str, error: Exception) -> FriendlyError:
     """Handle scanner-specific errors"""
     error_str = str(error).lower()
-    
+
     if "not found" in error_str or "command not found" in error_str:
         if scanner_name == "nmap":
             err_info = get_friendly_error("nmap_not_found")
@@ -142,7 +142,7 @@ def handle_scanner_error(scanner_name: str, error: Exception) -> FriendlyError:
         err_info = get_friendly_error("network_unreachable")
     else:
         err_info = get_friendly_error("scan_failed")
-    
+
     return FriendlyError(
         technical_msg=str(error),
         user_msg=err_info["user_message"],
@@ -153,7 +153,7 @@ def handle_scanner_error(scanner_name: str, error: Exception) -> FriendlyError:
 def handle_network_error(error: Exception, target: str = "") -> FriendlyError:
     """Handle network-related errors"""
     error_str = str(error).lower()
-    
+
     if "invalid" in error_str or "could not parse" in error_str:
         err_info = get_friendly_error("invalid_target")
     elif "unreachable" in error_str:
@@ -162,7 +162,7 @@ def handle_network_error(error: Exception, target: str = "") -> FriendlyError:
         err_info = get_friendly_error("no_hosts_found")
     else:
         err_info = get_friendly_error("unexpected_error")
-    
+
     return FriendlyError(
         technical_msg=str(error),
         user_msg=err_info["user_message"],
@@ -174,10 +174,10 @@ def format_error_for_user(error: Exception) -> str:
     """Format any error for user display"""
     if isinstance(error, FriendlyError):
         return str(error)
-    
+
     # Try to make common errors more friendly
     error_str = str(error).lower()
-    
+
     if "permission" in error_str:
         return "❌ Permission denied. Try running with sudo."
     elif "not found" in error_str:
