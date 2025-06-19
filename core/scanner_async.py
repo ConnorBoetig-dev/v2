@@ -556,8 +556,8 @@ class AsyncNetworkScanner:
 
                 while True:
                     try:
-                        # Try to read line with timeout
-                        line = await asyncio.wait_for(process.stdout.readline(), timeout=0.1)
+                        # Try to read line with timeout - increased to reduce overhead
+                        line = await asyncio.wait_for(process.stdout.readline(), timeout=2.0)
 
                         if not line:
                             if process.returncode is not None:
@@ -590,17 +590,16 @@ class AsyncNetworkScanner:
                     except asyncio.TimeoutError:
                         # No output - update status periodically
                         current_time = time.time()
-                        if current_time - last_update_time > 2:  # Update every 2 seconds
-                            elapsed = int(current_time - start_time)
-                            no_output_count += 1
+                        elapsed = int(current_time - start_time)
+                        no_output_count += 1
 
-                            if no_output_count > 5:  # After 10 seconds
-                                status = f"Scanning in progress... ({elapsed}s elapsed, no output from masscan)"
-                            else:
-                                status = f"Scanning in progress... ({elapsed}s elapsed)"
+                        if no_output_count > 3:  # After 6 seconds (3 × 2s timeout)
+                            status = f"Scanning in progress... ({elapsed}s elapsed, waiting for masscan)"
+                        else:
+                            status = f"Scanning in progress... ({elapsed}s elapsed)"
 
-                            progress.update(task, status=status)
-                            last_update_time = current_time
+                        progress.update(task, status=status)
+                        last_update_time = current_time
 
                     # Check if process finished
                     if process.returncode is not None:

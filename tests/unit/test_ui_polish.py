@@ -21,17 +21,17 @@ class TestUIPolish:
 
     def test_typewriter_animation_styles(self, report_content):
         """Test that typewriter animation CSS is defined"""
-        # Check for typewriter keyframes
-        assert "@keyframes typewriter" in report_content
-        assert "from { width: 0; }" in report_content
-        assert "to { width: 100%; }" in report_content
-
-        # Check for cursor blink animation
-        assert "@keyframes blinkCursor" in report_content
+        # Check for typing keyframes (updated animation)
+        assert "@keyframes typing" in report_content
+        assert "0% {" in report_content
+        assert "width: 0;" in report_content
+        assert "100% {" in report_content
+        assert "width: 100%;" in report_content
+        assert "border-right: none;" in report_content
 
         # Check for typewriter class
         assert ".typewriter {" in report_content
-        assert "animation: typewriter 2s steps(30) forwards" in report_content
+        assert "animation: typing 2s steps(30, end) forwards" in report_content
 
         # Check for subtitle animation
         assert ".typewriter-subtitle {" in report_content
@@ -39,8 +39,11 @@ class TestUIPolish:
 
     def test_hero_title_has_typewriter_class(self, report_content):
         """Test that hero title has typewriter animation"""
-        assert 'class="hero-title typewriter"' in report_content
-        assert 'id="hero-title"' in report_content
+        # Check for updated structure with span
+        assert (
+            '<span class="typewriter" id="hero-title">Network Scan Report</span>'
+            in report_content
+        )
 
         # Check subtitle
         assert 'class="hero-subtitle typewriter-subtitle"' in report_content
@@ -269,7 +272,7 @@ class TestUIPolish:
         assert "transition: all var(--transition-fast)" in report_content
 
         # Animations should be smooth and not jarring
-        assert "animation: typewriter 2s" in report_content  # 2s is reasonable
+        assert "animation: typing 2s" in report_content  # 2s is reasonable
         assert "animation-delay: 2.2s" in report_content  # Not too long
 
     def test_aria_labels_present(self, report_content):
