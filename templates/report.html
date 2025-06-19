@@ -1186,7 +1186,7 @@
         @media (max-width: 768px) {
             .grid-cols-3 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
             .grid-cols-2 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-            .dashboard-stats { grid-template-columns: 1fr; }
+            .dashboard-stats { grid-template-columns: 1fr !important; }
             
             .header-content {
                 flex-direction: column;
@@ -1223,34 +1223,58 @@
 
         /* Print Styles */
         @media print {
-            body {
-                background: white;
-                color: black;
-            }
-            
-            body::before {
-                display: none;
-            }
-            
-            .header,
-            .tabs,
-            .btn,
-            .modal,
-            .modal-backdrop {
+            /* Hide everything except the device table */
+            body > *:not(.print-container) {
                 display: none !important;
             }
             
-            .tab-content {
+            .print-container {
                 display: block !important;
+                position: static !important;
+                width: 100% !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 20px !important;
+                background: white !important;
             }
             
-            .card,
-            .stat-card,
-            .device-card,
-            .table-container {
+            .print-container * {
+                visibility: visible !important;
+            }
+            
+            .print-container table {
+                width: 100% !important;
+                border-collapse: collapse !important;
                 background: white !important;
+                color: black !important;
+            }
+            
+            .print-container th,
+            .print-container td {
                 border: 1px solid #ddd !important;
-                box-shadow: none !important;
+                padding: 8px !important;
+                text-align: left !important;
+                background: white !important;
+                color: black !important;
+            }
+            
+            .print-container th {
+                background-color: #f5f5f5 !important;
+                font-weight: bold !important;
+            }
+            
+            .print-container .badge {
+                border: 1px solid #ddd !important;
+                padding: 2px 6px !important;
+                border-radius: 4px !important;
+                display: inline-block !important;
+                margin: 2px !important;
+            }
+            
+            /* Page setup */
+            @page {
+                size: landscape;
+                margin: 0.5in;
             }
         }
     </style>
@@ -1286,7 +1310,7 @@
                 
                 <!-- Quick Actions -->
                 <div class="flex justify-center gap-md animate-fadeIn" style="animation-delay: 0.3s;">
-                    <button class="btn btn-primary" onclick="window.print()">
+                    <button class="btn btn-primary" onclick="printDeviceTable()">
                         <i data-feather="printer"></i>
                         Print Report
                     </button>
@@ -1294,23 +1318,22 @@
                         <i data-feather="download"></i>
                         Export CSV
                     </button>
-                    <button class="btn btn-accent{% if has_changes %} animate-pulse{% endif %}" onclick="compareToLastScan()">
-                        <i data-feather="git-branch"></i>
-                        Compare Scans
-                        {% if has_changes %}
-                        <span class="badge badge-warning">New!</span>
-                        {% endif %}
-                    </button>
-                    <button class="btn btn-glass" onclick="refreshScan()">
-                        <i data-feather="refresh-cw"></i>
-                        New Scan
-                    </button>
                 </div>
             </section>
 
             <!-- Statistics Dashboard -->
             <section class="section">
-                <div class="dashboard-stats stagger-animation">
+                {% set unique_services = [] %}
+                {% for device in devices %}
+                    {% for service in device.get('services', []) %}
+                        {% set service_name = service.split(':')[0] %}
+                        {% if service_name not in unique_services %}
+                            {% if unique_services.append(service_name) %}{% endif %}
+                        {% endif %}
+                    {% endfor %}
+                {% endfor %}
+                
+                <div class="dashboard-stats stagger-animation" style="grid-template-columns: repeat(3, 1fr); max-width: 900px; margin: 0 auto;">
                     <!-- Total Devices -->
                     <div class="stat-card glass hover-lift">
                         <div class="stat-card-header">
@@ -1320,27 +1343,6 @@
                         </div>
                         <div class="stat-card-value">{{ total_devices }}</div>
                         <div class="stat-card-label">Total Devices</div>
-                        <div class="stat-card-trend up">
-                            <i data-feather="trending-up"></i>
-                            <span>+{{ new_devices|length }} new</span>
-                        </div>
-                    </div>
-
-                    <!-- Critical Infrastructure -->
-                    <div class="stat-card glass hover-lift">
-                        <div class="stat-card-header">
-                            <div class="stat-card-icon glass" style="background: var(--gradient-danger);">
-                                <i data-feather="alert-triangle" style="color: white;"></i>
-                            </div>
-                        </div>
-                        <div class="stat-card-value">{{ critical_devices|length }}</div>
-                        <div class="stat-card-label">Critical Devices</div>
-                        {% if critical_devices|length > 0 %}
-                        <div class="stat-card-trend down">
-                            <i data-feather="alert-circle"></i>
-                            <span>Attention needed</span>
-                        </div>
-                        {% endif %}
                     </div>
 
                     <!-- Device Types -->
@@ -1364,7 +1366,7 @@
                                 <i data-feather="globe" style="color: white;"></i>
                             </div>
                         </div>
-                        <div class="stat-card-value">{{ all_services|length }}</div>
+                        <div class="stat-card-value">{{ unique_services|length }}</div>
                         <div class="stat-card-label">Network Services</div>
                         <div class="stat-card-trend up">
                             <i data-feather="activity"></i>
@@ -1916,18 +1918,65 @@
             URL.revokeObjectURL(url);
         }
 
-        // Compare to last scan
-        function compareToLastScan() {
-            {% if comparison_file %}
-                window.location.href = '{{ comparison_file }}';
-            {% else %}
-                alert('No comparison report available. Run at least 2 scans to see comparisons.');
-            {% endif %}
-        }
-
-        // Refresh scan
-        function refreshScan() {
-            alert('To run a new scan, please return to the NetworkMapper CLI');
+        // Print device table
+        function printDeviceTable() {
+            // Get the device table
+            const deviceTable = document.querySelector('#devices-tab #device-table-view table');
+            if (!deviceTable) {
+                alert('No device table found to print');
+                return;
+            }
+            
+            // Create print container
+            const printContainer = document.createElement('div');
+            printContainer.className = 'print-container';
+            printContainer.style.display = 'none';
+            
+            // Add title
+            const title = document.createElement('h1');
+            title.textContent = 'Network Scan Report - Device List';
+            title.style.marginBottom = '10px';
+            printContainer.appendChild(title);
+            
+            // Add metadata
+            const metadata = document.createElement('p');
+            metadata.textContent = `Scan Date: ${scanTimestamp} | Total Devices: ${devicesData.length}`;
+            metadata.style.marginBottom = '20px';
+            printContainer.appendChild(metadata);
+            
+            // Clone and clean up the table
+            const tableClone = deviceTable.cloneNode(true);
+            
+            // Remove action buttons column
+            const headers = tableClone.querySelectorAll('th');
+            const actionColIndex = Array.from(headers).findIndex(th => th.textContent.trim() === 'Actions');
+            if (actionColIndex !== -1) {
+                // Remove header
+                headers[actionColIndex].remove();
+                // Remove cells in that column
+                tableClone.querySelectorAll('tr').forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells[actionColIndex]) {
+                        cells[actionColIndex].remove();
+                    }
+                });
+            }
+            
+            // Remove any buttons or icons from the table
+            tableClone.querySelectorAll('button, svg, i').forEach(el => el.remove());
+            
+            printContainer.appendChild(tableClone);
+            
+            // Add to body temporarily
+            document.body.appendChild(printContainer);
+            
+            // Print
+            window.print();
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(printContainer);
+            }, 500);
         }
 
         // Open network visualization
