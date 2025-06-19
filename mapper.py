@@ -766,12 +766,24 @@ class NetworkMapper:
         # Show clickable links in terminal
         console.print("\n[green]✓ Reports generated and opened in browser![/green]")
         console.print(f"\n[bold cyan]Generated files:[/bold cyan]")
-        console.print(f"[yellow]Network Visualization:[/yellow] [underline]{viz_url}[/underline]")
-        console.print(f"[yellow]Detailed Report:[/yellow] [underline]{original_url}[/underline]")
+        
+        # Convert Docker paths to host paths for display
+        def get_display_url(url):
+            """Convert Docker container paths to host paths for clickable links"""
+            import os
+            if os.environ.get('DOCKER_HOST_BROWSER') == '1':
+                # Running in Docker - convert /app/output to actual host path
+                # Get the actual host path from PWD environment variable if available
+                host_path = os.environ.get('HOST_PROJECT_PATH', '/home/connorboetig/v2')
+                return url.replace('file:///app', f'file://{host_path}')
+            return url
+        
+        console.print(f"[yellow]Network Visualization:[/yellow] [underline]{get_display_url(viz_url)}[/underline]")
+        console.print(f"[yellow]Detailed Report:[/yellow] [underline]{get_display_url(original_url)}[/underline]")
 
         if self.passive_analysis_results and traffic_url:
             console.print(
-                f"[yellow]Traffic Flow Analysis:[/yellow] [underline]{traffic_url}[/underline]"
+                f"[yellow]Traffic Flow Analysis:[/yellow] [underline]{get_display_url(traffic_url)}[/underline]"
             )
 
         console.print("\n")
@@ -797,7 +809,7 @@ class NetworkMapper:
                         f"\n[bold green]✓ Comparison Report Generated and Opened![/bold green]"
                     )
                     console.print(
-                        f"[yellow]📊 Comparison Report:[/yellow] [underline]{comparison_url}[/underline]"
+                        f"[yellow]📊 Comparison Report:[/yellow] [underline]{get_display_url(comparison_url)}[/underline]"
                     )
                     console.print(
                         f"[cyan]Summary: {len(self.last_changes.get('new_devices', []))} new, "
