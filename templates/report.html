@@ -1559,10 +1559,8 @@
         <div class="container">
             <!-- Hero Section -->
             <section class="hero">
-                <h1 class="hero-title">
-                    <span class="typewriter" id="hero-title">Network Scan Report</span>
-                </h1>
-                <p class="hero-subtitle typewriter-subtitle" id="hero-subtitle">
+                <h1 class="hero-title" id="hero-title">Network Scan Report</h1>
+                <p class="hero-subtitle" id="hero-subtitle">
                     Comprehensive analysis of {{ total_devices }} devices across your network
                 </p>
                 
@@ -2129,27 +2127,7 @@
         const scanTimestamp = '{{ scan_timestamp }}';
         const deviceTypes = {{ device_types | tojson }};
         
-        // Typewriter animation - run once on page load
-        (function() {
-            const hasAnimated = sessionStorage.getItem('heroAnimated');
-            if (!hasAnimated) {
-                // Mark as animated
-                sessionStorage.setItem('heroAnimated', 'true');
-            } else {
-                // Remove animation classes if already played
-                const title = document.getElementById('hero-title');
-                const subtitle = document.getElementById('hero-subtitle');
-                if (title) {
-                    title.classList.remove('typewriter');
-                    title.style.animation = 'none';
-                }
-                if (subtitle) {
-                    subtitle.classList.remove('typewriter-subtitle');
-                    subtitle.style.opacity = '1';
-                    subtitle.style.animation = 'none';
-                }
-            }
-        })();
+        // Title is now static - no animation needed
         
         // Scroll to device table smoothly
         function scrollToDeviceTable() {

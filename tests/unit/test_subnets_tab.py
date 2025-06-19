@@ -219,22 +219,21 @@ class TestSubnetsTab:
             in report_content
         )
 
-    def test_typewriter_animation_fix(self, report_content):
-        """Test that typewriter animation artifact is fixed"""
-        # Check for improved animation
-        assert "@keyframes typing" in report_content
-        assert "100% {" in report_content
-        assert "border-right: none;" in report_content
-
-        # Check for wrapper span
+    def test_title_renders_without_animation(self, report_content):
+        """Test that title renders as static text without animation"""
+        # Check for static title
         assert (
-            '<span class="typewriter" id="hero-title">Network Scan Report</span>'
+            '<h1 class="hero-title" id="hero-title">Network Scan Report</h1>'
             in report_content
         )
 
-        # Check for overflow fix
+        # Check for overflow fix on hero section
         assert ".hero {" in report_content
-        assert "overflow-x: hidden;" in report_content
+        # Either overflow: hidden or overflow-x: hidden is acceptable
+        hero_section_idx = report_content.find(".hero {")
+        hero_end = report_content.find("}", hero_section_idx)
+        hero_styles = report_content[hero_section_idx:hero_end]
+        assert "overflow: hidden" in hero_styles or "overflow-x: hidden" in hero_styles
 
     def test_tab_badge_styles(self, report_content):
         """Test tab badge styling"""

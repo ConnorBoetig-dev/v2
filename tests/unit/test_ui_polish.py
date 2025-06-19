@@ -37,27 +37,27 @@ class TestUIPolish:
         assert ".typewriter-subtitle {" in report_content
         assert "animation-delay: 2.2s" in report_content
 
-    def test_hero_title_has_typewriter_class(self, report_content):
-        """Test that hero title has typewriter animation"""
-        # Check for updated structure with span
+    def test_hero_title_has_static_title(self, report_content):
+        """Test that hero title is static without animation"""
+        # Check for static title structure
         assert (
-            '<span class="typewriter" id="hero-title">Network Scan Report</span>'
+            '<h1 class="hero-title" id="hero-title">Network Scan Report</h1>'
             in report_content
         )
 
         # Check subtitle
-        assert 'class="hero-subtitle typewriter-subtitle"' in report_content
+        assert 'class="hero-subtitle"' in report_content
         assert 'id="hero-subtitle"' in report_content
 
-    def test_typewriter_animation_runs_once(self, report_content):
-        """Test that typewriter animation only runs once using sessionStorage"""
-        # Check for sessionStorage logic
-        assert "sessionStorage.getItem('heroAnimated')" in report_content
-        assert "sessionStorage.setItem('heroAnimated', 'true')" in report_content
+    def test_no_animation_code_present(self, report_content):
+        """Test that animation code has been removed"""
+        # Check that sessionStorage animation code is removed
+        assert "sessionStorage.getItem('heroAnimated')" not in report_content
+        assert "sessionStorage.setItem('heroAnimated', 'true')" not in report_content
 
-        # Check for animation removal logic
-        assert "classList.remove('typewriter')" in report_content
-        assert "classList.remove('typewriter-subtitle')" in report_content
+        # Check that typewriter classes are not in HTML
+        assert '<span class="typewriter"' not in report_content
+        assert 'class="typewriter-subtitle"' not in report_content
 
     def test_total_devices_kpi_clickable(self, report_content):
         """Test that Total Devices KPI box is clickable"""
