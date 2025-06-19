@@ -38,13 +38,22 @@ class TestDashboardCleanup:
         
         # Check that Network Services box uses unique_services length
         assert "{{ unique_services|length }}" in report_content
-        # Find the stat card section that contains Network Services
-        network_services_idx = report_content.find('>Network Services<')
-        if network_services_idx > 0:
-            # Look backwards to find the stat-card-value div
-            stat_card_start = report_content.rfind('class="stat-card glass hover-lift"', 0, network_services_idx)
-            stat_card_section = report_content[stat_card_start:network_services_idx + 50]
-            assert "unique_services|length" in stat_card_section
+        # Find Network Services section by looking for the label
+        network_services_idx = report_content.find('Network Services</div>')
+        assert network_services_idx > 0
+        
+        # Look backwards from the label to find the stat-card-value
+        # Get a larger section to ensure we capture the value
+        section_start = network_services_idx - 500  # Look back 500 chars
+        section = report_content[section_start:network_services_idx]
+        
+        # Find the stat-card-value that's closest to Network Services label
+        value_idx = section.rfind('stat-card-value')
+        assert value_idx > 0
+        
+        # Check that the value uses unique_services
+        value_section = section[value_idx:]
+        assert "unique_services|length" in value_section
 
     def test_new_devices_removed_from_total(self, report_content):
         """Test that new devices trend is removed from Total Devices box"""
@@ -125,13 +134,13 @@ class TestDashboardCleanup:
         
         if dashboard_start > 0 and dashboard_end > dashboard_start:
             dashboard_section = report_content[dashboard_start:dashboard_end]
-            # Count stat-card occurrences
-            stat_card_count = dashboard_section.count('class="stat-card glass hover-lift"')
+            # Count stat-card occurrences (now with clickable class)
+            stat_card_count = dashboard_section.count('class="stat-card glass hover-lift clickable"')
             assert stat_card_count == 3
         else:
             # If we can't find the section markers, just count in the whole document
             # but make sure they're in the dashboard area
-            stat_card_count = report_content.count('<div class="stat-card glass hover-lift">')
+            stat_card_count = report_content.count('<div class="stat-card glass hover-lift clickable">')
             # Should be exactly 3 (Total Devices, Device Types, Network Services)
             assert stat_card_count >= 3  # Allow for other stat cards elsewhere
 

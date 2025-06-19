@@ -1277,6 +1277,153 @@
                 margin: 0.5in;
             }
         }
+        /* Typewriter animation */
+        @keyframes typewriter {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+        
+        @keyframes blinkCursor {
+            0% { border-right-color: transparent; }
+            50% { border-right-color: currentColor; }
+            100% { border-right-color: transparent; }
+        }
+        
+        .typewriter {
+            overflow: hidden;
+            white-space: nowrap;
+            animation: typewriter 2s steps(30) forwards;
+            border-right: 3px solid;
+            animation-fill-mode: both;
+        }
+        
+        .typewriter-subtitle {
+            opacity: 0;
+            animation: fadeIn 0.5s ease-out forwards;
+            animation-delay: 2.2s;
+        }
+        
+        /* Device Types Overlay */
+        .device-types-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: var(--bg-elevated);
+            backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-2xl);
+            z-index: var(--z-modal);
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-base);
+            max-width: 600px;
+            width: 90vw;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .device-types-overlay.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        
+        .device-types-header {
+            padding: var(--space-lg);
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .device-types-close {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: var(--space-sm);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            color: var(--text-secondary);
+        }
+        
+        .device-types-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+        
+        .device-types-content {
+            padding: var(--space-lg);
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .device-type-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-md);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-sm);
+            transition: all var(--transition-fast);
+        }
+        
+        .device-type-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateX(4px);
+        }
+        
+        .device-type-name {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            font-weight: var(--font-medium);
+            text-transform: capitalize;
+        }
+        
+        .device-type-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        
+        .device-type-count {
+            font-size: var(--text-2xl);
+            font-weight: var(--font-bold);
+            color: var(--text-primary);
+        }
+        
+        /* Clickable KPI boxes */
+        .stat-card.clickable {
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .stat-card.clickable::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: var(--radius-xl);
+            background: rgba(255, 255, 255, 0);
+            transition: background var(--transition-fast);
+        }
+        
+        .stat-card.clickable:hover::after {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .stat-card.clickable:active {
+            transform: scale(0.98);
+        }
     </style>
     
     <!-- Feather Icons -->
@@ -1303,8 +1450,8 @@
         <div class="container">
             <!-- Hero Section -->
             <section class="hero">
-                <h1 class="hero-title animate-fadeInDown">Network Scan Report</h1>
-                <p class="hero-subtitle animate-fadeInUp">
+                <h1 class="hero-title typewriter" id="hero-title">Network Scan Report</h1>
+                <p class="hero-subtitle typewriter-subtitle" id="hero-subtitle">
                     Comprehensive analysis of {{ total_devices }} devices across your network
                 </p>
                 
@@ -1335,7 +1482,7 @@
                 
                 <div class="dashboard-stats stagger-animation" style="grid-template-columns: repeat(3, 1fr); max-width: 900px; margin: 0 auto;">
                     <!-- Total Devices -->
-                    <div class="stat-card glass hover-lift">
+                    <div class="stat-card glass hover-lift clickable" onclick="scrollToDeviceTable()" role="button" tabindex="0" aria-label="Click to scroll to device table">
                         <div class="stat-card-header">
                             <div class="stat-card-icon glass" style="background: var(--gradient-primary);">
                                 <i data-feather="server" style="color: white;"></i>
@@ -1346,7 +1493,7 @@
                     </div>
 
                     <!-- Device Types -->
-                    <div class="stat-card glass hover-lift">
+                    <div class="stat-card glass hover-lift clickable" onclick="showDeviceTypesOverlay()" role="button" tabindex="0" aria-label="Click to view device types breakdown">
                         <div class="stat-card-header">
                             <div class="stat-card-icon glass" style="background: var(--gradient-info);">
                                 <i data-feather="layers" style="color: white;"></i>
@@ -1354,13 +1501,10 @@
                         </div>
                         <div class="stat-card-value">{{ device_types|length }}</div>
                         <div class="stat-card-label">Device Types</div>
-                        <div class="progress" style="margin-top: 1rem;">
-                            <div class="progress-bar" style="width: 100%;"></div>
-                        </div>
                     </div>
 
                     <!-- Network Services -->
-                    <div class="stat-card glass hover-lift">
+                    <div class="stat-card glass hover-lift clickable" onclick="switchToServicesTab()" role="button" tabindex="0" aria-label="Click to view services tab">
                         <div class="stat-card-header">
                             <div class="stat-card-icon glass" style="background: var(--gradient-success);">
                                 <i data-feather="globe" style="color: white;"></i>
@@ -1764,6 +1908,20 @@
             </div>
         </div>
     </div>
+    
+    <!-- Device Types Overlay -->
+    <div class="modal-backdrop" id="device-types-backdrop" onclick="closeDeviceTypesOverlay()"></div>
+    <div class="device-types-overlay" id="device-types-overlay" role="dialog" aria-labelledby="device-types-title" aria-modal="true">
+        <div class="device-types-header">
+            <h2 id="device-types-title" style="margin: 0; font-size: var(--text-2xl);">Device Types Breakdown</h2>
+            <button class="device-types-close" onclick="closeDeviceTypesOverlay()" aria-label="Close overlay">
+                <i data-feather="x"></i>
+            </button>
+        </div>
+        <div class="device-types-content" id="device-types-content">
+            <!-- Dynamic content will be inserted here -->
+        </div>
+    </div>
 
     <!-- Scripts -->
     <script>
@@ -1773,6 +1931,152 @@
         // Global data
         const devicesData = {{ devices | tojson }};
         const scanTimestamp = '{{ scan_timestamp }}';
+        const deviceTypes = {{ device_types | tojson }};
+        
+        // Typewriter animation - run once on page load
+        (function() {
+            const hasAnimated = sessionStorage.getItem('heroAnimated');
+            if (!hasAnimated) {
+                // Mark as animated
+                sessionStorage.setItem('heroAnimated', 'true');
+            } else {
+                // Remove animation classes if already played
+                const title = document.getElementById('hero-title');
+                const subtitle = document.getElementById('hero-subtitle');
+                if (title) {
+                    title.classList.remove('typewriter');
+                    title.style.animation = 'none';
+                }
+                if (subtitle) {
+                    subtitle.classList.remove('typewriter-subtitle');
+                    subtitle.style.opacity = '1';
+                    subtitle.style.animation = 'none';
+                }
+            }
+        })();
+        
+        // Scroll to device table smoothly
+        function scrollToDeviceTable() {
+            const deviceTable = document.getElementById('device-table-view');
+            if (deviceTable) {
+                deviceTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+        
+        // Switch to services tab
+        function switchToServicesTab() {
+            // Find the services tab button
+            const servicesTabButton = document.querySelector('.tab[onclick*="services"]');
+            if (servicesTabButton) {
+                showTab('services', servicesTabButton);
+                // Scroll to services after a short delay to ensure tab is visible
+                setTimeout(() => {
+                    const servicesTab = document.getElementById('services-tab');
+                    if (servicesTab) {
+                        servicesTab.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 100);
+            }
+        }
+        
+        // Show device types overlay
+        function showDeviceTypesOverlay() {
+            const overlay = document.getElementById('device-types-overlay');
+            const backdrop = document.getElementById('device-types-backdrop');
+            const content = document.getElementById('device-types-content');
+            
+            // Generate device types content
+            const deviceTypeIcons = {
+                'router': { icon: '🔀', color: 'var(--device-router)' },
+                'switch': { icon: '🔁', color: 'var(--device-switch)' },
+                'server': { icon: '🖥️', color: 'var(--device-server)' },
+                'web_server': { icon: '🌐', color: 'var(--device-server)' },
+                'windows_server': { icon: '🪟', color: 'var(--device-windows-server)' },
+                'linux_server': { icon: '🐧', color: 'var(--device-linux-server)' },
+                'database': { icon: '🗄️', color: 'var(--device-database)' },
+                'workstation': { icon: '💻', color: 'var(--device-workstation)' },
+                'printer': { icon: '🖨️', color: 'var(--device-printer)' },
+                'iot': { icon: '📡', color: 'var(--device-iot)' },
+                'firewall': { icon: '🛡️', color: 'var(--device-firewall)' },
+                'unknown': { icon: '❓', color: 'var(--device-unknown)' }
+            };
+            
+            // Sort device types by count (descending)
+            const sortedTypes = Object.entries(deviceTypes).sort((a, b) => b[1] - a[1]);
+            
+            let html = '';
+            sortedTypes.forEach(([type, count]) => {
+                const typeConfig = deviceTypeIcons[type] || deviceTypeIcons['unknown'];
+                const displayName = type.replace(/_/g, ' ');
+                
+                html += `
+                    <div class="device-type-item">
+                        <div class="device-type-name">
+                            <div class="device-type-icon" style="background: ${typeConfig.color};">
+                                <span>${typeConfig.icon}</span>
+                            </div>
+                            <span>${displayName}</span>
+                        </div>
+                        <div class="device-type-count">${count}</div>
+                    </div>
+                `;
+            });
+            
+            content.innerHTML = html;
+            
+            // Show overlay
+            backdrop.classList.add('show');
+            overlay.classList.add('show');
+            
+            // Reinitialize feather icons
+            feather.replace();
+            
+            // Focus management for accessibility
+            overlay.focus();
+        }
+        
+        // Close device types overlay
+        function closeDeviceTypesOverlay() {
+            const overlay = document.getElementById('device-types-overlay');
+            const backdrop = document.getElementById('device-types-backdrop');
+            
+            backdrop.classList.remove('show');
+            overlay.classList.remove('show');
+            
+            // Return focus to the device types card
+            const deviceTypesCard = document.querySelector('.stat-card[onclick="showDeviceTypesOverlay()"]');
+            if (deviceTypesCard) {
+                deviceTypesCard.focus();
+            }
+        }
+        
+        // Keyboard event handlers
+        document.addEventListener('keydown', function(event) {
+            // Handle Escape key
+            if (event.key === 'Escape') {
+                // Close device types overlay if open
+                const deviceTypesOverlay = document.getElementById('device-types-overlay');
+                if (deviceTypesOverlay && deviceTypesOverlay.classList.contains('show')) {
+                    closeDeviceTypesOverlay();
+                    return;
+                }
+                
+                // Close device details modal if open
+                const deviceModal = document.getElementById('device-modal');
+                if (deviceModal && deviceModal.classList.contains('show')) {
+                    closeModal();
+                }
+            }
+            
+            // Handle Enter/Space on clickable stat cards
+            if (event.key === 'Enter' || event.key === ' ') {
+                const target = event.target;
+                if (target.classList.contains('stat-card') && target.classList.contains('clickable')) {
+                    event.preventDefault();
+                    target.click();
+                }
+            }
+        });
 
         // Tab switching
         function showTab(tabName, tabElement) {
