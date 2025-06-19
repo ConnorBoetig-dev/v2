@@ -317,8 +317,8 @@ class MACLookup:
         try:
             import requests
 
-            # Alternative: Wireshark's manuf database (smaller, curated)
-            url = "https://gitlab.com/wireshark/wireshark/-/raw/master/manuf"
+            # Alternative: Wireshark's manuf database from automated build server
+            url = "https://www.wireshark.org/download/automated/data/manuf"
             
             print("[INFO] Trying alternative source (Wireshark manuf database)...")
 

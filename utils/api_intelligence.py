@@ -85,7 +85,8 @@ class APIIntelligenceLayer:
         
         # Initialize databases
         self._init_cache_db()
-        self._download_vendor_db()
+        # Skip vendor DB download - MACLookup handles this
+        # self._download_vendor_db()
         self._download_iana_ports()
         
         # Load local databases
@@ -134,8 +135,8 @@ class APIIntelligenceLayer:
         
         logger.info("Downloading MAC vendor database...")
         try:
-            # Download from Wireshark's repository
-            url = "https://raw.githubusercontent.com/wireshark/wireshark/master/manuf"
+            # Download from Wireshark's automated build server
+            url = "https://www.wireshark.org/download/automated/data/manuf"
             response = requests.get(url, timeout=30)
             response.raise_for_status()
             
